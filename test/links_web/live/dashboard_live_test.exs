@@ -1,0 +1,62 @@
+defmodule LinksWeb.DashboardLiveTest do
+  use LinksWeb.ConnCase
+
+  import Phoenix.LiveViewTest
+  import Links.CollectionsFixtures
+
+  alias Links.Collections
+
+  describe "dashboard access" do
+    test "redirects anonymous users to login", %{conn: conn} do
+      assert {:error, {:redirect, %{to: "/users/log-in"}}} = live(conn, ~p"/")
+    end
+
+    test "renders the full-width dashboard for signed-in users", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      collection_fixture(scope, %{title: "Reading"})
+      bookmark_fixture(scope, %{title: "Inbox link", url: "https://example.com/inbox"})
+
+      {:ok, _lv, html} = live(conn, ~p"/")
+
+      assert html =~ "Paste a new link"
+      assert html =~ "Inbox"
+      assert html =~ "Projects"
+      assert html =~ "Reading"
+      assert html =~ "Inbox link"
+    end
+
+    test "creates new links in the inbox", %{conn: conn} do
+      %{conn: conn} = register_and_log_in_user(%{conn: conn})
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      html =
+        lv
+        |> form("#new-link-form", bookmark: %{url: "https://example.com/new"})
+        |> render_submit()
+
+      assert html =~ "https://example.com/new"
+    end
+
+    test "renders fetched page title after metadata is stored", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+
+      bookmark =
+        bookmark_fixture(scope, %{title: "https://example.com", url: "https://example.com"})
+
+      {:ok, _bookmark} =
+        Collections.update_bookmark_metadata(bookmark, %{
+          page_title: "Example Domain",
+          favicon_data: <<0, 1, 2>>,
+          favicon_content_type: "image/png",
+          favicon_byte_size: 3,
+          favicon_source_url: "https://example.com/favicon.ico",
+          metadata_fetched_at: DateTime.utc_now(:second)
+        })
+
+      {:ok, _lv, html} = live(conn, ~p"/")
+
+      assert html =~ "Example Domain"
+      assert html =~ ~s(/bookmarks/#{bookmark.id}/favicon)
+    end
+  end
+end
