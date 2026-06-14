@@ -188,43 +188,33 @@ defmodule Links.Collections do
 
   def get_bookmark(id), do: Repo.get(Bookmark, id)
 
+  def reorder_root_collections(%Scope{} = scope, ordered_ids) do
+    ordered_ids = Enum.map(ordered_ids, &to_integer/1)
+
+    root_ids =
+      Collection
+      |> where([c], c.owner_id == ^scope.user.id and is_nil(c.parent_id))
+      |> select([c], c.id)
+      |> Repo.all()
+      |> MapSet.new()
+
+    if Enum.all?(ordered_ids, &MapSet.member?(root_ids, &1)) do
+      Multi.new()
+      |> update_collection_positions(nil, ordered_ids)
+      |> Repo.transaction()
+      |> case do
+        {:ok, _changes} -> :ok
+        {:error, _name, reason, _changes} -> {:error, reason}
+      end
+    else
+      {:error, :unauthorized}
+    end
+  end
+
   def update_bookmark_metadata(%Bookmark{} = bookmark, attrs) do
     bookmark
     |> Bookmark.metadata_changeset(attrs)
     |> Repo.update()
-  end
-
-  def move_collection(%Scope{} = scope, collection_id, parent_id, ordered_ids) do
-    collection = get_collection!(collection_id)
-    parent_id = blank_to_nil(parent_id)
-
-    with :ok <- authorize_collection_move(scope, collection, parent_id),
-         :ok <- reject_cycle(collection.id, parent_id) do
-      Multi.new()
-      |> Multi.update(:collection, Collection.changeset(collection, %{parent_id: parent_id}))
-      |> update_collection_positions(parent_id, ordered_ids)
-      |> Repo.transaction()
-      |> case do
-        {:ok, %{collection: collection}} -> {:ok, collection}
-        {:error, _name, reason, _changes} -> {:error, reason}
-      end
-    end
-  end
-
-  def move_bookmark(%Scope{} = scope, bookmark_id, collection_id, ordered_ids) do
-    bookmark = get_bookmark!(bookmark_id)
-    collection_id = blank_to_nil(collection_id)
-
-    with :ok <- authorize_bookmark_move(scope, bookmark, collection_id) do
-      Multi.new()
-      |> Multi.update(:bookmark, Bookmark.changeset(bookmark, %{collection_id: collection_id}))
-      |> update_bookmark_positions(collection_id, ordered_ids)
-      |> Repo.transaction()
-      |> case do
-        {:ok, %{bookmark: bookmark}} -> {:ok, bookmark}
-        {:error, _name, reason, _changes} -> {:error, reason}
-      end
-    end
   end
 
   def create_public_share(%Scope{} = scope, %Collection{} = collection) do
@@ -488,48 +478,6 @@ defmodule Links.Collections do
     if can_edit_collection?(scope, collection_id), do: :ok, else: {:error, :unauthorized}
   end
 
-  defp authorize_collection_move(%Scope{} = scope, %Collection{} = collection, parent_id) do
-    local_mount? =
-      collection.owner_id == scope.user.id and not is_nil(collection.collaboration_id)
-
-    cond do
-      revoked_collaboration_mount?(collection) ->
-        {:error, :unauthorized}
-
-      local_mount? ->
-        authorize_parent(scope, parent_id)
-
-      can_edit_collection?(scope, collection.id) ->
-        authorize_parent(scope, parent_id)
-
-      true ->
-        {:error, :unauthorized}
-    end
-  end
-
-  defp authorize_bookmark_move(scope, bookmark, collection_id) do
-    with true <- can_edit_bookmark?(scope, bookmark),
-         :ok <- authorize_bookmark_parent(scope, collection_id) do
-      :ok
-    else
-      _ -> {:error, :unauthorized}
-    end
-  end
-
-  defp reject_cycle(_collection_id, nil), do: :ok
-
-  defp reject_cycle(collection_id, parent_id) when collection_id == parent_id do
-    {:error, :cycle}
-  end
-
-  defp reject_cycle(collection_id, parent_id) do
-    if parent_id in descendant_ids([collection_id]) do
-      {:error, :cycle}
-    else
-      :ok
-    end
-  end
-
   defp update_collection_positions(multi, parent_id, ordered_ids) do
     ordered_ids
     |> Enum.map(&to_integer/1)
@@ -544,34 +492,12 @@ defmodule Links.Collections do
     end)
   end
 
-  defp update_bookmark_positions(multi, collection_id, ordered_ids) do
-    ordered_ids
-    |> Enum.map(&to_integer/1)
-    |> Enum.with_index()
-    |> Enum.reduce(multi, fn {id, position}, multi ->
-      Multi.update_all(
-        multi,
-        {:bookmark_position, id},
-        bookmark_position_query(id, collection_id),
-        set: [position: position]
-      )
-    end)
-  end
-
   defp collection_position_query(id, nil) do
     from(c in Collection, where: c.id == ^id and is_nil(c.parent_id))
   end
 
   defp collection_position_query(id, parent_id) do
     from(c in Collection, where: c.id == ^id and c.parent_id == ^parent_id)
-  end
-
-  defp bookmark_position_query(id, nil) do
-    from(b in Bookmark, where: b.id == ^id and is_nil(b.collection_id))
-  end
-
-  defp bookmark_position_query(id, collection_id) do
-    from(b in Bookmark, where: b.id == ^id and b.collection_id == ^collection_id)
   end
 
   defp next_collection_position(parent_id, owner_id \\ nil)

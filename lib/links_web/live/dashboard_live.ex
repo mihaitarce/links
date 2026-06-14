@@ -27,7 +27,7 @@ defmodule LinksWeb.DashboardLive do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
       <div class="flex h-[calc(100vh-3rem)] w-full overflow-hidden bg-base-200 text-sm">
-        <aside class="flex w-[28rem] shrink-0 flex-col border-r border-base-300 bg-base-100">
+        <aside class="flex w-1/2 shrink-0 flex-col border-r border-base-300 bg-base-100">
           <div class="border-b border-base-300 p-3">
             <.form for={@new_bookmark_form} id="new-link-form" phx-submit="create_link">
               <div class="join w-full">
@@ -44,8 +44,8 @@ defmodule LinksWeb.DashboardLive do
             </.form>
           </div>
 
-          <div class="min-h-0 flex-1 overflow-auto">
-            <section class="border-b border-base-300 p-3">
+          <div class="flex min-h-0 flex-1 flex-col">
+            <section class="shrink-0 border-b border-base-300 p-3">
               <div class="mb-2 flex items-center justify-between">
                 <h2 class="text-xs font-semibold uppercase tracking-wide text-base-content/60">
                   Inbox
@@ -54,9 +54,6 @@ defmodule LinksWeb.DashboardLive do
               </div>
               <ul
                 id="bookmarks-zone-inbox"
-                phx-hook="SortableTree"
-                data-kind="bookmark"
-                data-parent-id=""
                 class="space-y-1"
               >
                 <li
@@ -82,7 +79,7 @@ defmodule LinksWeb.DashboardLive do
               </ul>
             </section>
 
-            <section class="p-3">
+            <section class="flex min-h-0 flex-1 flex-col p-3">
               <div class="mb-2 flex items-center justify-between">
                 <h2 class="text-xs font-semibold uppercase tracking-wide text-base-content/60">
                   Projects
@@ -91,10 +88,8 @@ defmodule LinksWeb.DashboardLive do
               </div>
               <ul
                 id="collections-zone-root"
-                phx-hook="SortableTree"
-                data-kind="collection"
-                data-parent-id=""
-                class="space-y-1"
+                phx-hook="RootCollectionSort"
+                class="menu menu-xs min-h-0 flex-1 overflow-auto rounded-box bg-base-200 w-full"
               >
                 <.tree_node
                   :for={node <- @dashboard.tree}
@@ -149,8 +144,50 @@ defmodule LinksWeb.DashboardLive do
         class={["shrink-0 rounded-sm object-contain", @class]}
       />
     <% else %>
-      <.icon name="hero-link" class={["shrink-0 text-base-content/40", @class]} />
+      <.file_icon class={@class} />
     <% end %>
+    """
+  end
+
+  attr :class, :string, default: "h-4 w-4"
+
+  def folder_icon(assigns) do
+    ~H"""
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke-width="1.5"
+      stroke="currentColor"
+      class={["shrink-0", @class]}
+    >
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"
+      />
+    </svg>
+    """
+  end
+
+  attr :class, :string, default: "h-4 w-4"
+
+  def file_icon(assigns) do
+    ~H"""
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke-width="1.5"
+      stroke="currentColor"
+      class={["shrink-0", @class]}
+    >
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+      />
+    </svg>
     """
   end
 
@@ -166,93 +203,76 @@ defmodule LinksWeb.DashboardLive do
       |> assign(:effective, assigns.node.effective_collection)
       |> assign(:expanded, not MapSet.member?(assigns.collapsed, assigns.node.collection.id))
       |> assign(:has_children, assigns.node.children != [] or assigns.node.bookmarks != [])
-      |> assign(:padding, 0.75 + assigns.depth * 0.9)
 
     ~H"""
     <li
       id={"collection-#{@collection.id}"}
       data-id={@collection.id}
-      class={["rounded", @node.revoked && "opacity-50"]}
+      class={[@node.revoked && "menu-disabled line-through opacity-50"]}
     >
-      <div
-        class={[
-          "group flex items-center gap-1 rounded px-2 py-1 hover:bg-base-200",
-          selected?(@selected, :collection, @collection.id) && "bg-primary/10 text-primary",
-          @node.revoked && "pointer-events-none line-through"
-        ]}
-        style={"padding-left: #{@padding}rem"}
-      >
-        <button
-          :if={@has_children}
-          type="button"
-          class="btn btn-ghost btn-xs h-5 min-h-5 w-5 px-0"
-          phx-click="toggle_collection"
-          phx-value-id={@collection.id}
-        >
-          {if @expanded, do: "▾", else: "▸"}
-        </button>
-        <span :if={!@has_children} class="w-5" />
-        <span class="cursor-grab text-base-content/40">⋮⋮</span>
-        <button
-          type="button"
-          class="min-w-0 flex-1 truncate text-left"
-          disabled={@node.revoked}
-          phx-click="select_collection"
-          phx-value-id={@collection.id}
-        >
-          {@node.title}
-        </button>
-        <span :if={@node.mount && !@node.revoked} class="badge badge-outline badge-xs">
-          {if @node.readonly, do: "read", else: "edit"}
-        </span>
-      </div>
-
-      <div :if={@expanded && !@node.revoked}>
-        <ul
-          id={"collections-zone-#{@effective.id}"}
-          phx-hook="SortableTree"
-          data-kind="collection"
-          data-parent-id={@effective.id}
-          class="space-y-1"
-        >
-          <.tree_node
-            :for={child <- @node.children}
-            node={child}
-            selected={@selected}
-            collapsed={@collapsed}
-            depth={@depth + 1}
-          />
-        </ul>
-        <ul
-          id={"bookmarks-zone-#{@effective.id}"}
-          phx-hook="SortableTree"
-          data-kind="bookmark"
-          data-parent-id={@effective.id}
-          class="space-y-1"
-        >
-          <li
-            :for={bookmark <- @node.bookmarks}
-            id={"bookmark-#{bookmark.id}"}
-            data-id={bookmark.id}
-            class="group flex cursor-grab items-center gap-2 rounded px-2 py-1 hover:bg-base-200"
-            style={"padding-left: #{@padding + 1.8}rem"}
+      <%= if @has_children && !@node.revoked do %>
+        <details open={@expanded}>
+          <summary
+            class={[
+              "gap-2",
+              selected?(@selected, :collection, @collection.id) && "menu-active"
+            ]}
+            phx-click="toggle_collection"
+            phx-value-id={@collection.id}
           >
-            <span class="text-base-content/40">⋮⋮</span>
-            <.bookmark_icon bookmark={bookmark} />
-            <button
-              type="button"
-              phx-click="select_bookmark"
-              phx-value-id={bookmark.id}
-              class={[
-                "truncate text-left",
-                selected?(@selected, :bookmark, bookmark.id) && "font-semibold text-primary"
-              ]}
+            <.folder_icon />
+            <span class="min-w-0 flex-1 truncate">{@node.title}</span>
+            <span :if={@node.mount} class="badge badge-outline badge-xs">
+              {if @node.readonly, do: "read", else: "edit"}
+            </span>
+          </summary>
+          <ul>
+            <.tree_node
+              :for={child <- @node.children}
+              node={child}
+              selected={@selected}
+              collapsed={@collapsed}
+              depth={@depth + 1}
+            />
+            <li
+              :for={bookmark <- @node.bookmarks}
+              id={"bookmark-#{bookmark.id}"}
+              data-id={bookmark.id}
             >
-              {bookmark_label(bookmark)}
-            </button>
-          </li>
-        </ul>
-      </div>
+              <a
+                phx-click="select_bookmark"
+                phx-value-id={bookmark.id}
+                class={[
+                  "gap-2",
+                  selected?(@selected, :bookmark, bookmark.id) && "menu-active"
+                ]}
+              >
+                <.bookmark_icon bookmark={bookmark} />
+                <span class="min-w-0 flex-1 truncate">
+                  {bookmark_label(bookmark)}
+                </span>
+              </a>
+            </li>
+          </ul>
+        </details>
+      <% else %>
+        <a
+          phx-click={if !@node.revoked, do: "select_collection"}
+          phx-value-id={if !@node.revoked, do: @collection.id}
+          class={[
+            "gap-2",
+            selected?(@selected, :collection, @collection.id) && "menu-active"
+          ]}
+        >
+          <.folder_icon />
+          <span class="min-w-0 flex-1 truncate">
+            {@node.title}
+          </span>
+          <span :if={@node.mount && !@node.revoked} class="badge badge-outline badge-xs">
+            {if @node.readonly, do: "read", else: "edit"}
+          </span>
+        </a>
+      <% end %>
     </li>
     """
   end
@@ -492,7 +512,7 @@ defmodule LinksWeb.DashboardLive do
         MapSet.put(collapsed, id)
       end
 
-    {:noreply, assign(socket, :collapsed, collapsed)}
+    {:noreply, socket |> assign(:collapsed, collapsed) |> select_collection(id)}
   end
 
   def handle_event("validate_collection", %{"collection" => params}, socket) do
@@ -570,23 +590,13 @@ defmodule LinksWeb.DashboardLive do
     end
   end
 
-  def handle_event("move_collection", params, socket) do
-    with %{"id" => id, "parent_id" => parent_id, "ordered_ids" => ordered_ids} <- params,
-         {:ok, _collection} <-
-           Collections.move_collection(socket.assigns.current_scope, id, parent_id, ordered_ids) do
-      {:noreply, refresh_dashboard(socket)}
-    else
-      _ -> {:noreply, put_flash(socket, :error, "Could not move collection")}
-    end
-  end
+  def handle_event("reorder_root_collections", %{"ordered_ids" => ordered_ids}, socket) do
+    case Collections.reorder_root_collections(socket.assigns.current_scope, ordered_ids) do
+      :ok ->
+        {:noreply, refresh_dashboard(socket)}
 
-  def handle_event("move_bookmark", params, socket) do
-    with %{"id" => id, "parent_id" => parent_id, "ordered_ids" => ordered_ids} <- params,
-         {:ok, _bookmark} <-
-           Collections.move_bookmark(socket.assigns.current_scope, id, parent_id, ordered_ids) do
-      {:noreply, refresh_dashboard(socket)}
-    else
-      _ -> {:noreply, put_flash(socket, :error, "Could not move bookmark")}
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, "Could not reorder collections")}
     end
   end
 

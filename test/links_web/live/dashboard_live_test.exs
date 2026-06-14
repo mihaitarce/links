@@ -37,6 +37,16 @@ defmodule LinksWeb.DashboardLiveTest do
       assert html =~ "https://example.com/new"
     end
 
+    test "root collection list is sortable", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      collection_fixture(scope, %{title: "Empty"})
+
+      {:ok, _lv, html} = live(conn, ~p"/")
+
+      assert html =~ ~s(id="collections-zone-root")
+      assert html =~ ~s(phx-hook="RootCollectionSort")
+    end
+
     test "renders fetched page title after metadata is stored", %{conn: conn} do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
 

@@ -30,15 +30,17 @@ defmodule Links.CollectionsTest do
       assert bookmark_id == bookmark.id
     end
 
-    test "moves bookmarks from inbox to collection through server-side reorder API" do
+    test "reorders only root-level collections for the current user" do
       scope = user_scope_fixture()
-      collection = collection_fixture(scope)
-      bookmark = bookmark_fixture(scope)
+      first = collection_fixture(scope, %{title: "First"})
+      second = collection_fixture(scope, %{title: "Second"})
+      child = collection_fixture(scope, %{title: "Child", parent_id: first.id})
 
-      assert {:ok, moved} =
-               Collections.move_bookmark(scope, bookmark.id, collection.id, [bookmark.id])
+      assert :ok = Collections.reorder_root_collections(scope, [second.id, first.id])
 
-      assert moved.collection_id == collection.id
+      assert Collections.get_collection!(second.id).position == 0
+      assert Collections.get_collection!(first.id).position == 1
+      assert {:error, :unauthorized} = Collections.reorder_root_collections(scope, [child.id])
     end
   end
 
