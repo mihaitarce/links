@@ -294,6 +294,10 @@ defmodule LinksWeb.DashboardLive do
     {:noreply, socket}
   end
 
+  def handle_info({:collection_order_changed, _user_id}, socket) do
+    {:noreply, refresh_dashboard(socket)}
+  end
+
   attr :selected, :map, required: true
   attr :context, :map, required: true
   attr :collection_form, :any, required: true

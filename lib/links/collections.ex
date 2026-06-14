@@ -203,8 +203,17 @@ defmodule Links.Collections do
       |> update_collection_positions(nil, ordered_ids)
       |> Repo.transaction()
       |> case do
-        {:ok, _changes} -> :ok
-        {:error, _name, reason, _changes} -> {:error, reason}
+        {:ok, _changes} ->
+          Phoenix.PubSub.broadcast(
+            Links.PubSub,
+            "bookmarks",
+            {:collection_order_changed, scope.user.id}
+          )
+
+          :ok
+
+        {:error, _name, reason, _changes} ->
+          {:error, reason}
       end
     else
       {:error, :unauthorized}

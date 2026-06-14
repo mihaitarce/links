@@ -36,7 +36,11 @@ defmodule Links.CollectionsTest do
       second = collection_fixture(scope, %{title: "Second"})
       child = collection_fixture(scope, %{title: "Child", parent_id: first.id})
 
+      Phoenix.PubSub.subscribe(Links.PubSub, "bookmarks")
+
       assert :ok = Collections.reorder_root_collections(scope, [second.id, first.id])
+      assert_receive {:collection_order_changed, user_id}
+      assert user_id == scope.user.id
 
       assert Collections.get_collection!(second.id).position == 0
       assert Collections.get_collection!(first.id).position == 1
