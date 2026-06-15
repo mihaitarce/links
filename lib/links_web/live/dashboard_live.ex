@@ -27,7 +27,7 @@ defmodule LinksWeb.DashboardLive do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
       <div class="flex h-[calc(100vh-3rem)] w-full overflow-hidden bg-base-200 text-sm">
-        <aside class="flex w-1/2 shrink-0 flex-col border-r border-base-300 bg-base-100">
+        <aside class="flex w-1/2 min-w-0 shrink-0 flex-col border-r border-base-300 bg-base-100">
           <div class="border-b border-base-300 p-3">
             <.form for={@new_bookmark_form} id="new-link-form" phx-submit="create_link">
               <div class="join w-full">
@@ -77,8 +77,8 @@ defmodule LinksWeb.DashboardLive do
               </ul>
             </section>
 
-            <section class="flex min-h-0 flex-1 flex-col p-3">
-              <div class="mb-2 flex items-center justify-between">
+            <section class="flex min-h-0 flex-1 flex-col overflow-hidden p-3">
+              <div class="mb-2 flex shrink-0 items-center justify-between">
                 <h2 class="text-xs font-semibold uppercase tracking-wide text-base-content/60">
                   Projects
                 </h2>
@@ -86,7 +86,15 @@ defmodule LinksWeb.DashboardLive do
               </div>
               <ul
                 id="collections-zone-root"
-                class="menu min-h-0 flex-1 overflow-auto rounded-box bg-base-200 w-full"
+                class={[
+                  "menu menu-vertical min-h-0 w-full min-w-0 max-w-full flex-1 flex-nowrap",
+                  "overflow-x-hidden overflow-y-auto rounded-box bg-base-200",
+                  "[&_a]:w-full [&_a]:min-w-0 [&_li]:w-full [&_li]:min-w-0 [&_li]:flex-nowrap",
+                  "[&_li_ul]:w-full [&_li_ul]:min-w-0 [&_li_ul]:whitespace-normal",
+                  "[&_summary]:w-full [&_summary]:min-w-0",
+                  "[&_summary]:[grid-template-columns:auto_minmax(0,1fr)_auto]",
+                  "[&_a]:[grid-template-columns:auto_minmax(0,1fr)_auto]"
+                ]}
               >
                 <.tree_node
                   :for={node <- @dashboard.tree}
@@ -203,7 +211,10 @@ defmodule LinksWeb.DashboardLive do
     ~H"""
     <li
       id={"collection-#{@collection.id}"}
-      class={[@node.revoked && "menu-disabled line-through opacity-50"]}
+      class={[
+        "w-full min-w-0",
+        @node.revoked && "menu-disabled line-through opacity-50"
+      ]}
     >
       <%= if @node.revoked do %>
         <a class="gap-2">
@@ -214,7 +225,7 @@ defmodule LinksWeb.DashboardLive do
         <details open={@expanded}>
           <summary
             class={[
-              "gap-2",
+              "w-full min-w-0 gap-2",
               selected?(@selected, :collection, @collection.id) && "menu-active"
             ]}
             phx-click="toggle_collection"
@@ -226,7 +237,7 @@ defmodule LinksWeb.DashboardLive do
               {if @node.readonly, do: "read", else: "edit"}
             </span>
           </summary>
-          <ul id={"nested-zone-#{@effective.id}"}>
+          <ul id={"nested-zone-#{@effective.id}"} class="w-full min-w-0 whitespace-normal">
             <.tree_node
               :for={child <- @node.children}
               node={child}
@@ -242,7 +253,7 @@ defmodule LinksWeb.DashboardLive do
                 phx-click="select_bookmark"
                 phx-value-id={bookmark.id}
                 class={[
-                  "gap-2",
+                  "w-full min-w-0 gap-2",
                   selected?(@selected, :bookmark, bookmark.id) && "menu-active"
                 ]}
               >
