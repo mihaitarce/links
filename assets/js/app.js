@@ -23,39 +23,13 @@ import "phoenix_html"
 import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/links"
-import Sortable from "sortablejs"
 import topbar from "../vendor/topbar"
-
-const RootCollectionSort = {
-  mounted() {
-    this.sortable = new Sortable(this.el, {
-      animation: 120,
-      fallbackOnBody: true,
-      filter: "button, input, textarea, select",
-      preventOnFilter: false,
-      swapThreshold: 0.65,
-      onEnd: (event) => {
-        const orderedIds = Array.from(event.to.children)
-          .filter((child) => child.id && child.id.startsWith("collection-"))
-          .map((child) => child.dataset.id)
-          .filter(Boolean)
-
-        this.pushEvent("reorder_root_collections", {
-          ordered_ids: orderedIds,
-        })
-      },
-    })
-  },
-  destroyed() {
-    if (this.sortable) this.sortable.destroy()
-  },
-}
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, RootCollectionSort},
+  hooks: {...colocatedHooks},
 })
 
 // Show progress bar on live navigation and form submits
@@ -106,4 +80,3 @@ if (process.env.NODE_ENV === "development") {
     window.liveReloader = reloader
   })
 }
-

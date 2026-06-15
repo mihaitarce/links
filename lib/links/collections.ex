@@ -5,7 +5,6 @@ defmodule Links.Collections do
 
   import Ecto.Query, warn: false
 
-  alias Ecto.Multi
   alias Links.Accounts
   alias Links.Accounts.Scope
   alias Links.Bookmarks.Bookmark
@@ -187,38 +186,6 @@ defmodule Links.Collections do
   def get_bookmark!(id), do: Repo.get!(Bookmark, id)
 
   def get_bookmark(id), do: Repo.get(Bookmark, id)
-
-  def reorder_root_collections(%Scope{} = scope, ordered_ids) do
-    ordered_ids = Enum.map(ordered_ids, &to_integer/1)
-
-    root_ids =
-      Collection
-      |> where([c], c.owner_id == ^scope.user.id and is_nil(c.parent_id))
-      |> select([c], c.id)
-      |> Repo.all()
-      |> MapSet.new()
-
-    if Enum.all?(ordered_ids, &MapSet.member?(root_ids, &1)) do
-      Multi.new()
-      |> update_collection_positions(nil, ordered_ids)
-      |> Repo.transaction()
-      |> case do
-        {:ok, _changes} ->
-          Phoenix.PubSub.broadcast(
-            Links.PubSub,
-            "bookmarks",
-            {:collection_order_changed, scope.user.id}
-          )
-
-          :ok
-
-        {:error, _name, reason, _changes} ->
-          {:error, reason}
-      end
-    else
-      {:error, :unauthorized}
-    end
-  end
 
   def update_bookmark_metadata(%Bookmark{} = bookmark, attrs) do
     bookmark
@@ -485,28 +452,6 @@ defmodule Links.Collections do
 
   defp authorize_bookmark_parent(scope, collection_id) do
     if can_edit_collection?(scope, collection_id), do: :ok, else: {:error, :unauthorized}
-  end
-
-  defp update_collection_positions(multi, parent_id, ordered_ids) do
-    ordered_ids
-    |> Enum.map(&to_integer/1)
-    |> Enum.with_index()
-    |> Enum.reduce(multi, fn {id, position}, multi ->
-      Multi.update_all(
-        multi,
-        {:collection_position, id},
-        collection_position_query(id, parent_id),
-        set: [position: position]
-      )
-    end)
-  end
-
-  defp collection_position_query(id, nil) do
-    from(c in Collection, where: c.id == ^id and is_nil(c.parent_id))
-  end
-
-  defp collection_position_query(id, parent_id) do
-    from(c in Collection, where: c.id == ^id and c.parent_id == ^parent_id)
   end
 
   defp next_collection_position(parent_id, owner_id \\ nil)

@@ -59,10 +59,8 @@ defmodule LinksWeb.DashboardLive do
                 <li
                   :for={bookmark <- @dashboard.inbox}
                   id={"bookmark-#{bookmark.id}"}
-                  data-id={bookmark.id}
-                  class="group flex cursor-grab items-center gap-2 rounded px-2 py-1 hover:bg-base-200"
+                  class="group flex items-center gap-2 rounded px-2 py-1 hover:bg-base-200"
                 >
-                  <span class="text-base-content/40">⋮⋮</span>
                   <.bookmark_icon bookmark={bookmark} />
                   <button
                     type="button"
@@ -88,8 +86,7 @@ defmodule LinksWeb.DashboardLive do
               </div>
               <ul
                 id="collections-zone-root"
-                phx-hook="RootCollectionSort"
-                class="menu menu-xs min-h-0 flex-1 overflow-auto rounded-box bg-base-200 w-full"
+                class="menu min-h-0 flex-1 overflow-auto rounded-box bg-base-200 w-full"
               >
                 <.tree_node
                   :for={node <- @dashboard.tree}
@@ -202,15 +199,18 @@ defmodule LinksWeb.DashboardLive do
       |> assign(:collection, assigns.node.collection)
       |> assign(:effective, assigns.node.effective_collection)
       |> assign(:expanded, not MapSet.member?(assigns.collapsed, assigns.node.collection.id))
-      |> assign(:has_children, assigns.node.children != [] or assigns.node.bookmarks != [])
 
     ~H"""
     <li
       id={"collection-#{@collection.id}"}
-      data-id={@collection.id}
       class={[@node.revoked && "menu-disabled line-through opacity-50"]}
     >
-      <%= if @has_children && !@node.revoked do %>
+      <%= if @node.revoked do %>
+        <a class="gap-2">
+          <.folder_icon />
+          <span class="min-w-0 flex-1 truncate">{@node.title}</span>
+        </a>
+      <% else %>
         <details open={@expanded}>
           <summary
             class={[
@@ -226,7 +226,7 @@ defmodule LinksWeb.DashboardLive do
               {if @node.readonly, do: "read", else: "edit"}
             </span>
           </summary>
-          <ul>
+          <ul id={"nested-zone-#{@effective.id}"}>
             <.tree_node
               :for={child <- @node.children}
               node={child}
@@ -237,7 +237,6 @@ defmodule LinksWeb.DashboardLive do
             <li
               :for={bookmark <- @node.bookmarks}
               id={"bookmark-#{bookmark.id}"}
-              data-id={bookmark.id}
             >
               <a
                 phx-click="select_bookmark"
@@ -255,23 +254,6 @@ defmodule LinksWeb.DashboardLive do
             </li>
           </ul>
         </details>
-      <% else %>
-        <a
-          phx-click={if !@node.revoked, do: "select_collection"}
-          phx-value-id={if !@node.revoked, do: @collection.id}
-          class={[
-            "gap-2",
-            selected?(@selected, :collection, @collection.id) && "menu-active"
-          ]}
-        >
-          <.folder_icon />
-          <span class="min-w-0 flex-1 truncate">
-            {@node.title}
-          </span>
-          <span :if={@node.mount && !@node.revoked} class="badge badge-outline badge-xs">
-            {if @node.readonly, do: "read", else: "edit"}
-          </span>
-        </a>
       <% end %>
     </li>
     """
@@ -292,10 +274,6 @@ defmodule LinksWeb.DashboardLive do
       end
 
     {:noreply, socket}
-  end
-
-  def handle_info({:collection_order_changed, _user_id}, socket) do
-    {:noreply, refresh_dashboard(socket)}
   end
 
   attr :selected, :map, required: true
@@ -591,16 +569,6 @@ defmodule LinksWeb.DashboardLive do
 
       {:error, _reason} ->
         {:noreply, put_flash(socket, :error, "Could not delete bookmark")}
-    end
-  end
-
-  def handle_event("reorder_root_collections", %{"ordered_ids" => ordered_ids}, socket) do
-    case Collections.reorder_root_collections(socket.assigns.current_scope, ordered_ids) do
-      :ok ->
-        {:noreply, refresh_dashboard(socket)}
-
-      {:error, _reason} ->
-        {:noreply, put_flash(socket, :error, "Could not reorder collections")}
     end
   end
 
