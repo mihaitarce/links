@@ -386,7 +386,7 @@ defmodule LinksWeb.DashboardLive do
         </.form>
       </div>
 
-      <div :if={!@readonly} class="grid gap-4 lg:grid-cols-2">
+      <div :if={!@readonly} class="space-y-4">
         <div class="rounded-box border border-base-300 bg-base-100 p-4">
           <h2 class="mb-3 font-semibold">Add Sub-Collection</h2>
           <.form
