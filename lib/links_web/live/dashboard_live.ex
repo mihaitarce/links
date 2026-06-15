@@ -52,27 +52,25 @@ defmodule LinksWeb.DashboardLive do
                 </h2>
                 <span class="badge badge-ghost badge-sm">{length(@dashboard.inbox)}</span>
               </div>
-              <ul
-                id="bookmarks-zone-inbox"
-                class="space-y-1"
-              >
+              <ul id="bookmarks-zone-inbox" class={sidebar_menu_class()}>
                 <li
                   :for={bookmark <- @dashboard.inbox}
                   id={"bookmark-#{bookmark.id}"}
-                  class="group flex items-center gap-2 rounded px-2 py-1 hover:bg-base-200"
+                  class="w-full min-w-0"
                 >
-                  <.bookmark_icon bookmark={bookmark} />
-                  <button
-                    type="button"
+                  <a
                     phx-click="select_bookmark"
                     phx-value-id={bookmark.id}
                     class={[
-                      "truncate text-left",
-                      selected?(@selected, :bookmark, bookmark.id) && "font-semibold text-primary"
+                      "w-full min-w-0 gap-2",
+                      selected?(@selected, :bookmark, bookmark.id) && "menu-active"
                     ]}
                   >
-                    {bookmark_label(bookmark)}
-                  </button>
+                    <.bookmark_icon bookmark={bookmark} />
+                    <span class="min-w-0 flex-1 truncate">
+                      {bookmark_label(bookmark)}
+                    </span>
+                  </a>
                 </li>
               </ul>
             </section>
@@ -86,15 +84,14 @@ defmodule LinksWeb.DashboardLive do
               </div>
               <ul
                 id="collections-zone-root"
-                class={[
-                  "menu menu-vertical min-h-0 w-full min-w-0 max-w-full flex-1 flex-nowrap",
-                  "overflow-x-hidden overflow-y-auto rounded-box bg-base-200",
-                  "[&_a]:w-full [&_a]:min-w-0 [&_li]:w-full [&_li]:min-w-0 [&_li]:flex-nowrap",
-                  "[&_li_ul]:w-full [&_li_ul]:min-w-0 [&_li_ul]:whitespace-normal",
-                  "[&_summary]:w-full [&_summary]:min-w-0",
-                  "[&_summary]:[grid-template-columns:auto_minmax(0,1fr)_auto]",
-                  "[&_a]:[grid-template-columns:auto_minmax(0,1fr)_auto]"
-                ]}
+                class={
+                  sidebar_menu_class([
+                    "min-h-0 flex-1 overflow-x-hidden overflow-y-auto",
+                    "[&_li_ul]:w-full [&_li_ul]:min-w-0 [&_li_ul]:whitespace-normal",
+                    "[&_summary]:w-full [&_summary]:min-w-0",
+                    "[&_summary]:[grid-template-columns:auto_minmax(0,1fr)_auto]"
+                  ])
+                }
               >
                 <.tree_node
                   :for={node <- @dashboard.tree}
@@ -687,4 +684,13 @@ defmodule LinksWeb.DashboardLive do
     do: title
 
   def bookmark_label(%Bookmark{title: title}), do: title
+
+  defp sidebar_menu_class(extra \\ []) do
+    [
+      "menu menu-vertical w-full min-w-0 max-w-full flex-nowrap rounded-box bg-base-200",
+      "[&_a]:w-full [&_a]:min-w-0 [&_li]:w-full [&_li]:min-w-0 [&_li]:flex-nowrap",
+      "[&_a]:[grid-template-columns:auto_minmax(0,1fr)_auto]"
+      | extra
+    ]
+  end
 end
