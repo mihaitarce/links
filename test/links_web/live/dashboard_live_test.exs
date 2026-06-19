@@ -162,7 +162,7 @@ defmodule LinksWeb.DashboardLiveTest do
       assert html =~ "Select a collection or bookmark"
     end
 
-    test "shows collaboration badges only on shared root collections", %{conn: conn} do
+    test "shows collaboration icons only on shared root collections", %{conn: conn} do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()
       parent = collection_fixture(owner_scope, %{title: "Shared Parent"})
@@ -183,8 +183,8 @@ defmodule LinksWeb.DashboardLiveTest do
 
       assert html =~ "Shared Parent"
       assert html =~ "Child Folder"
-      assert Enum.count(:binary.matches(html, "badge badge-outline badge-xs")) == 1
-      assert html =~ "read"
+      assert has_element?(lv, "#collection-#{mount.id} summary [aria-label='Read-only collaboration']")
+      assert Enum.count(:binary.matches(html, "Read-only collaboration")) == 1
     end
 
     test "shows a new sub-collection in the tree after creation", %{conn: conn} do
