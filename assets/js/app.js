@@ -32,6 +32,8 @@ const bookmarkSortContainers = (root) => [
 ]
 
 const targetCollectionId = (el) => {
+  if (!el) return null
+
   const collectionId = el.dataset.collectionId
 
   if (collectionId === "inbox" || collectionId == null) {
@@ -40,6 +42,20 @@ const targetCollectionId = (el) => {
 
   return collectionId
 }
+
+const sortContainerForSummary = (summary) => {
+  if (!summary) return null
+
+  return summary.closest("details")?.querySelector(":scope > [data-bookmark-sortable]") ?? null
+}
+
+const isWritableSortContainer = (container) =>
+  container != null && container.dataset.readonly !== "true"
+
+const isEmptyBookmarkContainer = (container) =>
+  container != null &&
+  container.dataset.collectionId !== "inbox" &&
+  container.dataset.emptyBookmarks === "true"
 
 const DROP_HIGHLIGHT_CLASS = "bookmark-drop-highlight"
 const AUTO_EXPAND_DELAY_MS = 2000
@@ -110,30 +126,33 @@ const CollectionBookmarkSort = {
 
     return details?.open ?? false
   },
-  resolveDropHighlight(summary) {
-    if (
-      summary &&
-      this.isExpandedCollection(summary) &&
-      summary !== this.sourceSummary
-    ) {
-      return summary
+  summaryFromPointerTarget(target) {
+    if (!target) return null
+
+    return target.closest("li[id^='collection-'] > details > summary")
+  },
+  dropContainerFromPointerTarget(target) {
+    if (!target) return null
+
+    const summaryContainer = sortContainerForSummary(this.summaryFromPointerTarget(target))
+
+    if (isWritableSortContainer(summaryContainer)) {
+      return summaryContainer
     }
 
-    return this.sourceSummary
+    const sortContainer = target.closest("[data-bookmark-sortable]")
+
+    if (isWritableSortContainer(sortContainer)) {
+      return sortContainer
+    }
+
+    return null
   },
   updateDropHighlightFromTarget(target) {
-    const container = target.closest("[data-bookmark-sortable]")
-
-    if (container) {
-      const summary = this.summaryForSortContainer(container)
-      this.setDropHighlight(this.resolveDropHighlight(summary))
-      return
-    }
-
-    const summary = target.closest("li[id^='collection-'] > details > summary")
+    const summary = this.summaryFromPointerTarget(target)
 
     if (summary) {
-      this.setDropHighlight(this.resolveDropHighlight(summary))
+      this.setDropHighlight(summary)
 
       if (!this.isExpandedCollection(summary)) {
         this.scheduleExpand(summary)
@@ -142,7 +161,27 @@ const CollectionBookmarkSort = {
       return
     }
 
+    const container = target.closest("[data-bookmark-sortable]")
+
+    if (container) {
+      this.setDropHighlight(this.summaryForSortContainer(container) || this.sourceSummary)
+      return
+    }
+
     this.setDropHighlight(this.sourceSummary)
+  },
+  shouldRejectMoveInContainer(event, pointerTarget) {
+    const dropContainer = this.dropContainerFromPointerTarget(pointerTarget)
+
+    if (dropContainer != null && event.to !== dropContainer) {
+      return true
+    }
+
+    if (isEmptyBookmarkContainer(event.to) && !this.summaryFromPointerTarget(pointerTarget)) {
+      return true
+    }
+
+    return false
   },
   scheduleExpand(summary) {
     const details = summary.closest("details")
@@ -187,6 +226,7 @@ const CollectionBookmarkSort = {
 
     bookmarkSortContainers(details).forEach((el) => {
       if (el.dataset.readonly === "true") return
+      if (isEmptyBookmarkContainer(el)) return
       if (this.sortables.some((sortable) => sortable.el === el)) return
 
       this.sortables.push(this.createSortable(el))
@@ -200,6 +240,53 @@ const CollectionBookmarkSort = {
     if (!container || container.dataset.collectionId === "inbox") return null
 
     return container.closest("details")?.querySelector("summary") ?? null
+  },
+  elementUnderPointer(event) {
+    const originalEvent = event.originalEvent ?? event
+    const clientX = originalEvent.clientX
+    const clientY = originalEvent.clientY
+
+    if (clientX == null || clientY == null) return null
+
+    const draggedItem = event.item
+
+    return (
+      document
+        .elementsFromPoint(clientX, clientY)
+        .find(
+          (el) =>
+            el !== draggedItem &&
+            !el.classList.contains("sortable-ghost") &&
+            !el.classList.contains("sortable-drag") &&
+            !el.classList.contains("sortable-fallback")
+        ) ?? null
+    )
+  },
+  resolveDropContainer(event) {
+    const pointerTarget = this.elementUnderPointer(event)
+
+    if (pointerTarget) {
+      const dropContainer = this.dropContainerFromPointerTarget(pointerTarget)
+
+      if (dropContainer) {
+        return dropContainer
+      }
+    }
+
+    return isWritableSortContainer(event.to) ? event.to : event.from
+  },
+  orderedBookmarkIds(container, movedItem) {
+    const movedId = movedItem.dataset.id
+    const existingIds = Array.from(container.children)
+      .filter((child) => child.id.startsWith("bookmark-"))
+      .map((child) => child.dataset.id)
+      .filter(Boolean)
+
+    if (existingIds.includes(movedId)) {
+      return existingIds
+    }
+
+    return [...existingIds, movedId]
   },
   bindDragOver() {
     if (this.onDragOver) return
@@ -231,7 +318,7 @@ const CollectionBookmarkSort = {
       animation: 150,
       handle: ".bookmark-drag-handle",
       draggable: "li[id^='bookmark-']",
-      filter: "summary, button, input, textarea, select, .collection-empty-drop",
+      filter: "summary, button, input, textarea, select",
       preventOnFilter: false,
       fallbackOnBody: true,
       swapThreshold: 0.65,
@@ -242,28 +329,29 @@ const CollectionBookmarkSort = {
         hook.setDropHighlight(hook.sourceSummary)
       },
       onMove(event) {
-        const summary = hook.summaryForSortContainer(event.to)
-        hook.setDropHighlight(hook.resolveDropHighlight(summary))
-        return true
+        const pointerTarget = hook.elementUnderPointer(event)
+
+        hook.updateDropHighlightFromTarget(pointerTarget || event.related)
+
+        return !hook.shouldRejectMoveInContainer(event, pointerTarget)
       },
       onEnd(event) {
         hook.unbindDragOver()
+
+        const targetContainer = hook.resolveDropContainer(event)
+        const sourceContainer = event.from
+
         hook.clearDropHighlight()
         hook.clearExpandTimer()
         hook.sourceSummary = null
         hook.syncAutoExpandedCollections()
 
-        if (event.from === event.to && event.oldIndex === event.newIndex) return
-
-        const orderedIds = Array.from(event.to.children)
-          .filter((child) => child.id.startsWith("bookmark-"))
-          .map((child) => child.dataset.id)
-          .filter(Boolean)
+        if (targetContainer === sourceContainer && event.oldIndex === event.newIndex) return
 
         hook.pushEvent("move_bookmark", {
           id: event.item.dataset.id,
-          collection_id: targetCollectionId(event.to),
-          ordered_ids: orderedIds,
+          collection_id: targetCollectionId(targetContainer),
+          ordered_ids: hook.orderedBookmarkIds(targetContainer, event.item),
         })
       },
     })
@@ -273,6 +361,7 @@ const CollectionBookmarkSort = {
 
     bookmarkSortContainers(this.el).forEach((el) => {
       if (el.dataset.readonly === "true") return
+      if (isEmptyBookmarkContainer(el)) return
 
       this.sortables.push(this.createSortable(el))
     })

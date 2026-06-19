@@ -269,7 +269,9 @@ defmodule LinksWeb.DashboardLive do
             id={"nested-zone-#{@effective.id}"}
             data-bookmark-sortable
             data-collection-id={@effective.id}
+            data-empty-bookmarks={to_string(@node.bookmarks == [])}
             data-readonly={to_string(@node.readonly || false)}
+            class={@node.bookmarks == [] && "collection-bookmark-drop-hidden"}
           >
             <.tree_node
               :for={child <- @node.children}
@@ -288,15 +290,6 @@ defmodule LinksWeb.DashboardLive do
                 selected={selected?(@selected, :bookmark, bookmark.id)}
                 show_drag_handle={!@node.readonly}
               />
-            </li>
-            <li
-              :if={!@node.readonly}
-              id={"collection-empty-#{@effective.id}"}
-              class="collection-empty-drop"
-            >
-              <span class="flex min-w-0 w-full items-center justify-center">
-                Empty
-              </span>
             </li>
           </ul>
         </details>

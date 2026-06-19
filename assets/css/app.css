@@ -34,19 +34,11 @@ summary.bookmark-drop-highlight {
   border-radius: var(--radius-field);
 }
 
-.collection-empty-drop {
+.collection-bookmark-drop-hidden:empty {
   display: none;
 }
 
-.collection-empty-drop:only-child {
-  display: list-item;
-}
-
-.collection-empty-drop > span {
-  border: 1px dashed color-mix(in oklch, var(--color-base-content) 20%, transparent);
-  border-radius: var(--radius-field);
-  font-size: 0.75rem;
-  color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
-  user-select: none;
-  pointer-events: none;
+.collection-bookmark-drop-hidden:not(:has(> li[id^="bookmark-"])) {
+  min-height: 0;
+  padding: 0;
 }

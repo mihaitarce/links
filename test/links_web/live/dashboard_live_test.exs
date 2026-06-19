@@ -115,23 +115,6 @@ defmodule LinksWeb.DashboardLiveTest do
       refute html =~ ~s(<details open)
     end
 
-    test "shows empty drop area in expanded collections without links", %{conn: conn} do
-      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
-      parent = collection_fixture(scope, %{title: "Empty Folder"})
-
-      {:ok, lv, _html} = live(conn, ~p"/")
-
-      refute render(lv) =~ ~s(id="collection-empty-")
-
-      html =
-        lv
-        |> element("#collection-#{parent.id} > details > summary")
-        |> render_click()
-
-      assert html =~ "Empty"
-      assert has_element?(lv, "#collection-empty-#{parent.id}")
-    end
-
     test "collapsing a collection clears the detail panel", %{conn: conn} do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
       parent = collection_fixture(scope, %{title: "Parent"})
