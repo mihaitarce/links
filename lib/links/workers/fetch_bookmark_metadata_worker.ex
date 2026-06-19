@@ -46,6 +46,8 @@ defmodule Links.Workers.FetchBookmarkMetadataWorker do
         {:bookmark_metadata_updated, bookmark.id}
       )
 
+      Collections.broadcast_collection_bookmarks_changed(bookmark.collection_id)
+
       :ok
     else
       {:cancel, reason} -> {:cancel, reason}

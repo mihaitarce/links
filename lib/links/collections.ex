@@ -59,6 +59,18 @@ defmodule Links.Collections do
     |> Repo.all()
   end
 
+  def collection_bookmarks_topic(collection_id) do
+    "collection_bookmarks:#{collection_id}"
+  end
+
+  def broadcast_collection_bookmarks_changed(collection_id) when not is_nil(collection_id) do
+    Phoenix.PubSub.broadcast(
+      Links.PubSub,
+      collection_bookmarks_topic(collection_id),
+      {:collection_bookmarks_changed, collection_id}
+    )
+  end
+
   def get_collection!(id), do: Repo.get!(Collection, id)
 
   def get_visible_collection(%Scope{} = scope, id) do
@@ -128,7 +140,12 @@ defmodule Links.Collections do
 
   def delete_collection(%Scope{} = scope, %Collection{} = collection) do
     if can_edit_collection?(scope, collection.id) do
-      Repo.delete(collection)
+      collection_id = collection.id
+
+      with {:ok, collection} <- Repo.delete(collection) do
+        broadcast_collection_bookmarks_changed(collection_id)
+        {:ok, collection}
+      end
     else
       {:error, :unauthorized}
     end
@@ -163,6 +180,9 @@ defmodule Links.Collections do
       |> Bookmark.changeset(attrs)
       |> Repo.insert()
       |> enqueue_metadata_fetch()
+      |> tap(fn {:ok, bookmark} ->
+        broadcast_collection_bookmarks_changed(bookmark.collection_id)
+      end)
     end
   end
 
@@ -171,6 +191,9 @@ defmodule Links.Collections do
       bookmark
       |> Bookmark.changeset(normalize_attrs(attrs))
       |> Repo.update()
+      |> tap(fn {:ok, bookmark} ->
+        broadcast_collection_bookmarks_changed(bookmark.collection_id)
+      end)
     else
       {:error, :unauthorized}
     end
@@ -178,7 +201,12 @@ defmodule Links.Collections do
 
   def delete_bookmark(%Scope{} = scope, %Bookmark{} = bookmark) do
     if can_edit_bookmark?(scope, bookmark) do
-      Repo.delete(bookmark)
+      collection_id = bookmark.collection_id
+
+      with {:ok, bookmark} <- Repo.delete(bookmark) do
+        broadcast_collection_bookmarks_changed(collection_id)
+        {:ok, bookmark}
+      end
     else
       {:error, :unauthorized}
     end
@@ -190,6 +218,7 @@ defmodule Links.Collections do
 
   def move_bookmark(%Scope{} = scope, bookmark_id, collection_id, ordered_ids) do
     bookmark = get_bookmark!(bookmark_id)
+    source_collection_id = bookmark.collection_id
     collection_id = to_integer(collection_id)
     ordered_ids = Enum.map(ordered_ids, &to_integer/1)
 
@@ -200,8 +229,17 @@ defmodule Links.Collections do
       |> update_bookmark_positions(collection_id, ordered_ids)
       |> Repo.transaction()
       |> case do
-        {:ok, %{bookmark: bookmark}} -> {:ok, bookmark}
-        {:error, _name, reason, _changes} -> {:error, reason}
+        {:ok, %{bookmark: bookmark}} ->
+          broadcast_collection_bookmarks_changed(collection_id)
+
+          if source_collection_id != collection_id do
+            broadcast_collection_bookmarks_changed(source_collection_id)
+          end
+
+          {:ok, bookmark}
+
+        {:error, _name, reason, _changes} ->
+          {:error, reason}
       end
     end
   end

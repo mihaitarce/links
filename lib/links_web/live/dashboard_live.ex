@@ -13,6 +13,7 @@ defmodule LinksWeb.DashboardLive do
      socket
      |> assign(:page_title, "Dashboard")
      |> assign(:collapsed, MapSet.new())
+     |> assign(:subscribed_collection_ids, MapSet.new())
      |> assign(:selected, nil)
      |> assign(:selected_context, nil)
      |> assign(:public_shares, [])
@@ -270,14 +271,17 @@ defmodule LinksWeb.DashboardLive do
   end
 
   @impl true
+  def handle_info({:collection_bookmarks_changed, _collection_id}, socket) do
+    {:noreply, refresh_dashboard_and_selection(socket)}
+  end
+
   def handle_info({:bookmark_metadata_updated, bookmark_id}, socket) do
     socket = refresh_dashboard(socket)
 
     socket =
       case socket.assigns.selected do
         %{type: :bookmark, id: ^bookmark_id} ->
-          bookmark = Collections.get_bookmark!(bookmark_id)
-          select_bookmark(socket, bookmark)
+          refresh_selected_bookmark(socket, bookmark_id)
 
         _ ->
           socket
@@ -647,7 +651,58 @@ defmodule LinksWeb.DashboardLive do
   end
 
   defp refresh_dashboard(socket) do
-    assign(socket, :dashboard, Collections.list_dashboard(socket.assigns.current_scope))
+    socket
+    |> assign(:dashboard, Collections.list_dashboard(socket.assigns.current_scope))
+    |> sync_collection_subscriptions()
+  end
+
+  defp refresh_dashboard_and_selection(socket) do
+    socket = refresh_dashboard(socket)
+
+    case socket.assigns.selected do
+      %{type: :bookmark, id: bookmark_id} ->
+        refresh_selected_bookmark(socket, bookmark_id)
+
+      _ ->
+        socket
+    end
+  end
+
+  defp refresh_selected_bookmark(socket, bookmark_id) do
+    case Collections.get_bookmark(bookmark_id) do
+      %Bookmark{} = bookmark ->
+        select_bookmark(socket, bookmark)
+
+      nil ->
+        socket
+        |> assign(:selected, nil)
+        |> assign(:selected_context, nil)
+    end
+  end
+
+  defp sync_collection_subscriptions(socket) do
+    if connected?(socket) do
+      visible_ids = MapSet.new(Enum.map(socket.assigns.dashboard.collections, & &1.id))
+      previous = socket.assigns.subscribed_collection_ids
+
+      for collection_id <- MapSet.difference(visible_ids, previous) do
+        Phoenix.PubSub.subscribe(
+          Links.PubSub,
+          Collections.collection_bookmarks_topic(collection_id)
+        )
+      end
+
+      for collection_id <- MapSet.difference(previous, visible_ids) do
+        Phoenix.PubSub.unsubscribe(
+          Links.PubSub,
+          Collections.collection_bookmarks_topic(collection_id)
+        )
+      end
+
+      assign(socket, :subscribed_collection_ids, visible_ids)
+    else
+      socket
+    end
   end
 
   defp assign_forms(socket) do

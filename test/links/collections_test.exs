@@ -81,6 +81,34 @@ defmodule Links.CollectionsTest do
       assert Collections.get_bookmark!(existing.id).position == 0
       assert Collections.get_bookmark!(bookmark.id).position == 1
     end
+
+    test "broadcasts collection bookmark list changes" do
+      scope = user_scope_fixture()
+      source = collection_fixture(scope, %{title: "Source"})
+      target = collection_fixture(scope, %{title: "Target"})
+
+      Phoenix.PubSub.subscribe(Links.PubSub, Collections.collection_bookmarks_topic(source.id))
+      Phoenix.PubSub.subscribe(Links.PubSub, Collections.collection_bookmarks_topic(target.id))
+
+      {:ok, bookmark} =
+        Collections.create_bookmark(scope, %{
+          title: "Link",
+          url: "https://example.com/link",
+          collection_id: source.id
+        })
+
+      assert_receive {:collection_bookmarks_changed, collection_id}
+                     when collection_id == source.id
+
+      assert {:ok, _bookmark} =
+               Collections.move_bookmark(scope, bookmark.id, target.id, [bookmark.id])
+
+      assert_receive {:collection_bookmarks_changed, collection_id}
+                     when collection_id == target.id
+
+      assert_receive {:collection_bookmarks_changed, collection_id}
+                     when collection_id == source.id
+    end
   end
 
   describe "public shares" do
