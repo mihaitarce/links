@@ -103,6 +103,25 @@ defmodule LinksWeb.DashboardLiveTest do
       assert html =~ "bookmark-drag-handle"
     end
 
+    test "shows a new sub-collection in the tree after creation", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      parent = collection_fixture(scope, %{title: "Parent"})
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv
+      |> element("#collection-#{parent.id} summary")
+      |> render_click()
+
+      html =
+        lv
+        |> form("#child-collection-form", child_collection: %{title: "Child Folder"})
+        |> render_submit()
+
+      assert html =~ "Child Folder"
+      assert has_element?(lv, "#collection-#{parent.id}")
+    end
+
     test "renders fetched page title after metadata is stored", %{conn: conn} do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
 

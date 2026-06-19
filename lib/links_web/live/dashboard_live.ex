@@ -566,16 +566,22 @@ defmodule LinksWeb.DashboardLive do
     end
   end
 
-  def handle_event("create_child_collection", %{"collection" => params}, socket) do
+  def handle_event("create_child_collection", %{"child_collection" => params}, socket) do
     parent = socket.assigns.selected_context.effective_collection
+    parent_tree_id = socket.assigns.selected_context.collection.id
     params = Map.put(params, "parent_id", parent.id)
 
     case Collections.create_collection(socket.assigns.current_scope, params) do
-      {:ok, collection} ->
-        {:noreply, socket |> refresh_dashboard() |> select_collection(collection.id)}
+      {:ok, _collection} ->
+        {:noreply,
+         socket
+         |> expand_collection(parent_tree_id)
+         |> assign(:child_collection_form, child_collection_form())
+         |> refresh_dashboard_and_selection()}
 
       {:error, changeset} ->
-        {:noreply, assign(socket, :child_collection_form, to_form(changeset))}
+        {:noreply,
+         assign(socket, :child_collection_form, to_form(changeset, as: :child_collection))}
     end
   end
 
@@ -687,9 +693,16 @@ defmodule LinksWeb.DashboardLive do
       %{type: :bookmark, id: bookmark_id} ->
         refresh_selected_bookmark(socket, bookmark_id)
 
+      %{type: :collection, id: collection_id} ->
+        select_collection(socket, collection_id)
+
       _ ->
         socket
     end
+  end
+
+  defp expand_collection(socket, collection_id) do
+    assign(socket, :collapsed, MapSet.delete(socket.assigns.collapsed, collection_id))
   end
 
   defp refresh_selected_bookmark(socket, bookmark_id) do
@@ -733,8 +746,13 @@ defmodule LinksWeb.DashboardLive do
     socket
     |> assign(:new_bookmark_form, to_form(Bookmark.changeset(%Bookmark{}, %{})))
     |> assign(:collection_form, to_form(Collection.changeset(%Collection{}, %{})))
-    |> assign(:child_collection_form, to_form(Collection.changeset(%Collection{}, %{})))
+    |> assign(:child_collection_form, child_collection_form())
     |> assign(:bookmark_form, to_form(Bookmark.changeset(%Bookmark{}, %{})))
+  end
+
+  defp child_collection_form do
+    Collection.changeset(%Collection{}, %{})
+    |> to_form(as: :child_collection)
   end
 
   defp select_collection(socket, id) do
@@ -757,7 +775,7 @@ defmodule LinksWeb.DashboardLive do
           :collection_form,
           to_form(Collection.changeset(context.effective_collection, %{}))
         )
-        |> assign(:child_collection_form, to_form(Collection.changeset(%Collection{}, %{})))
+        |> assign(:child_collection_form, child_collection_form())
 
       {:error, _reason} ->
         put_flash(socket, :error, "That collection is not available")
