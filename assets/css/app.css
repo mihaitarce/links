@@ -43,6 +43,10 @@ summary.bookmark-drop-highlight {
   padding: 0;
 }
 
+.bookmark-drag-handle {
+  align-self: center;
+}
+
 [data-collection-sortable] > li[id^="collection-"][data-reorderable="true"] > details > summary {
   cursor: grab;
 }

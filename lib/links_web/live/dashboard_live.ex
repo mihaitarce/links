@@ -180,13 +180,13 @@ defmodule LinksWeb.DashboardLive do
     >
       <span
         :if={@show_drag_handle}
-        class="bookmark-drag-handle shrink-0 cursor-grab text-base-content/40"
+        class="bookmark-drag-handle inline-flex shrink-0 items-center leading-none text-base-content/40"
         aria-hidden="true"
       >
-        ⋮⋮
+        <.icon name="hero-ellipsis-vertical" class="size-4 cursor-grab" />
       </span>
       <.bookmark_icon bookmark={@bookmark} />
-      <span class="min-w-0 flex-1 truncate text-left">
+      <span class="min-w-0 flex-1 truncate text-left leading-normal">
         {bookmark_label(@bookmark)}
       </span>
     </a>
