@@ -173,15 +173,7 @@ const CollectionBookmarkSort = {
   shouldRejectMoveInContainer(event, pointerTarget) {
     const dropContainer = this.dropContainerFromPointerTarget(pointerTarget)
 
-    if (dropContainer != null && event.to !== dropContainer) {
-      return true
-    }
-
-    if (isEmptyBookmarkContainer(event.to) && !this.summaryFromPointerTarget(pointerTarget)) {
-      return true
-    }
-
-    return false
+    return dropContainer != null && event.to !== dropContainer
   },
   scheduleExpand(summary) {
     const details = summary.closest("details")
@@ -310,6 +302,15 @@ const CollectionBookmarkSort = {
 
     this.autoExpandedIds.clear()
   },
+  ensureDropTargetExpanded(targetContainer, event) {
+    const summary =
+      this.summaryFromPointerTarget(this.elementUnderPointer(event)) ||
+      this.summaryForSortContainer(targetContainer)
+
+    if (!summary || this.isExpandedCollection(summary)) return
+
+    this.expandCollectionForDrop(summary)
+  },
   createSortable(el) {
     const hook = this
 
@@ -340,13 +341,20 @@ const CollectionBookmarkSort = {
 
         const targetContainer = hook.resolveDropContainer(event)
         const sourceContainer = event.from
+        const moved =
+          !(targetContainer === sourceContainer && event.oldIndex === event.newIndex)
 
         hook.clearDropHighlight()
         hook.clearExpandTimer()
         hook.sourceSummary = null
+
+        if (moved) {
+          hook.ensureDropTargetExpanded(targetContainer, event)
+        }
+
         hook.syncAutoExpandedCollections()
 
-        if (targetContainer === sourceContainer && event.oldIndex === event.newIndex) return
+        if (!moved) return
 
         hook.pushEvent("move_bookmark", {
           id: event.item.dataset.id,
