@@ -110,6 +110,33 @@ defmodule Links.CollectionsTest do
                      when collection_id == source.id
     end
 
+    test "broadcasts to parent when a sub-collection is created, updated, or deleted" do
+      scope = user_scope_fixture()
+      parent = collection_fixture(scope, %{title: "Parent"})
+
+      Phoenix.PubSub.subscribe(Links.PubSub, Collections.collection_bookmarks_topic(parent.id))
+
+      assert {:ok, child} =
+               Collections.create_collection(scope, %{
+                 title: "Child",
+                 parent_id: parent.id
+               })
+
+      assert_receive {:collection_bookmarks_changed, collection_id}
+                     when collection_id == parent.id
+
+      assert {:ok, _child} =
+               Collections.update_collection(scope, child, %{title: "Renamed Child"})
+
+      assert_receive {:collection_bookmarks_changed, collection_id}
+                     when collection_id == parent.id
+
+      assert {:ok, _child} = Collections.delete_collection(scope, child)
+
+      assert_receive {:collection_bookmarks_changed, collection_id}
+                     when collection_id == parent.id
+    end
+
     test "reorders inbox bookmarks" do
       scope = user_scope_fixture()
 

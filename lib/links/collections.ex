@@ -135,14 +135,27 @@ defmodule Links.Collections do
       %Collection{}
       |> Collection.changeset(attrs)
       |> Repo.insert()
+      |> tap(fn {:ok, collection} ->
+        broadcast_parent_collection_changed(collection)
+      end)
     end
   end
 
   def update_collection(%Scope{} = scope, %Collection{} = collection, attrs) do
     if can_edit_collection?(scope, collection.id) do
+      old_parent_id = collection.parent_id
+
       collection
       |> Collection.changeset(normalize_attrs(attrs))
       |> Repo.update()
+      |> tap(fn {:ok, updated} ->
+        broadcast_collection_changed(updated.id)
+        broadcast_collection_changed(old_parent_id)
+
+        if updated.parent_id != old_parent_id do
+          broadcast_collection_changed(updated.parent_id)
+        end
+      end)
     else
       {:error, :unauthorized}
     end
@@ -151,9 +164,11 @@ defmodule Links.Collections do
   def delete_collection(%Scope{} = scope, %Collection{} = collection) do
     if can_edit_collection?(scope, collection.id) do
       collection_id = collection.id
+      parent_id = collection.parent_id
 
       with {:ok, collection} <- Repo.delete(collection) do
-        broadcast_collection_bookmarks_changed(collection_id)
+        broadcast_collection_changed(collection_id)
+        broadcast_collection_changed(parent_id)
         {:ok, collection}
       end
     else
@@ -634,6 +649,15 @@ defmodule Links.Collections do
   defp broadcast_bookmark_list_changes(_scope, collection_id) do
     broadcast_collection_bookmarks_changed(collection_id)
   end
+
+  defp broadcast_parent_collection_changed(%Collection{parent_id: parent_id}) do
+    broadcast_collection_changed(parent_id)
+  end
+
+  defp broadcast_collection_changed(nil), do: :ok
+
+  defp broadcast_collection_changed(collection_id),
+    do: broadcast_collection_bookmarks_changed(collection_id)
 
   defp normalize_collection_id(value) do
     case value do
