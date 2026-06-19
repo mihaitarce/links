@@ -75,7 +75,7 @@ defmodule LinksWeb.DashboardLive do
               </div>
               <ul
                 id="collections-zone-root"
-                class={sidebar_menu_class(["min-h-0 flex-1 overflow-y-auto overflow-x-hidden"])}
+                class={sidebar_menu_class(["overflow-y-auto"])}
               >
                 <.tree_node
                   :for={node <- @dashboard.tree}
@@ -656,6 +656,6 @@ defmodule LinksWeb.DashboardLive do
   def bookmark_label(%Bookmark{title: title}), do: title
 
   defp sidebar_menu_class(extra \\ []) do
-    ["menu bg-base-200 rounded-box w-full min-w-0" | extra]
+    ["menu flex-col flex-nowrap bg-base-200 rounded-box w-full min-w-0" | extra]
   end
 end
