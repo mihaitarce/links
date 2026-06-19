@@ -103,6 +103,37 @@ defmodule LinksWeb.DashboardLiveTest do
       assert html =~ "bookmark-drag-handle"
     end
 
+    test "keeps collection trees collapsed on initial load", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      parent = collection_fixture(scope, %{title: "Parent"})
+      collection_fixture(scope, %{title: "Child", parent_id: parent.id})
+
+      {:ok, _lv, html} = live(conn, ~p"/")
+
+      refute html =~ ~s(<details open)
+    end
+
+    test "collapsing a collection clears the detail panel", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      parent = collection_fixture(scope, %{title: "Parent"})
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv
+      |> element("#collection-#{parent.id} summary")
+      |> render_click()
+
+      assert has_element?(lv, "#collection-form")
+
+      html =
+        lv
+        |> element("#collection-#{parent.id} summary")
+        |> render_click()
+
+      refute html =~ ~s(id="collection-form")
+      assert html =~ "Select a collection or bookmark"
+    end
+
     test "shows a new sub-collection in the tree after creation", %{conn: conn} do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
       parent = collection_fixture(scope, %{title: "Parent"})

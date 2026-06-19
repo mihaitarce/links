@@ -27,7 +27,8 @@ defmodule LinksWeb.DashboardLive do
      |> assign(:collaboration_email, "")
      |> assign(:collaboration_readonly, false)
      |> assign_forms()
-     |> refresh_dashboard()}
+     |> refresh_dashboard()
+     |> collapse_all_collections()}
   end
 
   @impl true
@@ -524,15 +525,27 @@ defmodule LinksWeb.DashboardLive do
   def handle_event("toggle_collection", %{"id" => id}, socket) do
     id = String.to_integer(id)
     collapsed = socket.assigns.collapsed
+    was_collapsed = MapSet.member?(collapsed, id)
 
     collapsed =
-      if MapSet.member?(collapsed, id) do
+      if was_collapsed do
         MapSet.delete(collapsed, id)
       else
         MapSet.put(collapsed, id)
       end
 
-    {:noreply, socket |> assign(:collapsed, collapsed) |> select_collection(id)}
+    socket = assign(socket, :collapsed, collapsed)
+
+    socket =
+      if was_collapsed do
+        select_collection(socket, id)
+      else
+        socket
+        |> assign(:selected, nil)
+        |> assign(:selected_context, nil)
+      end
+
+    {:noreply, socket}
   end
 
   def handle_event("validate_collection", %{"collection" => params}, socket) do
@@ -703,6 +716,16 @@ defmodule LinksWeb.DashboardLive do
 
   defp expand_collection(socket, collection_id) do
     assign(socket, :collapsed, MapSet.delete(socket.assigns.collapsed, collection_id))
+  end
+
+  defp collapse_all_collections(socket) do
+    assign(
+      socket,
+      :collapsed,
+      socket.assigns.dashboard.collections
+      |> Enum.map(& &1.id)
+      |> MapSet.new()
+    )
   end
 
   defp refresh_selected_bookmark(socket, bookmark_id) do
