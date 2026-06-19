@@ -236,6 +236,10 @@ defmodule LinksWeb.DashboardLive do
       |> assign(:collection, assigns.node.collection)
       |> assign(:effective, assigns.node.effective_collection)
       |> assign(:expanded, not MapSet.member?(assigns.collapsed, assigns.node.collection.id))
+      |> assign(
+        :collaboration_mount?,
+        Collections.active_collaboration_mount?(assigns.node.collection)
+      )
 
     ~H"""
     <li
@@ -256,7 +260,7 @@ defmodule LinksWeb.DashboardLive do
           >
             <.folder_icon />
             {@node.title}
-            <span :if={@node.mount} class="badge badge-outline badge-xs">
+            <span :if={@collaboration_mount?} class="badge badge-outline badge-xs">
               {if @node.readonly, do: "read", else: "edit"}
             </span>
           </summary>

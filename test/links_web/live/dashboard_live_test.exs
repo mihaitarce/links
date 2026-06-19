@@ -2,6 +2,7 @@ defmodule LinksWeb.DashboardLiveTest do
   use LinksWeb.ConnCase
 
   import Phoenix.LiveViewTest
+  import Links.AccountsFixtures
   import Links.CollectionsFixtures
 
   alias Links.Collections
@@ -132,6 +133,34 @@ defmodule LinksWeb.DashboardLiveTest do
 
       refute html =~ ~s(id="collection-form")
       assert html =~ "Select a collection or bookmark"
+    end
+
+    test "shows collaboration badges only on shared root collections", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      parent = collection_fixture(owner_scope, %{title: "Shared Parent"})
+
+      collection_fixture(owner_scope, %{title: "Child Folder", parent_id: parent.id})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, parent, collaborator.email, true)
+
+      conn = log_in_user(conn, collaborator)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv
+      |> element("#collection-#{mount.id} summary")
+      |> render_click()
+
+      document =
+        lv
+        |> render()
+        |> LazyHTML.from_fragment()
+
+      badges = LazyHTML.filter(document, "#collections-zone-root .badge")
+
+      assert length(badges) == 1
+      assert LazyHTML.text(hd(badges)) == "read"
     end
 
     test "shows a new sub-collection in the tree after creation", %{conn: conn} do
