@@ -31,6 +31,14 @@ const bookmarkSortContainers = (root) => [
   ...root.querySelectorAll("[data-bookmark-sortable]"),
 ]
 
+const collectionSortContainers = (root) => [
+  ...(root.hasAttribute("data-collection-sortable") ? [root] : []),
+  ...root.querySelectorAll("[data-collection-sortable]"),
+]
+
+const isWritableCollectionSortContainer = (container) =>
+  container != null && container.dataset.readonly !== "true"
+
 const targetCollectionId = (el) => {
   if (!el) return null
 
@@ -69,7 +77,8 @@ const CollectionBookmarkSort = {
     this.pendingExpandSummary = null
     this.autoExpandedIds = new Set()
     this.spilled = false
-    this.sortables = []
+    this.bookmarkSortables = []
+    this.collectionSortables = []
     this.initSortables()
   },
   updated() {
@@ -220,9 +229,16 @@ const CollectionBookmarkSort = {
     bookmarkSortContainers(details).forEach((el) => {
       if (el.dataset.readonly === "true") return
       if (isEmptyBookmarkContainer(el)) return
-      if (this.sortables.some((sortable) => sortable.el === el)) return
+      if (this.bookmarkSortables.some((sortable) => sortable.el === el)) return
 
-      this.sortables.push(this.createSortable(el))
+      this.bookmarkSortables.push(this.createBookmarkSortable(el))
+    })
+
+    collectionSortContainers(details).forEach((el) => {
+      if (!isWritableCollectionSortContainer(el)) return
+      if (this.collectionSortables.some((sortable) => sortable.el === el)) return
+
+      this.collectionSortables.push(this.createCollectionSortable(el))
     })
 
     if (summary !== this.sourceSummary) {
@@ -334,7 +350,7 @@ const CollectionBookmarkSort = {
 
     this.expandCollectionForDrop(summary)
   },
-  createSortable(el) {
+  createBookmarkSortable(el) {
     const hook = this
 
     return new Sortable(el, {
@@ -406,22 +422,65 @@ const CollectionBookmarkSort = {
       },
     })
   },
+  orderedCollectionIds(container) {
+    return Array.from(container.children)
+      .filter((child) => child.id.startsWith("collection-"))
+      .map((child) => child.id.replace("collection-", ""))
+  },
+  createCollectionSortable(el) {
+    const hook = this
+
+    return new Sortable(el, {
+      group: {
+        name: "collections",
+        pull: false,
+        put: false,
+      },
+      animation: 150,
+      draggable: "li[id^='collection-']",
+      filter: "[data-readonly='true'], button, input, textarea, select, a",
+      preventOnFilter: true,
+      delay: 200,
+      delayOnTouchOnly: false,
+      revertOnSpill: true,
+      onEnd(event) {
+        if (event.from !== event.to || event.oldIndex === event.newIndex) return
+
+        hook.pushEvent("reorder_collections", {
+          parent_id: el.dataset.parentId,
+          ordered_ids: hook.orderedCollectionIds(event.from),
+        })
+      },
+    })
+  },
   initSortables() {
-    this.sortables = []
+    this.bookmarkSortables = []
+    this.collectionSortables = []
 
     bookmarkSortContainers(this.el).forEach((el) => {
       if (el.dataset.readonly === "true") return
       if (isEmptyBookmarkContainer(el)) return
 
-      this.sortables.push(this.createSortable(el))
+      this.bookmarkSortables.push(this.createBookmarkSortable(el))
+    })
+
+    collectionSortContainers(this.el).forEach((el) => {
+      if (!isWritableCollectionSortContainer(el)) return
+
+      this.collectionSortables.push(this.createCollectionSortable(el))
     })
   },
   destroySortables() {
-    if (this.sortables) {
-      this.sortables.forEach((sortable) => sortable.destroy())
+    if (this.bookmarkSortables) {
+      this.bookmarkSortables.forEach((sortable) => sortable.destroy())
     }
 
-    this.sortables = []
+    if (this.collectionSortables) {
+      this.collectionSortables.forEach((sortable) => sortable.destroy())
+    }
+
+    this.bookmarkSortables = []
+    this.collectionSortables = []
   },
 }
 

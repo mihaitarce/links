@@ -55,6 +55,36 @@ defmodule Links.CollectionsTest do
       assert Collections.get_bookmark!(first.id).position == 1
     end
 
+    test "reorders root collections" do
+      scope = user_scope_fixture()
+
+      {:ok, first} = Collections.create_collection(scope, %{title: "First"})
+      {:ok, second} = Collections.create_collection(scope, %{title: "Second"})
+
+      assert {:ok, :reordered} =
+               Collections.reorder_collections(scope, "root", [second.id, first.id])
+
+      assert Collections.get_collection!(second.id).position == 0
+      assert Collections.get_collection!(first.id).position == 1
+    end
+
+    test "reorders nested collections" do
+      scope = user_scope_fixture()
+      root = collection_fixture(scope)
+
+      {:ok, first} =
+        Collections.create_collection(scope, %{title: "Child A", parent_id: root.id})
+
+      {:ok, second} =
+        Collections.create_collection(scope, %{title: "Child B", parent_id: root.id})
+
+      assert {:ok, :reordered} =
+               Collections.reorder_collections(scope, root.id, [second.id, first.id])
+
+      assert Collections.get_collection!(second.id).position == 0
+      assert Collections.get_collection!(first.id).position == 1
+    end
+
     test "moves bookmarks between collections" do
       scope = user_scope_fixture()
       source = collection_fixture(scope, %{title: "Source"})
@@ -400,7 +430,12 @@ defmodule Links.CollectionsTest do
       collection = collection_fixture(owner_scope, %{title: "Shared"})
 
       assert {:ok, _mount} =
-               Collections.create_collaboration(owner_scope, collection, collaborator.email, false)
+               Collections.create_collaboration(
+                 owner_scope,
+                 collection,
+                 collaborator.email,
+                 false
+               )
 
       {:ok, bookmark} =
         Collections.create_bookmark(owner_scope, %{

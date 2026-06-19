@@ -176,6 +176,25 @@ defmodule Links.Collections do
     end
   end
 
+  def reorder_collections(%Scope{} = scope, parent_id, ordered_ids) do
+    parent_id = normalize_reorder_parent_id(parent_id)
+    ordered_ids = Enum.map(ordered_ids, &to_integer/1)
+
+    with :ok <- validate_collection_reorder(scope, parent_id, ordered_ids) do
+      Multi.new()
+      |> update_collection_positions(ordered_ids)
+      |> Repo.transaction()
+      |> case do
+        {:ok, _results} ->
+          broadcast_collection_changed(parent_id)
+          {:ok, :reordered}
+
+        {:error, _name, reason, _changes} ->
+          {:error, reason}
+      end
+    end
+  end
+
   def create_inbox_bookmark(%Scope{} = scope, attrs) do
     attrs =
       attrs
@@ -254,7 +273,10 @@ defmodule Links.Collections do
     with :ok <- authorize_bookmark_move(scope, bookmark, collection_id),
          :ok <- validate_bookmark_order(scope, bookmark, collection_id, ordered_ids) do
       Multi.new()
-      |> Multi.update(:bookmark, Bookmark.changeset(bookmark, move_bookmark_attrs(scope, collection_id)))
+      |> Multi.update(
+        :bookmark,
+        Bookmark.changeset(bookmark, move_bookmark_attrs(scope, collection_id))
+      )
       |> update_bookmark_positions(scope, collection_id, ordered_ids)
       |> Repo.transaction()
       |> case do
@@ -575,6 +597,54 @@ defmodule Links.Collections do
     end
   end
 
+  defp validate_collection_reorder(%Scope{} = scope, parent_id, ordered_ids) do
+    siblings =
+      scope
+      |> sibling_collections_query(parent_id)
+      |> Repo.all()
+
+    expected = MapSet.new(Enum.map(siblings, & &1.id))
+    actual = MapSet.new(ordered_ids)
+
+    with true <- MapSet.equal?(expected, actual),
+         true <- Enum.all?(ordered_ids, &can_edit_collection?(scope, &1)) do
+      :ok
+    else
+      _ -> {:error, :invalid_order}
+    end
+  end
+
+  defp sibling_collections_query(%Scope{} = scope, parent_id) do
+    user_id = scope.user.id
+    editable_ids = editable_collaboration_ids(scope)
+
+    Collection
+    |> sibling_parent_filter(parent_id)
+    |> where([c], c.owner_id == ^user_id or c.id in ^editable_ids)
+    |> order_by([c], asc: c.position, asc: c.title, asc: c.id)
+  end
+
+  defp sibling_parent_filter(query, nil) do
+    where(query, [c], is_nil(c.parent_id))
+  end
+
+  defp sibling_parent_filter(query, parent_id) do
+    where(query, [c], c.parent_id == ^parent_id)
+  end
+
+  defp update_collection_positions(multi, ordered_ids) do
+    ordered_ids
+    |> Enum.with_index()
+    |> Enum.reduce(multi, fn {id, position}, multi ->
+      Multi.update_all(
+        multi,
+        {:collection_position, id},
+        from(c in Collection, where: c.id == ^id),
+        set: [position: position]
+      )
+    end)
+  end
+
   defp validate_bookmark_order(%Scope{} = scope, bookmark, nil, ordered_ids) do
     user_id = scope.user.id
 
@@ -680,6 +750,13 @@ defmodule Links.Collections do
   defp move_bookmark_attrs(_scope, collection_id) do
     %{collection_id: collection_id}
   end
+
+  defp normalize_reorder_parent_id("root"), do: nil
+
+  defp normalize_reorder_parent_id(parent_id) when is_binary(parent_id),
+    do: String.to_integer(parent_id)
+
+  defp normalize_reorder_parent_id(parent_id), do: parent_id
 
   defp next_collection_position(parent_id, owner_id \\ nil)
 

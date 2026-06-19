@@ -97,6 +97,8 @@ defmodule LinksWeb.DashboardLiveTest do
       {:ok, lv, html} = live(conn, ~p"/")
 
       assert html =~ ~s(id="collections-zone-root")
+      assert html =~ ~s(data-collection-sortable)
+      assert html =~ ~s(data-parent-id="root")
       assert html =~ ~s(id="bookmarks-sidebar")
       assert html =~ ~s(phx-hook="CollectionBookmarkSort")
       assert html =~ ~s(data-bookmark-sortable)
@@ -104,6 +106,23 @@ defmodule LinksWeb.DashboardLiveTest do
       assert html =~ ~s(data-readonly="false")
       assert html =~ "bookmark-drag-handle"
       assert has_element?(lv, "#collection-#{collection.id} summary .badge.badge-ghost", "1")
+    end
+
+    test "reorders collections from the dashboard", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+
+      {:ok, first} = Collections.create_collection(scope, %{title: "Alpha"})
+      {:ok, second} = Collections.create_collection(scope, %{title: "Beta"})
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      assert render_reorder_collections(lv, %{
+               "parent_id" => "root",
+               "ordered_ids" => [to_string(second.id), to_string(first.id)]
+             })
+
+      assert Collections.get_collection!(second.id).position == 0
+      assert Collections.get_collection!(first.id).position == 1
     end
 
     test "shows total bookmark counts including sub-collections", %{conn: conn} do
@@ -183,7 +202,12 @@ defmodule LinksWeb.DashboardLiveTest do
 
       assert html =~ "Shared Parent"
       assert html =~ "Child Folder"
-      assert has_element?(lv, "#collection-#{mount.id} summary [aria-label='Read-only collaboration']")
+
+      assert has_element?(
+               lv,
+               "#collection-#{mount.id} summary [aria-label='Read-only collaboration']"
+             )
+
       assert Enum.count(:binary.matches(html, "Read-only collaboration")) == 1
     end
 
@@ -233,5 +257,11 @@ defmodule LinksWeb.DashboardLiveTest do
     view
     |> element("#bookmarks-sidebar")
     |> render_hook("move_bookmark", params)
+  end
+
+  defp render_reorder_collections(view, params) do
+    view
+    |> element("#bookmarks-sidebar")
+    |> render_hook("reorder_collections", params)
   end
 end

@@ -94,6 +94,8 @@ defmodule LinksWeb.DashboardLive do
               </div>
               <ul
                 id="collections-zone-root"
+                data-collection-sortable
+                data-parent-id="root"
                 class={sidebar_menu_class(["overflow-y-auto"])}
               >
                 <.tree_node
@@ -283,12 +285,11 @@ defmodule LinksWeb.DashboardLive do
             </span>
           </summary>
           <ul
-            id={"nested-zone-#{@effective.id}"}
-            data-bookmark-sortable
-            data-collection-id={@effective.id}
-            data-empty-bookmarks={to_string(@node.bookmarks == [])}
+            :if={@node.children != []}
+            id={"collections-zone-#{@effective.id}"}
+            data-collection-sortable
+            data-parent-id={@effective.id}
             data-readonly={to_string(@node.readonly || false)}
-            class={@node.bookmarks == [] && "collection-bookmark-drop-hidden"}
           >
             <.tree_node
               :for={child <- @node.children}
@@ -297,6 +298,15 @@ defmodule LinksWeb.DashboardLive do
               collapsed={@collapsed}
               depth={@depth + 1}
             />
+          </ul>
+          <ul
+            id={"nested-zone-#{@effective.id}"}
+            data-bookmark-sortable
+            data-collection-id={@effective.id}
+            data-empty-bookmarks={to_string(@node.bookmarks == [])}
+            data-readonly={to_string(@node.readonly || false)}
+            class={@node.bookmarks == [] && "collection-bookmark-drop-hidden"}
+          >
             <li
               :for={bookmark <- @node.bookmarks}
               id={"bookmark-#{bookmark.id}"}
@@ -670,6 +680,23 @@ defmodule LinksWeb.DashboardLive do
       {:noreply, refresh_dashboard(socket)}
     else
       _ -> {:noreply, put_flash(socket, :error, "Could not move bookmark")}
+    end
+  end
+
+  def handle_event("reorder_collections", params, socket) do
+    parent_id = params["parent_id"]
+    ordered_ids = params["ordered_ids"] || []
+
+    case Collections.reorder_collections(
+           socket.assigns.current_scope,
+           parent_id,
+           ordered_ids
+         ) do
+      {:ok, _} ->
+        {:noreply, refresh_dashboard(socket)}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Could not reorder collections")}
     end
   end
 

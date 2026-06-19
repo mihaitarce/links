@@ -42,3 +42,11 @@ summary.bookmark-drop-highlight {
   min-height: 0;
   padding: 0;
 }
+
+[data-collection-sortable] > li[id^="collection-"]:not([data-readonly="true"]) > details > summary {
+  cursor: grab;
+}
+
+[data-collection-sortable] > li[id^="collection-"].sortable-chosen > details > summary {
+  cursor: grabbing;
+}
