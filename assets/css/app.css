@@ -27,3 +27,26 @@
 [data-phx-session], [data-phx-teleported-src] { display: contents }
 
 /* This file is for your main application CSS */
+
+summary.bookmark-drop-highlight {
+  background-color: color-mix(in oklch, var(--color-primary) 14%, transparent);
+  box-shadow: inset 0 0 0 2px var(--color-primary);
+  border-radius: var(--radius-field);
+}
+
+.collection-empty-drop {
+  display: none;
+}
+
+.collection-empty-drop:only-child {
+  display: list-item;
+}
+
+.collection-empty-drop > span {
+  border: 1px dashed color-mix(in oklch, var(--color-base-content) 20%, transparent);
+  border-radius: var(--radius-field);
+  font-size: 0.75rem;
+  color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
+  user-select: none;
+  pointer-events: none;
+}

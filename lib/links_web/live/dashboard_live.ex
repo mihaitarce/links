@@ -244,6 +244,7 @@ defmodule LinksWeb.DashboardLive do
     ~H"""
     <li
       id={"collection-#{@collection.id}"}
+      data-readonly={to_string(@node.readonly || false)}
       class={[@node.revoked && "menu-disabled line-through opacity-50"]}
     >
       <%= if @node.revoked do %>
@@ -287,6 +288,15 @@ defmodule LinksWeb.DashboardLive do
                 selected={selected?(@selected, :bookmark, bookmark.id)}
                 show_drag_handle={!@node.readonly}
               />
+            </li>
+            <li
+              :if={!@node.readonly}
+              id={"collection-empty-#{@effective.id}"}
+              class="collection-empty-drop"
+            >
+              <span class="flex min-w-0 w-full items-center justify-center">
+                empty
+              </span>
             </li>
           </ul>
         </details>
@@ -550,6 +560,10 @@ defmodule LinksWeb.DashboardLive do
       end
 
     {:noreply, socket}
+  end
+
+  def handle_event("expand_collection", %{"id" => id}, socket) do
+    {:noreply, expand_collection(socket, String.to_integer(id))}
   end
 
   def handle_event("validate_collection", %{"collection" => params}, socket) do

@@ -41,16 +41,191 @@ const targetCollectionId = (el) => {
   return collectionId
 }
 
+const DROP_HIGHLIGHT_CLASS = "bookmark-drop-highlight"
+const AUTO_EXPAND_DELAY_MS = 2000
+
 const CollectionBookmarkSort = {
   mounted() {
+    this.highlightedSummary = null
+    this.expandTimer = null
+    this.expandTargetId = null
+    this.pendingExpandSummary = null
+    this.autoExpandedIds = new Set()
+    this.sortables = []
     this.initSortables()
   },
   updated() {
     this.destroySortables()
+    this.clearDropHighlight()
+    this.clearExpandTimer()
     this.initSortables()
   },
   destroyed() {
     this.destroySortables()
+    this.clearDropHighlight()
+    this.clearExpandTimer()
+    this.unbindDragOver()
+  },
+  clearExpandTimer() {
+    if (this.expandTimer) {
+      clearTimeout(this.expandTimer)
+      this.expandTimer = null
+    }
+
+    this.expandTargetId = null
+    this.pendingExpandSummary = null
+  },
+  clearDropHighlight() {
+    if (this.highlightedSummary) {
+      this.highlightedSummary.classList.remove(DROP_HIGHLIGHT_CLASS)
+      this.highlightedSummary = null
+    }
+  },
+  setDropHighlight(summary) {
+    if (this.highlightedSummary === summary) {
+      if (summary) this.scheduleExpand(summary)
+      return
+    }
+
+    this.clearDropHighlight()
+    this.clearExpandTimer()
+
+    if (!summary) return
+
+    const collection = summary.closest("li[id^='collection-']")
+
+    if (collection?.dataset.readonly === "true") return
+
+    summary.classList.add(DROP_HIGHLIGHT_CLASS)
+    this.highlightedSummary = summary
+    this.scheduleExpand(summary)
+  },
+  scheduleExpand(summary) {
+    const details = summary.closest("details")
+
+    if (!details || details.open) {
+      this.clearExpandTimer()
+      return
+    }
+
+    const collection = summary.closest("li[id^='collection-']")
+
+    if (collection?.dataset.readonly === "true") {
+      this.clearExpandTimer()
+      return
+    }
+
+    const collectionId = collection.id
+
+    if (this.expandTargetId === collectionId && this.expandTimer) return
+
+    this.clearExpandTimer()
+    this.expandTargetId = collectionId
+    this.pendingExpandSummary = summary
+
+    this.expandTimer = setTimeout(() => {
+      this.expandCollectionForDrop(this.pendingExpandSummary)
+      this.clearExpandTimer()
+    }, AUTO_EXPAND_DELAY_MS)
+  },
+  expandCollectionForDrop(summary) {
+    if (!summary) return
+
+    const details = summary.closest("details")
+
+    if (!details || details.open) return
+
+    details.open = true
+
+    const collectionId = summary.closest("li[id^='collection-']")?.id?.replace("collection-", "")
+
+    if (collectionId) this.autoExpandedIds.add(collectionId)
+
+    bookmarkSortContainers(details).forEach((el) => {
+      if (el.dataset.readonly === "true") return
+      if (this.sortables.some((sortable) => sortable.el === el)) return
+
+      this.sortables.push(this.createSortable(el))
+    })
+  },
+  summaryForSortContainer(container) {
+    if (!container || container.dataset.collectionId === "inbox") return null
+
+    return container.closest("details")?.querySelector("summary") ?? null
+  },
+  summaryFromEventTarget(target) {
+    const sortContainer = target.closest("[data-bookmark-sortable]")
+
+    if (sortContainer) {
+      return this.summaryForSortContainer(sortContainer)
+    }
+
+    const summary = target.closest("li[id^='collection-'] > details > summary")
+
+    return summary ?? null
+  },
+  bindDragOver() {
+    if (this.onDragOver) return
+
+    this.onDragOver = (event) => {
+      this.setDropHighlight(this.summaryFromEventTarget(event.target))
+    }
+
+    document.addEventListener("dragover", this.onDragOver)
+  },
+  unbindDragOver() {
+    if (this.onDragOver) {
+      document.removeEventListener("dragover", this.onDragOver)
+      this.onDragOver = null
+    }
+  },
+  syncAutoExpandedCollections() {
+    for (const id of this.autoExpandedIds) {
+      this.pushEvent("expand_collection", {id})
+    }
+
+    this.autoExpandedIds.clear()
+  },
+  createSortable(el) {
+    const hook = this
+
+    return new Sortable(el, {
+      group: "bookmarks",
+      animation: 150,
+      handle: ".bookmark-drag-handle",
+      draggable: "li[id^='bookmark-']",
+      filter: "summary, button, input, textarea, select, .collection-empty-drop",
+      preventOnFilter: false,
+      fallbackOnBody: true,
+      swapThreshold: 0.65,
+      emptyInsertThreshold: 8,
+      onStart() {
+        hook.bindDragOver()
+      },
+      onMove(event) {
+        hook.setDropHighlight(hook.summaryForSortContainer(event.to))
+        return true
+      },
+      onEnd(event) {
+        hook.unbindDragOver()
+        hook.clearDropHighlight()
+        hook.clearExpandTimer()
+        hook.syncAutoExpandedCollections()
+
+        if (event.from === event.to && event.oldIndex === event.newIndex) return
+
+        const orderedIds = Array.from(event.to.children)
+          .filter((child) => child.id.startsWith("bookmark-"))
+          .map((child) => child.dataset.id)
+          .filter(Boolean)
+
+        hook.pushEvent("move_bookmark", {
+          id: event.item.dataset.id,
+          collection_id: targetCollectionId(event.to),
+          ordered_ids: orderedIds,
+        })
+      },
+    })
   },
   initSortables() {
     this.sortables = []
@@ -58,33 +233,7 @@ const CollectionBookmarkSort = {
     bookmarkSortContainers(this.el).forEach((el) => {
       if (el.dataset.readonly === "true") return
 
-      const sortable = new Sortable(el, {
-        group: "bookmarks",
-        animation: 150,
-        handle: ".bookmark-drag-handle",
-        draggable: "li[id^='bookmark-']",
-        filter: "summary, button, input, textarea, select",
-        preventOnFilter: false,
-        fallbackOnBody: true,
-        swapThreshold: 0.65,
-        emptyInsertThreshold: 8,
-        onEnd: (event) => {
-          if (event.from === event.to && event.oldIndex === event.newIndex) return
-
-          const orderedIds = Array.from(event.to.children)
-            .filter((child) => child.id.startsWith("bookmark-"))
-            .map((child) => child.dataset.id)
-            .filter(Boolean)
-
-          this.pushEvent("move_bookmark", {
-            id: event.item.dataset.id,
-            collection_id: targetCollectionId(event.to),
-            ordered_ids: orderedIds,
-          })
-        },
-      })
-
-      this.sortables.push(sortable)
+      this.sortables.push(this.createSortable(el))
     })
   },
   destroySortables() {

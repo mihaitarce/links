@@ -101,6 +101,7 @@ defmodule LinksWeb.DashboardLiveTest do
       assert html =~ ~s(phx-hook="CollectionBookmarkSort")
       assert html =~ ~s(data-bookmark-sortable)
       assert html =~ ~s(data-collection-id="#{collection.id}")
+      assert html =~ ~s(data-readonly="false")
       assert html =~ "bookmark-drag-handle"
     end
 
@@ -112,6 +113,23 @@ defmodule LinksWeb.DashboardLiveTest do
       {:ok, _lv, html} = live(conn, ~p"/")
 
       refute html =~ ~s(<details open)
+    end
+
+    test "shows empty drop area in expanded collections without links", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      parent = collection_fixture(scope, %{title: "Empty Folder"})
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      refute render(lv) =~ ~s(id="collection-empty-")
+
+      html =
+        lv
+        |> element("#collection-#{parent.id} > details > summary")
+        |> render_click()
+
+      assert html =~ "empty"
+      assert has_element?(lv, "#collection-empty-#{parent.id}")
     end
 
     test "collapsing a collection clears the detail panel", %{conn: conn} do
@@ -149,18 +167,15 @@ defmodule LinksWeb.DashboardLiveTest do
       {:ok, lv, _html} = live(conn, ~p"/")
 
       lv
-      |> element("#collection-#{mount.id} summary")
+      |> element("#collection-#{mount.id} > details > summary")
       |> render_click()
 
-      document =
-        lv
-        |> render()
-        |> LazyHTML.from_fragment()
+      html = render(lv)
 
-      badges = LazyHTML.filter(document, "#collections-zone-root .badge")
-
-      assert length(badges) == 1
-      assert LazyHTML.text(hd(badges)) == "read"
+      assert html =~ "Shared Parent"
+      assert html =~ "Child Folder"
+      assert Enum.count(:binary.matches(html, "badge badge-outline badge-xs")) == 1
+      assert html =~ "read"
     end
 
     test "shows a new sub-collection in the tree after creation", %{conn: conn} do
