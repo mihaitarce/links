@@ -53,23 +53,14 @@ defmodule LinksWeb.DashboardLive do
                 <span class="badge badge-ghost badge-sm">{length(@dashboard.inbox)}</span>
               </div>
               <ul id="bookmarks-zone-inbox" class={sidebar_menu_class()}>
-                <li
-                  :for={bookmark <- @dashboard.inbox}
-                  id={"bookmark-#{bookmark.id}"}
-                  class="w-full min-w-0"
-                >
+                <li :for={bookmark <- @dashboard.inbox} id={"bookmark-#{bookmark.id}"}>
                   <a
                     phx-click="select_bookmark"
                     phx-value-id={bookmark.id}
-                    class={[
-                      "w-full min-w-0 gap-2",
-                      selected?(@selected, :bookmark, bookmark.id) && "menu-active"
-                    ]}
+                    class={selected?(@selected, :bookmark, bookmark.id) && "menu-active"}
                   >
                     <.bookmark_icon bookmark={bookmark} />
-                    <span class="min-w-0 flex-1 truncate">
-                      {bookmark_label(bookmark)}
-                    </span>
+                    {bookmark_label(bookmark)}
                   </a>
                 </li>
               </ul>
@@ -84,14 +75,7 @@ defmodule LinksWeb.DashboardLive do
               </div>
               <ul
                 id="collections-zone-root"
-                class={
-                  sidebar_menu_class([
-                    "min-h-0 flex-1 overflow-x-hidden overflow-y-auto",
-                    "[&_li_ul]:w-full [&_li_ul]:min-w-0 [&_li_ul]:whitespace-normal",
-                    "[&_summary]:w-full [&_summary]:min-w-0",
-                    "[&_summary]:[grid-template-columns:auto_minmax(0,1fr)_auto]"
-                  ])
-                }
+                class={sidebar_menu_class(["min-h-0 flex-1 overflow-y-auto overflow-x-hidden"])}
               >
                 <.tree_node
                   :for={node <- @dashboard.tree}
@@ -208,33 +192,27 @@ defmodule LinksWeb.DashboardLive do
     ~H"""
     <li
       id={"collection-#{@collection.id}"}
-      class={[
-        "w-full min-w-0",
-        @node.revoked && "menu-disabled line-through opacity-50"
-      ]}
+      class={[@node.revoked && "menu-disabled line-through opacity-50"]}
     >
       <%= if @node.revoked do %>
-        <a class="gap-2">
+        <a>
           <.folder_icon />
-          <span class="min-w-0 flex-1 truncate">{@node.title}</span>
+          {@node.title}
         </a>
       <% else %>
         <details open={@expanded}>
           <summary
-            class={[
-              "w-full min-w-0 gap-2",
-              selected?(@selected, :collection, @collection.id) && "menu-active"
-            ]}
+            class={selected?(@selected, :collection, @collection.id) && "menu-active"}
             phx-click="toggle_collection"
             phx-value-id={@collection.id}
           >
             <.folder_icon />
-            <span class="min-w-0 flex-1 truncate">{@node.title}</span>
+            {@node.title}
             <span :if={@node.mount} class="badge badge-outline badge-xs">
               {if @node.readonly, do: "read", else: "edit"}
             </span>
           </summary>
-          <ul id={"nested-zone-#{@effective.id}"} class="w-full min-w-0 whitespace-normal">
+          <ul id={"nested-zone-#{@effective.id}"}>
             <.tree_node
               :for={child <- @node.children}
               node={child}
@@ -242,22 +220,14 @@ defmodule LinksWeb.DashboardLive do
               collapsed={@collapsed}
               depth={@depth + 1}
             />
-            <li
-              :for={bookmark <- @node.bookmarks}
-              id={"bookmark-#{bookmark.id}"}
-            >
+            <li :for={bookmark <- @node.bookmarks} id={"bookmark-#{bookmark.id}"}>
               <a
                 phx-click="select_bookmark"
                 phx-value-id={bookmark.id}
-                class={[
-                  "w-full min-w-0 gap-2",
-                  selected?(@selected, :bookmark, bookmark.id) && "menu-active"
-                ]}
+                class={selected?(@selected, :bookmark, bookmark.id) && "menu-active"}
               >
                 <.bookmark_icon bookmark={bookmark} />
-                <span class="min-w-0 flex-1 truncate">
-                  {bookmark_label(bookmark)}
-                </span>
+                {bookmark_label(bookmark)}
               </a>
             </li>
           </ul>
@@ -686,11 +656,6 @@ defmodule LinksWeb.DashboardLive do
   def bookmark_label(%Bookmark{title: title}), do: title
 
   defp sidebar_menu_class(extra \\ []) do
-    [
-      "menu menu-vertical w-full min-w-0 max-w-full flex-nowrap rounded-box bg-base-200",
-      "[&_a]:w-full [&_a]:min-w-0 [&_li]:w-full [&_li]:min-w-0 [&_li]:flex-nowrap",
-      "[&_a]:[grid-template-columns:auto_minmax(0,1fr)_auto]"
-      | extra
-    ]
+    ["menu bg-base-200 rounded-box w-full min-w-0" | extra]
   end
 end
