@@ -24,6 +24,7 @@ defmodule LinksWeb.DashboardLive do
      |> assign(:selected, nil)
      |> assign(:selected_context, nil)
      |> assign(:public_shares, [])
+     |> assign(:collaborators, [])
      |> assign(:collaboration_email, "")
      |> assign(:collaboration_readonly, false)
      |> assign_forms()
@@ -120,6 +121,7 @@ defmodule LinksWeb.DashboardLive do
               child_collection_form={@child_collection_form}
               bookmark_form={@bookmark_form}
               public_shares={@public_shares}
+              collaborators={@collaborators}
               collaboration_email={@collaboration_email}
               collaboration_readonly={@collaboration_readonly}
             />
@@ -370,6 +372,7 @@ defmodule LinksWeb.DashboardLive do
   attr :child_collection_form, :any, required: true
   attr :bookmark_form, :any, required: true
   attr :public_shares, :list, default: []
+  attr :collaborators, :list, default: []
   attr :collaboration_email, :string, default: ""
   attr :collaboration_readonly, :boolean, default: false
 
@@ -485,6 +488,37 @@ defmodule LinksWeb.DashboardLive do
             </label>
             <button class="btn btn-primary btn-sm mt-2">Add collaborator</button>
           </.form>
+          <ul id="collaborators-list" class="mt-4 space-y-2">
+            <li
+              :for={collaborator <- @collaborators}
+              id={"collaborator-#{collaborator.id}"}
+              class="flex items-center justify-between rounded bg-base-200 p-2"
+            >
+              <div class="min-w-0">
+                <p class={[
+                  "truncate text-sm",
+                  collaborator.collaboration_revoked_at && "line-through opacity-60"
+                ]}>
+                  {collaborator.owner.email}
+                </p>
+                <p class="text-xs text-base-content/50">
+                  {collaborator_access_label(collaborator)}
+                </p>
+              </div>
+              <button
+                :if={is_nil(collaborator.collaboration_revoked_at)}
+                id={"revoke-collaborator-#{collaborator.id}"}
+                class="btn btn-ghost btn-xs"
+                phx-click="revoke_collaboration"
+                phx-value-id={collaborator.id}
+              >
+                Revoke
+              </button>
+            </li>
+            <li :if={@collaborators == []} class="text-sm text-base-content/60">
+              No collaborators yet.
+            </li>
+          </ul>
         </div>
       </div>
 
@@ -763,6 +797,19 @@ defmodule LinksWeb.DashboardLive do
     end
   end
 
+  def handle_event("revoke_collaboration", %{"id" => id}, socket) do
+    mount = Collections.get_collection!(id)
+    collection = socket.assigns.selected_context.effective_collection
+
+    case Collections.revoke_collaboration(socket.assigns.current_scope, mount) do
+      {:ok, _mount} ->
+        {:noreply, select_collection(refresh_dashboard(socket), collection.id)}
+
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, "Could not revoke collaborator")}
+    end
+  end
+
   defp refresh_dashboard(socket) do
     socket
     |> assign(:dashboard, Collections.list_dashboard(socket.assigns.current_scope))
@@ -860,10 +907,17 @@ defmodule LinksWeb.DashboardLive do
             context.effective_collection
           )
 
+        collaborators =
+          Collections.list_collaborators(
+            socket.assigns.current_scope,
+            context.effective_collection
+          )
+
         socket
         |> assign(:selected, %{type: :collection, id: context.collection.id})
         |> assign(:selected_context, context)
         |> assign(:public_shares, shares)
+        |> assign(:collaborators, collaborators)
         |> assign(
           :collection_form,
           to_form(Collection.changeset(context.effective_collection, %{}))
@@ -892,6 +946,16 @@ defmodule LinksWeb.DashboardLive do
     do: title
 
   def bookmark_label(%Bookmark{title: title}), do: title
+
+  def collaborator_access_label(%Collection{collaboration_revoked_at: revoked_at} = collaborator) do
+    access =
+      if collaborator.collaboration_readonly,
+        do: "Read-only",
+        else: "Can edit"
+
+    status = if revoked_at, do: "Revoked", else: "Active"
+    "#{access} · #{status}"
+  end
 
   defp sidebar_menu_class(extra \\ []) do
     [

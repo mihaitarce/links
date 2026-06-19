@@ -223,6 +223,38 @@ defmodule LinksWeb.DashboardLiveTest do
              )
     end
 
+    test "lists collaborators in the detail panel and revokes access", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      collection = collection_fixture(owner_scope, %{title: "Team Project"})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(
+                 owner_scope,
+                 collection,
+                 collaborator.email,
+                 false
+               )
+
+      conn = log_in_user(conn, owner_scope.user)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv
+      |> element("#collection-#{collection.id} summary")
+      |> render_click()
+
+      assert has_element?(lv, "#collaborators-list")
+      assert has_element?(lv, "#collaborator-#{mount.id}", collaborator.email)
+      assert has_element?(lv, "#collaborator-#{mount.id}", "Can edit · Active")
+
+      lv
+      |> element("#revoke-collaborator-#{mount.id}")
+      |> render_click()
+
+      assert has_element?(lv, "#collaborator-#{mount.id}", "Revoked")
+      refute has_element?(lv, "#revoke-collaborator-#{mount.id}")
+    end
+
     test "shows collaboration icons only on shared root collections", %{conn: conn} do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()

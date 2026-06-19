@@ -362,10 +362,24 @@ defmodule Links.Collections do
     end
   end
 
+  def list_collaborators(%Scope{} = scope, %Collection{} = collection) do
+    if collection.owner_id == scope.user.id do
+      Collection
+      |> where([c], c.collaboration_id == ^collection.id)
+      |> order_by([c], asc: c.collaboration_revoked_at, desc: c.inserted_at)
+      |> preload(:owner)
+      |> Repo.all()
+    else
+      []
+    end
+  end
+
   def revoke_collaboration(%Scope{} = scope, %Collection{} = collaboration_mount) do
     source = Repo.get(Collection, collaboration_mount.collaboration_id)
 
-    if source && source.owner_id == scope.user.id do
+    if source &&
+         source.owner_id == scope.user.id &&
+         active_collaboration_mount?(collaboration_mount) do
       collaboration_mount
       |> Collection.changeset(%{collaboration_revoked_at: DateTime.utc_now(:second)})
       |> Repo.update()

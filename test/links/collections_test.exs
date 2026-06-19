@@ -539,5 +539,32 @@ defmodule Links.CollectionsTest do
       refute Collections.can_view_collection?(collaborator_scope, source.id)
       refute Collections.can_edit_collection?(collaborator_scope, source.id)
     end
+
+    test "lists collaborators for a collection" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      assert [listed] = Collections.list_collaborators(owner_scope, source)
+      assert listed.id == mount.id
+      assert listed.owner.email == collaborator.email
+      assert listed.collaboration_readonly
+      refute listed.collaboration_revoked_at
+    end
+
+    test "cannot revoke an already revoked collaboration" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, false)
+
+      assert {:ok, revoked} = Collections.revoke_collaboration(owner_scope, mount)
+      assert {:error, :unauthorized} = Collections.revoke_collaboration(owner_scope, revoked)
+    end
   end
 end
