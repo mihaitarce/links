@@ -254,7 +254,7 @@ defmodule Links.Collections do
     with :ok <- authorize_bookmark_move(scope, bookmark, collection_id),
          :ok <- validate_bookmark_order(scope, bookmark, collection_id, ordered_ids) do
       Multi.new()
-      |> Multi.update(:bookmark, Bookmark.changeset(bookmark, %{collection_id: collection_id}))
+      |> Multi.update(:bookmark, Bookmark.changeset(bookmark, move_bookmark_attrs(scope, collection_id)))
       |> update_bookmark_positions(scope, collection_id, ordered_ids)
       |> Repo.transaction()
       |> case do
@@ -671,6 +671,14 @@ defmodule Links.Collections do
       id when is_integer(id) -> id
       id when is_binary(id) -> String.to_integer(id)
     end
+  end
+
+  defp move_bookmark_attrs(%Scope{} = scope, nil) do
+    %{collection_id: nil, created_by_id: scope.user.id}
+  end
+
+  defp move_bookmark_attrs(_scope, collection_id) do
+    %{collection_id: collection_id}
   end
 
   defp next_collection_position(parent_id, owner_id \\ nil)

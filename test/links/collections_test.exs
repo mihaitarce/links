@@ -394,6 +394,32 @@ defmodule Links.CollectionsTest do
       assert Collections.can_view_collection?(collaborator_scope, child.id)
     end
 
+    test "moving a shared bookmark to inbox transfers ownership to the mover" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      collection = collection_fixture(owner_scope, %{title: "Shared"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, collection, collaborator.email, false)
+
+      {:ok, bookmark} =
+        Collections.create_bookmark(owner_scope, %{
+          title: "Shared link",
+          url: "https://example.com/shared",
+          collection_id: collection.id
+        })
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:ok, moved} =
+               Collections.move_bookmark(collaborator_scope, bookmark.id, nil, [bookmark.id])
+
+      assert moved.collection_id == nil
+      assert moved.created_by_id == collaborator.id
+      assert Collections.list_inbox_bookmarks(collaborator_scope) == [moved]
+      assert Collections.list_inbox_bookmarks(owner_scope) == []
+    end
+
     test "revoked collaborations stay in the tree but stop granting access" do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()
