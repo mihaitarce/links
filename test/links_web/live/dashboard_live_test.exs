@@ -106,6 +106,31 @@ defmodule LinksWeb.DashboardLiveTest do
       assert has_element?(lv, "#collection-#{collection.id} summary .badge.badge-ghost", "1")
     end
 
+    test "shows total bookmark counts including sub-collections", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      parent = collection_fixture(scope, %{title: "Parent"})
+      child = collection_fixture(scope, %{title: "Child", parent_id: parent.id})
+
+      {:ok, _} =
+        Collections.create_bookmark(scope, %{
+          title: "Parent link",
+          url: "https://example.com/parent",
+          collection_id: parent.id
+        })
+
+      {:ok, _} =
+        Collections.create_bookmark(scope, %{
+          title: "Child link",
+          url: "https://example.com/child",
+          collection_id: child.id
+        })
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      assert has_element?(lv, "#collection-#{parent.id} summary .badge.badge-ghost", "2")
+      assert has_element?(lv, "#collection-#{child.id} summary .badge.badge-ghost", "1")
+    end
+
     test "keeps collection trees collapsed on initial load", %{conn: conn} do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
       parent = collection_fixture(scope, %{title: "Parent"})

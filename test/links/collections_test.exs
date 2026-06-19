@@ -82,6 +82,33 @@ defmodule Links.CollectionsTest do
       assert Collections.get_bookmark!(bookmark.id).position == 1
     end
 
+    test "tree nodes count bookmarks in descendant collections" do
+      scope = user_scope_fixture()
+      parent = collection_fixture(scope, %{title: "Parent"})
+      child = collection_fixture(scope, %{title: "Child", parent_id: parent.id})
+
+      {:ok, _} =
+        Collections.create_bookmark(scope, %{
+          title: "Parent link",
+          url: "https://example.com/parent",
+          collection_id: parent.id
+        })
+
+      {:ok, _} =
+        Collections.create_bookmark(scope, %{
+          title: "Child link",
+          url: "https://example.com/child",
+          collection_id: child.id
+        })
+
+      dashboard = Collections.list_dashboard(scope)
+      [parent_node] = dashboard.tree
+
+      assert parent_node.bookmark_count == 2
+      [child_node] = parent_node.children
+      assert child_node.bookmark_count == 1
+    end
+
     test "broadcasts collection bookmark list changes" do
       scope = user_scope_fixture()
       source = collection_fixture(scope, %{title: "Source"})

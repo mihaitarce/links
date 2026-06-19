@@ -463,6 +463,9 @@ defmodule Links.Collections do
   end
 
   defp node(collection, effective_collection, children, bookmarks, mount, readonly, revoked) do
+    bookmark_count =
+      length(bookmarks) + Enum.sum(Enum.map(children, & &1.bookmark_count))
+
     %{
       collection: collection,
       effective_collection: effective_collection,
@@ -471,7 +474,8 @@ defmodule Links.Collections do
       revoked: revoked,
       title: effective_collection.title,
       children: children,
-      bookmarks: bookmarks
+      bookmarks: bookmarks,
+      bookmark_count: bookmark_count
     }
   end
 

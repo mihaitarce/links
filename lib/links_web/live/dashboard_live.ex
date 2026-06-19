@@ -262,7 +262,7 @@ defmodule LinksWeb.DashboardLive do
             <.folder_icon />
             <span class="min-w-0 truncate">{@node.title}</span>
             <span class="badge badge-ghost badge-xs tabular-nums">
-              {length(@node.bookmarks)}
+              {@node.bookmark_count}
             </span>
             <span :if={@collaboration_mount?} class="badge badge-outline badge-xs">
               {if @node.readonly, do: "read", else: "edit"}
