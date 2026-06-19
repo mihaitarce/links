@@ -260,14 +260,14 @@ defmodule LinksWeb.DashboardLive do
             phx-value-id={@collection.id}
           >
             <.folder_icon />
-            <span class="flex min-w-0 items-center gap-1.5">
-              <span class="min-w-0 truncate">{@node.title}</span>
+            <span class="flex min-w-0 items-center gap-1.5 leading-none">
+              <span class="min-w-0 truncate leading-normal">{@node.title}</span>
               <span class="badge badge-ghost badge-xs shrink-0 tabular-nums">
                 {@node.bookmark_count}
               </span>
               <span
                 :if={@collaboration_mount?}
-                class="shrink-0 text-base-content/60"
+                class="inline-flex shrink-0 items-center justify-center self-center text-base-content/60"
                 aria-label={
                   if(@node.readonly,
                     do: "Read-only collaboration",
@@ -277,7 +277,7 @@ defmodule LinksWeb.DashboardLive do
               >
                 <.icon
                   name={if @node.readonly, do: "hero-eye", else: "hero-pencil-square"}
-                  class="size-4"
+                  class="size-4 block leading-none"
                 />
               </span>
             </span>
