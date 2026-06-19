@@ -37,6 +37,17 @@ defmodule LinksWeb.DashboardLiveTest do
       assert html =~ "https://example.com/new"
     end
 
+    test "inbox bookmark lists are sortable", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      bookmark_fixture(scope, %{title: "Inbox link", url: "https://example.com/inbox"})
+      {:ok, _lv, html} = live(conn, ~p"/")
+
+      assert html =~ ~s(id="bookmarks-zone-inbox")
+      assert html =~ ~s(phx-hook="CollectionBookmarkSort")
+      assert html =~ ~s(data-collection-id="")
+      assert html =~ "bookmark-drag-handle"
+    end
+
     test "collection bookmark lists are sortable", %{conn: conn} do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
       collection = collection_fixture(scope, %{title: "Reading"})

@@ -71,6 +71,18 @@ defmodule Links.Collections do
     )
   end
 
+  def inbox_bookmarks_topic(user_id) do
+    "inbox_bookmarks:#{user_id}"
+  end
+
+  def broadcast_inbox_bookmarks_changed(user_id) do
+    Phoenix.PubSub.broadcast(
+      Links.PubSub,
+      inbox_bookmarks_topic(user_id),
+      {:inbox_bookmarks_changed, user_id}
+    )
+  end
+
   def get_collection!(id), do: Repo.get!(Collection, id)
 
   def get_visible_collection(%Scope{} = scope, id) do
@@ -163,6 +175,9 @@ defmodule Links.Collections do
     |> Bookmark.changeset(attrs)
     |> Repo.insert()
     |> enqueue_metadata_fetch()
+    |> tap(fn {:ok, _bookmark} ->
+      broadcast_inbox_bookmarks_changed(scope.user.id)
+    end)
   end
 
   def create_bookmark(%Scope{} = scope, attrs) do
@@ -204,6 +219,7 @@ defmodule Links.Collections do
       collection_id = bookmark.collection_id
 
       with {:ok, bookmark} <- Repo.delete(bookmark) do
+        broadcast_inbox_bookmarks_changed(scope.user.id)
         broadcast_collection_bookmarks_changed(collection_id)
         {:ok, bookmark}
       end
@@ -219,23 +235,19 @@ defmodule Links.Collections do
   def move_bookmark(%Scope{} = scope, bookmark_id, collection_id, ordered_ids) do
     bookmark = get_bookmark!(bookmark_id)
     source_collection_id = bookmark.collection_id
-    collection_id = to_integer(collection_id)
+    collection_id = normalize_collection_id(collection_id)
     ordered_ids = Enum.map(ordered_ids, &to_integer/1)
 
     with :ok <- authorize_bookmark_move(scope, bookmark, collection_id),
-         :ok <- validate_bookmark_order(bookmark, collection_id, ordered_ids) do
+         :ok <- validate_bookmark_order(scope, bookmark, collection_id, ordered_ids) do
       Multi.new()
       |> Multi.update(:bookmark, Bookmark.changeset(bookmark, %{collection_id: collection_id}))
-      |> update_bookmark_positions(collection_id, ordered_ids)
+      |> update_bookmark_positions(scope, collection_id, ordered_ids)
       |> Repo.transaction()
       |> case do
         {:ok, %{bookmark: bookmark}} ->
-          broadcast_collection_bookmarks_changed(collection_id)
-
-          if source_collection_id != collection_id do
-            broadcast_collection_bookmarks_changed(source_collection_id)
-          end
-
+          broadcast_bookmark_list_changes(scope, source_collection_id)
+          broadcast_bookmark_list_changes(scope, collection_id)
           {:ok, bookmark}
 
         {:error, _name, reason, _changes} ->
@@ -520,7 +532,26 @@ defmodule Links.Collections do
     end
   end
 
-  defp validate_bookmark_order(bookmark, collection_id, ordered_ids) do
+  defp validate_bookmark_order(%Scope{} = scope, bookmark, nil, ordered_ids) do
+    user_id = scope.user.id
+
+    existing_in_target =
+      Bookmark
+      |> where(
+        [b],
+        b.created_by_id == ^user_id and is_nil(b.collection_id) and b.id != ^bookmark.id
+      )
+      |> select([b], b.id)
+      |> Repo.all()
+      |> MapSet.new()
+
+    expected = MapSet.put(existing_in_target, bookmark.id)
+    actual = MapSet.new(ordered_ids)
+
+    if MapSet.equal?(expected, actual), do: :ok, else: {:error, :invalid_order}
+  end
+
+  defp validate_bookmark_order(_scope, bookmark, collection_id, ordered_ids) do
     existing_in_target =
       Bookmark
       |> where([b], b.collection_id == ^collection_id and b.id != ^bookmark.id)
@@ -534,7 +565,22 @@ defmodule Links.Collections do
     if MapSet.equal?(expected, actual), do: :ok, else: {:error, :invalid_order}
   end
 
-  defp update_bookmark_positions(multi, collection_id, ordered_ids) do
+  defp update_bookmark_positions(multi, %Scope{} = scope, nil, ordered_ids) do
+    user_id = scope.user.id
+
+    ordered_ids
+    |> Enum.with_index()
+    |> Enum.reduce(multi, fn {id, position}, multi ->
+      Multi.update_all(
+        multi,
+        {:bookmark_position, id},
+        bookmark_position_query(id, nil, user_id),
+        set: [position: position]
+      )
+    end)
+  end
+
+  defp update_bookmark_positions(multi, _scope, collection_id, ordered_ids) do
     ordered_ids
     |> Enum.with_index()
     |> Enum.reduce(multi, fn {id, position}, multi ->
@@ -547,8 +593,31 @@ defmodule Links.Collections do
     end)
   end
 
+  defp bookmark_position_query(id, nil, user_id) do
+    from(b in Bookmark,
+      where: b.id == ^id and is_nil(b.collection_id) and b.created_by_id == ^user_id
+    )
+  end
+
   defp bookmark_position_query(id, collection_id) do
     from(b in Bookmark, where: b.id == ^id and b.collection_id == ^collection_id)
+  end
+
+  defp broadcast_bookmark_list_changes(%Scope{} = scope, nil) do
+    broadcast_inbox_bookmarks_changed(scope.user.id)
+  end
+
+  defp broadcast_bookmark_list_changes(_scope, collection_id) do
+    broadcast_collection_bookmarks_changed(collection_id)
+  end
+
+  defp normalize_collection_id(value) do
+    case value do
+      nil -> nil
+      "" -> nil
+      id when is_integer(id) -> id
+      id when is_binary(id) -> String.to_integer(id)
+    end
   end
 
   defp next_collection_position(parent_id, owner_id \\ nil)

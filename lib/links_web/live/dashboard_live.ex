@@ -7,7 +7,14 @@ defmodule LinksWeb.DashboardLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    if connected?(socket), do: Phoenix.PubSub.subscribe(Links.PubSub, "bookmarks")
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(Links.PubSub, "bookmarks")
+
+      Phoenix.PubSub.subscribe(
+        Links.PubSub,
+        Collections.inbox_bookmarks_topic(socket.assigns.current_scope.user.id)
+      )
+    end
 
     {:ok,
      socket
@@ -53,11 +60,22 @@ defmodule LinksWeb.DashboardLive do
                 </h2>
                 <span class="badge badge-ghost badge-sm">{length(@dashboard.inbox)}</span>
               </div>
-              <ul id="bookmarks-zone-inbox" class={sidebar_menu_class()}>
-                <li :for={bookmark <- @dashboard.inbox} id={"bookmark-#{bookmark.id}"}>
+              <ul
+                id="bookmarks-zone-inbox"
+                phx-hook="CollectionBookmarkSort"
+                data-bookmark-sortable
+                data-collection-id=""
+                class={sidebar_menu_class()}
+              >
+                <li
+                  :for={bookmark <- @dashboard.inbox}
+                  id={"bookmark-#{bookmark.id}"}
+                  data-id={bookmark.id}
+                >
                   <.bookmark_menu_link
                     bookmark={bookmark}
                     selected={selected?(@selected, :bookmark, bookmark.id)}
+                    show_drag_handle
                   />
                 </li>
               </ul>
@@ -272,6 +290,10 @@ defmodule LinksWeb.DashboardLive do
 
   @impl true
   def handle_info({:collection_bookmarks_changed, _collection_id}, socket) do
+    {:noreply, refresh_dashboard_and_selection(socket)}
+  end
+
+  def handle_info({:inbox_bookmarks_changed, _user_id}, socket) do
     {:noreply, refresh_dashboard_and_selection(socket)}
   end
 
@@ -771,6 +793,7 @@ defmodule LinksWeb.DashboardLive do
          "collection_id" => collection_id,
          "ordered_ids" => ordered_ids
        }) do
+    collection_id = if collection_id in [nil, ""], do: nil, else: collection_id
     %{id: id, collection_id: collection_id, ordered_ids: ordered_ids}
   end
 

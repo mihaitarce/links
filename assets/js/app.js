@@ -40,11 +40,18 @@ const CollectionBookmarkSort = {
   initSortables() {
     this.sortables = []
 
-    this.el.querySelectorAll("[data-bookmark-sortable]").forEach((el) => {
+    const containers = [
+      ...(this.el.hasAttribute("data-bookmark-sortable") ? [this.el] : []),
+      ...this.el.querySelectorAll("[data-bookmark-sortable]"),
+    ]
+
+    containers.forEach((el) => {
       if (el.dataset.readonly === "true") return
 
+      const isInbox = el.dataset.collectionId === ""
+
       const sortable = new Sortable(el, {
-        group: "bookmarks",
+        group: isInbox ? "inbox" : "bookmarks",
         animation: 150,
         handle: ".bookmark-drag-handle",
         draggable: "li[id^='bookmark-']",

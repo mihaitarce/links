@@ -109,6 +109,42 @@ defmodule Links.CollectionsTest do
       assert_receive {:collection_bookmarks_changed, collection_id}
                      when collection_id == source.id
     end
+
+    test "reorders inbox bookmarks" do
+      scope = user_scope_fixture()
+
+      {:ok, first} =
+        Collections.create_inbox_bookmark(scope, %{
+          title: "First",
+          url: "https://example.com/1"
+        })
+
+      {:ok, second} =
+        Collections.create_inbox_bookmark(scope, %{
+          title: "Second",
+          url: "https://example.com/2"
+        })
+
+      assert {:ok, _bookmark} =
+               Collections.move_bookmark(scope, second.id, nil, [second.id, first.id])
+
+      assert Collections.get_bookmark!(second.id).position == 0
+      assert Collections.get_bookmark!(first.id).position == 1
+    end
+
+    test "broadcasts inbox bookmark list changes" do
+      scope = user_scope_fixture()
+
+      Phoenix.PubSub.subscribe(Links.PubSub, Collections.inbox_bookmarks_topic(scope.user.id))
+
+      {:ok, _bookmark} =
+        Collections.create_inbox_bookmark(scope, %{
+          title: "Link",
+          url: "https://example.com/link"
+        })
+
+      assert_receive {:inbox_bookmarks_changed, user_id} when user_id == scope.user.id
+    end
   end
 
   describe "public shares" do
