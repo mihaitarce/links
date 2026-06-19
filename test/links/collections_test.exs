@@ -5,6 +5,7 @@ defmodule Links.CollectionsTest do
   import Links.CollectionsFixtures
 
   alias Links.Collections
+  alias Links.Collections.Collection
   alias Links.Repo
 
   describe "collections and inbox bookmarks" do
@@ -565,6 +566,73 @@ defmodule Links.CollectionsTest do
 
       assert {:ok, revoked} = Collections.revoke_collaboration(owner_scope, mount)
       assert {:error, :unauthorized} = Collections.revoke_collaboration(owner_scope, revoked)
+    end
+
+    test "broadcasts user collection list changes when sharing and revoking" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+
+      Phoenix.PubSub.subscribe(
+        Links.PubSub,
+        Collections.user_collections_topic(owner_scope.user.id)
+      )
+
+      Phoenix.PubSub.subscribe(
+        Links.PubSub,
+        Collections.user_collections_topic(collaborator.id)
+      )
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      assert_receive {:user_collections_changed, user_id} when user_id == collaborator.id
+      assert_receive {:user_collections_changed, user_id} when user_id == owner_scope.user.id
+
+      assert {:ok, _mount} = Collections.revoke_collaboration(owner_scope, mount)
+
+      assert_receive {:user_collections_changed, user_id} when user_id == collaborator.id
+      assert_receive {:user_collections_changed, user_id} when user_id == owner_scope.user.id
+    end
+
+    test "deleting a shared collection removes only the collaborator mount" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      other = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared Project"})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, false)
+
+      assert {:ok, _other_mount} =
+               Collections.create_collaboration(owner_scope, source, other.email, true)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:ok, _deleted_mount} = Collections.delete_collection(collaborator_scope, source)
+
+      assert Collections.get_collection!(source.id).title == "Shared Project"
+      refute Repo.get(Collection, mount.id)
+      refute Collections.can_view_collection?(collaborator_scope, source.id)
+
+      other_scope = user_scope_fixture(other)
+      assert Collections.can_view_collection?(other_scope, source.id)
+      assert length(Collections.list_collaborators(owner_scope, source)) == 1
+    end
+
+    test "collaborators can remove a shared collection using their mount id" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared Project"})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:ok, _deleted_mount} = Collections.delete_collection(collaborator_scope, mount)
+      assert Collections.get_collection!(source.id).id == source.id
+      refute Repo.get(Collection, mount.id)
     end
   end
 end

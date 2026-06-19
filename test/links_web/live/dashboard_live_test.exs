@@ -6,6 +6,8 @@ defmodule LinksWeb.DashboardLiveTest do
   import Links.CollectionsFixtures
 
   alias Links.Collections
+  alias Links.Collections.Collection
+  alias Links.Repo
 
   describe "dashboard access" do
     test "redirects anonymous users to login", %{conn: conn} do
@@ -253,6 +255,56 @@ defmodule LinksWeb.DashboardLiveTest do
 
       assert has_element?(lv, "#collaborator-#{mount.id}", "Revoked")
       refute has_element?(lv, "#revoke-collaborator-#{mount.id}")
+    end
+
+    test "updates collaborator tree when a collection is shared or revoked", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Live Shared"})
+
+      conn = log_in_user(conn, collaborator)
+      {:ok, lv, html} = live(conn, ~p"/")
+
+      refute html =~ "Live Shared"
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      html = render(lv)
+      assert html =~ "Live Shared"
+      assert has_element?(lv, "#collection-#{mount.id}")
+
+      assert {:ok, _mount} = Collections.revoke_collaboration(owner_scope, mount)
+
+      render(lv)
+      assert has_element?(lv, "#collection-#{mount.id}.menu-disabled")
+    end
+
+    test "collaborator removing a shared collection deletes only their mount", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared To Remove"})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, false)
+
+      conn = log_in_user(conn, collaborator)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv
+      |> element("#collection-#{mount.id} summary")
+      |> render_click()
+
+      assert has_element?(lv, "button", "Remove")
+
+      lv
+      |> element("button", "Remove")
+      |> render_click()
+
+      html = render(lv)
+      refute html =~ "Shared To Remove"
+      assert Collections.get_collection!(source.id).title == "Shared To Remove"
+      refute Repo.get(Collection, mount.id)
     end
 
     test "shows collaboration icons only on shared root collections", %{conn: conn} do

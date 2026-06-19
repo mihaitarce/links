@@ -87,6 +87,18 @@ defmodule Links.Collections do
     )
   end
 
+  def user_collections_topic(user_id) do
+    "user_collections:#{user_id}"
+  end
+
+  def broadcast_user_collections_changed(user_id) do
+    Phoenix.PubSub.broadcast(
+      Links.PubSub,
+      user_collections_topic(user_id),
+      {:user_collections_changed, user_id}
+    )
+  end
+
   def get_collection!(id), do: Repo.get!(Collection, id)
 
   def get_visible_collection(%Scope{} = scope, id) do
@@ -168,7 +180,17 @@ defmodule Links.Collections do
   end
 
   def delete_collection(%Scope{} = scope, %Collection{} = collection) do
-    if can_edit_collection?(scope, collection.id) do
+    case collaboration_mount_for_user(scope, collection) do
+      %Collection{} = mount ->
+        delete_collaboration_mount(scope, mount)
+
+      nil ->
+        delete_owned_collection(scope, collection)
+    end
+  end
+
+  defp delete_owned_collection(%Scope{} = scope, %Collection{} = collection) do
+    if collection.owner_id == scope.user.id and is_nil(collection.collaboration_id) do
       collection_id = collection.id
       parent_id = collection.parent_id
 
@@ -179,6 +201,39 @@ defmodule Links.Collections do
       end
     else
       {:error, :unauthorized}
+    end
+  end
+
+  defp delete_collaboration_mount(%Scope{} = scope, %Collection{} = mount) do
+    source = Repo.get(Collection, mount.collaboration_id)
+
+    if mount.owner_id == scope.user.id and not is_nil(mount.collaboration_id) do
+      with {:ok, mount} <- Repo.delete(mount) do
+        broadcast_user_collections_changed(scope.user.id)
+
+        if source do
+          broadcast_user_collections_changed(source.owner_id)
+        end
+
+        {:ok, mount}
+      end
+    else
+      {:error, :unauthorized}
+    end
+  end
+
+  defp collaboration_mount_for_user(%Scope{} = scope, %Collection{} = collection) do
+    cond do
+      collection.owner_id == scope.user.id and not is_nil(collection.collaboration_id) ->
+        collection
+
+      collection.owner_id != scope.user.id ->
+        Collection
+        |> where([c], c.owner_id == ^scope.user.id and c.collaboration_id == ^collection.id)
+        |> Repo.one()
+
+      true ->
+        nil
     end
   end
 
@@ -357,6 +412,14 @@ defmodule Links.Collections do
       %Collection{}
       |> Collection.changeset(attrs)
       |> Repo.insert()
+      |> tap(fn
+        {:ok, _mount} ->
+          broadcast_user_collections_changed(collaborator.id)
+          broadcast_user_collections_changed(scope.user.id)
+
+        _ ->
+          :ok
+      end)
     else
       _ -> {:error, :unauthorized}
     end
@@ -383,6 +446,14 @@ defmodule Links.Collections do
       collaboration_mount
       |> Collection.changeset(%{collaboration_revoked_at: DateTime.utc_now(:second)})
       |> Repo.update()
+      |> tap(fn
+        {:ok, _mount} ->
+          broadcast_user_collections_changed(collaboration_mount.owner_id)
+          broadcast_user_collections_changed(scope.user.id)
+
+        _ ->
+          :ok
+      end)
     else
       {:error, :unauthorized}
     end

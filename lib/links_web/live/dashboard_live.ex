@@ -14,6 +14,11 @@ defmodule LinksWeb.DashboardLive do
         Links.PubSub,
         Collections.inbox_bookmarks_topic(socket.assigns.current_scope.user.id)
       )
+
+      Phoenix.PubSub.subscribe(
+        Links.PubSub,
+        Collections.user_collections_topic(socket.assigns.current_scope.user.id)
+      )
     end
 
     {:ok,
@@ -351,6 +356,10 @@ defmodule LinksWeb.DashboardLive do
     {:noreply, refresh_dashboard_and_selection(socket)}
   end
 
+  def handle_info({:user_collections_changed, _user_id}, socket) do
+    {:noreply, refresh_dashboard_and_selection(socket)}
+  end
+
   def handle_info({:bookmark_metadata_updated, bookmark_id}, socket) do
     socket = refresh_dashboard(socket)
 
@@ -433,13 +442,13 @@ defmodule LinksWeb.DashboardLive do
             <p :if={@readonly} class="mt-1 text-sm text-base-content/60">Read-only access</p>
           </div>
           <button
-            :if={!@readonly}
+            :if={@context.mount || !@readonly}
             type="button"
             class="btn btn-error btn-soft btn-sm"
             phx-click="delete_collection"
-            phx-value-id={@context.effective_collection.id}
+            phx-value-id={@context.collection.id}
           >
-            Delete
+            {if @context.mount, do: "Remove", else: "Delete"}
           </button>
         </div>
 
