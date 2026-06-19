@@ -23,12 +23,10 @@ defmodule Links.Collections do
       |> order_by([c], asc: c.position, asc: c.title, asc: c.id)
       |> Repo.all()
 
-    active_mount_targets =
-      own_collections
-      |> Enum.filter(&active_collaboration_mount?/1)
-      |> Enum.map(& &1.collaboration_id)
-
-    visible_target_ids = descendant_ids(active_mount_targets)
+    visible_target_ids =
+      scope
+      |> accessible_tree_root_ids()
+      |> descendant_ids()
 
     target_collections =
       Collection
@@ -464,27 +462,53 @@ defmodule Links.Collections do
 
   defp visible_collaboration_ids(%Scope{} = scope) do
     scope
-    |> active_mounts()
-    |> Enum.map(& &1.collaboration_id)
+    |> accessible_tree_root_ids()
     |> descendant_ids()
   end
 
   defp editable_collaboration_ids(%Scope{} = scope) do
-    scope
-    |> active_mounts()
-    |> Enum.reject(& &1.collaboration_readonly)
-    |> Enum.map(& &1.collaboration_id)
+    user_id = scope.user.id
+
+    own_source_ids =
+      Collection
+      |> where([c], c.owner_id == ^user_id and is_nil(c.collaboration_id))
+      |> select([c], c.id)
+      |> Repo.all()
+
+    collaboration_target_ids =
+      Collection
+      |> where(
+        [c],
+        c.owner_id == ^user_id and not is_nil(c.collaboration_id) and
+          is_nil(c.collaboration_revoked_at) and c.collaboration_readonly == false
+      )
+      |> select([c], c.collaboration_id)
+      |> Repo.all()
+
+    (own_source_ids ++ collaboration_target_ids)
     |> descendant_ids()
   end
 
-  defp active_mounts(%Scope{} = scope) do
-    Collection
-    |> where(
-      [c],
-      c.owner_id == ^scope.user.id and not is_nil(c.collaboration_id) and
-        is_nil(c.collaboration_revoked_at)
-    )
-    |> Repo.all()
+  defp accessible_tree_root_ids(%Scope{} = scope) do
+    user_id = scope.user.id
+
+    own_source_ids =
+      Collection
+      |> where([c], c.owner_id == ^user_id and is_nil(c.collaboration_id))
+      |> select([c], c.id)
+      |> Repo.all()
+
+    collaboration_target_ids =
+      Collection
+      |> where(
+        [c],
+        c.owner_id == ^user_id and not is_nil(c.collaboration_id) and
+          is_nil(c.collaboration_revoked_at)
+      )
+      |> select([c], c.collaboration_id)
+      |> Repo.all()
+
+    own_source_ids ++ collaboration_target_ids
   end
 
   defp descendant_ids([]), do: []

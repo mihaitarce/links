@@ -223,6 +223,123 @@ defmodule Links.CollectionsTest do
       assert Collections.can_view_collection?(collaborator_scope, source.id)
     end
 
+    test "collaborators see nested child collections under a shared parent" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      parent = collection_fixture(owner_scope, %{title: "Shared Parent"})
+
+      {:ok, child} =
+        Collections.create_collection(owner_scope, %{
+          title: "Child Folder",
+          parent_id: parent.id
+        })
+
+      {:ok, _mount} =
+        Collections.create_collaboration(owner_scope, parent, collaborator.email, true)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+      dashboard = Collections.list_dashboard(collaborator_scope)
+
+      assert [%{title: "Shared Parent", readonly: true, children: children}] = dashboard.tree
+      assert Enum.any?(children, &(&1.title == "Child Folder"))
+      assert Collections.can_view_collection?(collaborator_scope, child.id)
+    end
+
+    test "owner sees collaborator-created child collections under a shared parent" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      parent = collection_fixture(owner_scope, %{title: "Shared Parent"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, parent, collaborator.email, false)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:ok, child} =
+               Collections.create_collection(collaborator_scope, %{
+                 title: "Collab Child",
+                 parent_id: parent.id
+               })
+
+      owner_dashboard = Collections.list_dashboard(owner_scope)
+      children = hd(owner_dashboard.tree).children
+
+      assert Enum.any?(children, &(&1.title == "Collab Child"))
+      assert Collections.can_view_collection?(owner_scope, child.id)
+      assert Collections.can_edit_collection?(owner_scope, child.id)
+    end
+
+    test "collaborators see grandchildren under a shared parent" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      parent = collection_fixture(owner_scope, %{title: "Shared Parent"})
+      child = collection_fixture(owner_scope, %{title: "Child", parent_id: parent.id})
+
+      {:ok, grandchild} =
+        Collections.create_collection(owner_scope, %{
+          title: "Grandchild",
+          parent_id: child.id
+        })
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, parent, collaborator.email, true)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+      dashboard = Collections.list_dashboard(collaborator_scope)
+
+      child_node = hd(hd(dashboard.tree).children)
+      assert child_node.title == "Child"
+      assert hd(child_node.children).title == "Grandchild"
+      assert Collections.can_view_collection?(collaborator_scope, grandchild.id)
+    end
+
+    test "collaborators see descendants when only a sub-collection is shared" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      root = collection_fixture(owner_scope, %{title: "Root"})
+      shared = collection_fixture(owner_scope, %{title: "Shared Sub", parent_id: root.id})
+
+      {:ok, child} =
+        Collections.create_collection(owner_scope, %{
+          title: "Nested",
+          parent_id: shared.id
+        })
+
+      _sibling = collection_fixture(owner_scope, %{title: "Sibling", parent_id: root.id})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, shared, collaborator.email, true)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+      dashboard = Collections.list_dashboard(collaborator_scope)
+
+      assert [%{title: "Shared Sub", children: [%{title: "Nested"}]}] = dashboard.tree
+      assert Collections.can_view_collection?(collaborator_scope, child.id)
+      refute Collections.can_view_collection?(collaborator_scope, root.id)
+    end
+
+    test "collaborators see child collections added after sharing" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      parent = collection_fixture(owner_scope, %{title: "Shared Parent"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, parent, collaborator.email, false)
+
+      {:ok, child} =
+        Collections.create_collection(owner_scope, %{
+          title: "Later Child",
+          parent_id: parent.id
+        })
+
+      collaborator_scope = user_scope_fixture(collaborator)
+      dashboard = Collections.list_dashboard(collaborator_scope)
+
+      assert [%{title: "Shared Parent", children: children}] = dashboard.tree
+      assert Enum.any?(children, &(&1.title == "Later Child"))
+      assert Collections.can_view_collection?(collaborator_scope, child.id)
+    end
+
     test "revoked collaborations stay in the tree but stop granting access" do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()
