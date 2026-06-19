@@ -43,11 +43,17 @@ defmodule Links.Collections do
       |> order_by([b], asc: b.position, asc: b.title, asc: b.id)
       |> Repo.all()
 
+    shared_ids = shared_collection_ids(user_id)
+
     %{
       inbox: list_inbox_bookmarks(scope),
-      tree: build_tree(collections, bookmarks, own_collections),
+      tree: build_tree(collections, bookmarks, own_collections, shared_ids),
       collections: collections
     }
+  end
+
+  def shared_collection?(%Scope{} = scope, collection_id) do
+    MapSet.member?(shared_collection_ids(scope.user.id), collection_id)
   end
 
   def list_inbox_bookmarks(%Scope{} = scope) do
@@ -428,7 +434,7 @@ defmodule Links.Collections do
     can_view_collection?(scope, collection_id)
   end
 
-  defp build_tree(collections, bookmarks, own_collections) do
+  defp build_tree(collections, bookmarks, own_collections, shared_ids) do
     by_id = Map.new(collections, &{&1.id, &1})
     by_parent = Enum.group_by(collections, & &1.parent_id)
     bookmarks_by_collection = Enum.group_by(bookmarks, & &1.collection_id)
@@ -436,18 +442,21 @@ defmodule Links.Collections do
     own_collections
     |> Enum.filter(&is_nil(&1.parent_id))
     |> Enum.sort_by(&{&1.position, &1.title, &1.id})
-    |> Enum.map(&build_node(&1, by_id, by_parent, bookmarks_by_collection, nil))
+    |> Enum.map(&build_node(&1, by_id, by_parent, bookmarks_by_collection, nil, shared_ids))
   end
 
-  defp build_node(collection, by_id, by_parent, bookmarks_by_collection, mount) do
+  defp build_node(collection, by_id, by_parent, bookmarks_by_collection, mount, shared_ids) do
     cond do
       revoked_collaboration_mount?(collection) ->
-        node(collection, collection, [], [], collection, true, true)
+        node(collection, collection, [], [], collection, true, true, false)
 
       active_collaboration_mount?(collection) ->
         target = Map.fetch!(by_id, collection.collaboration_id)
         mount = %{root: collection, readonly: collection.collaboration_readonly}
-        children = child_nodes(target, by_id, by_parent, bookmarks_by_collection, mount)
+
+        children =
+          child_nodes(target, by_id, by_parent, bookmarks_by_collection, mount, shared_ids)
+
         bookmarks = Map.get(bookmarks_by_collection, target.id, [])
 
         node(
@@ -457,13 +466,17 @@ defmodule Links.Collections do
           bookmarks,
           collection,
           collection.collaboration_readonly,
+          false,
           false
         )
 
       true ->
-        children = child_nodes(collection, by_id, by_parent, bookmarks_by_collection, mount)
+        children =
+          child_nodes(collection, by_id, by_parent, bookmarks_by_collection, mount, shared_ids)
+
         bookmarks = Map.get(bookmarks_by_collection, collection.id, [])
         readonly = mount && mount.readonly
+        shared = MapSet.member?(shared_ids, collection.id)
 
         node(
           collection,
@@ -472,19 +485,29 @@ defmodule Links.Collections do
           bookmarks,
           mount && mount.root,
           readonly || false,
-          false
+          false,
+          shared
         )
     end
   end
 
-  defp child_nodes(collection, by_id, by_parent, bookmarks_by_collection, mount) do
+  defp child_nodes(collection, by_id, by_parent, bookmarks_by_collection, mount, shared_ids) do
     collection.id
     |> then(&Map.get(by_parent, &1, []))
     |> Enum.sort_by(&{&1.position, &1.title, &1.id})
-    |> Enum.map(&build_node(&1, by_id, by_parent, bookmarks_by_collection, mount))
+    |> Enum.map(&build_node(&1, by_id, by_parent, bookmarks_by_collection, mount, shared_ids))
   end
 
-  defp node(collection, effective_collection, children, bookmarks, mount, readonly, revoked) do
+  defp node(
+         collection,
+         effective_collection,
+         children,
+         bookmarks,
+         mount,
+         readonly,
+         revoked,
+         shared
+       ) do
     bookmark_count =
       length(bookmarks) + Enum.sum(Enum.map(children, & &1.bookmark_count))
 
@@ -494,11 +517,34 @@ defmodule Links.Collections do
       mount: mount,
       readonly: readonly,
       revoked: revoked,
+      shared: shared,
       title: effective_collection.title,
       children: children,
       bookmarks: bookmarks,
       bookmark_count: bookmark_count
     }
+  end
+
+  defp shared_collection_ids(user_id) do
+    collaboration_ids =
+      Collection
+      |> where([c], not is_nil(c.collaboration_id) and is_nil(c.collaboration_revoked_at))
+      |> join(:inner, [c], source in Collection, on: source.id == c.collaboration_id)
+      |> where([_c, source], source.owner_id == ^user_id)
+      |> select([_c, source], source.id)
+      |> distinct(true)
+      |> Repo.all()
+
+    public_share_ids =
+      PublicShare
+      |> where([s], is_nil(s.revoked_at))
+      |> join(:inner, [s], collection in Collection, on: collection.id == s.collection_id)
+      |> where([_s, collection], collection.owner_id == ^user_id)
+      |> select([_s, collection], collection.id)
+      |> distinct(true)
+      |> Repo.all()
+
+    MapSet.new(collaboration_ids ++ public_share_ids)
   end
 
   defp visible_collaboration_ids(%Scope{} = scope) do

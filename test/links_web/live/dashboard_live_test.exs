@@ -206,6 +206,23 @@ defmodule LinksWeb.DashboardLiveTest do
       assert html =~ "Select a collection or bookmark"
     end
 
+    test "shows shared icon on owned collections shared with collaborators", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      collection = collection_fixture(owner_scope, %{title: "Shared Project"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, collection, collaborator.email, true)
+
+      conn = log_in_user(conn, owner_scope.user)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      assert has_element?(
+               lv,
+               "#collection-#{collection.id} summary [aria-label='Shared with others']"
+             )
+    end
+
     test "shows collaboration icons only on shared root collections", %{conn: conn} do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()

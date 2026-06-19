@@ -275,6 +275,13 @@ defmodule LinksWeb.DashboardLive do
                 {@node.bookmark_count}
               </span>
               <span
+                :if={@node.shared}
+                class="inline-flex shrink-0 items-center justify-center self-center text-base-content/60"
+                aria-label="Shared with others"
+              >
+                <.icon name="hero-user-group" class="size-4 block leading-none" />
+              </span>
+              <span
                 :if={@collaboration_mount?}
                 class="inline-flex shrink-0 items-center justify-center self-center text-base-content/60"
                 aria-label={

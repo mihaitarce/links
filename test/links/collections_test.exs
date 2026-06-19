@@ -322,6 +322,16 @@ defmodule Links.CollectionsTest do
       assert {:ok, revoked} = Collections.revoke_public_share(scope, share)
       assert revoked.revoked_at
     end
+
+    test "marks owned collections as shared when a public link exists" do
+      scope = user_scope_fixture()
+      collection = collection_fixture(scope)
+
+      assert {:ok, _share} = Collections.create_public_share(scope, collection)
+
+      assert [%{shared: true}] = Collections.list_dashboard(scope).tree
+      assert Collections.shared_collection?(scope, collection.id)
+    end
   end
 
   describe "collaboration mounts" do
@@ -346,6 +356,22 @@ defmodule Links.CollectionsTest do
       assert [%{title: "Shared", readonly: true}] = dashboard.tree
       refute Collections.can_edit_collection?(collaborator_scope, source.id)
       assert Collections.can_view_collection?(collaborator_scope, source.id)
+    end
+
+    test "marks owned collections as shared when collaborators are invited" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      owner_dashboard = Collections.list_dashboard(owner_scope)
+      collaborator_dashboard = Collections.list_dashboard(user_scope_fixture(collaborator))
+
+      assert [%{title: "Shared", shared: true}] = owner_dashboard.tree
+      assert [%{title: "Shared", readonly: true, shared: false}] = collaborator_dashboard.tree
+      assert Collections.shared_collection?(owner_scope, source.id)
     end
 
     test "collaborators see nested child collections under a shared parent" do
