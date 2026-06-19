@@ -94,7 +94,7 @@ defmodule LinksWeb.DashboardLiveTest do
           collection_id: collection.id
         })
 
-      {:ok, _lv, html} = live(conn, ~p"/")
+      {:ok, lv, html} = live(conn, ~p"/")
 
       assert html =~ ~s(id="collections-zone-root")
       assert html =~ ~s(id="bookmarks-sidebar")
@@ -103,6 +103,7 @@ defmodule LinksWeb.DashboardLiveTest do
       assert html =~ ~s(data-collection-id="#{collection.id}")
       assert html =~ ~s(data-readonly="false")
       assert html =~ "bookmark-drag-handle"
+      assert has_element?(lv, "#collection-#{collection.id} summary .badge.badge-ghost", "1")
     end
 
     test "keeps collection trees collapsed on initial load", %{conn: conn} do

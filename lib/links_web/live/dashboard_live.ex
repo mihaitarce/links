@@ -260,7 +260,10 @@ defmodule LinksWeb.DashboardLive do
             phx-value-id={@collection.id}
           >
             <.folder_icon />
-            {@node.title}
+            <span class="min-w-0 truncate">{@node.title}</span>
+            <span class="badge badge-ghost badge-xs tabular-nums">
+              {length(@node.bookmarks)}
+            </span>
             <span :if={@collaboration_mount?} class="badge badge-outline badge-xs">
               {if @node.readonly, do: "read", else: "edit"}
             </span>
