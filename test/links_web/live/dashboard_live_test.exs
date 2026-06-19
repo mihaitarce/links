@@ -128,7 +128,7 @@ defmodule LinksWeb.DashboardLiveTest do
         |> element("#collection-#{parent.id} > details > summary")
         |> render_click()
 
-      assert html =~ "empty"
+      assert html =~ "Empty"
       assert has_element?(lv, "#collection-empty-#{parent.id}")
     end
 

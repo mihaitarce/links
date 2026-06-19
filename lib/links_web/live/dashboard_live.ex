@@ -295,7 +295,7 @@ defmodule LinksWeb.DashboardLive do
               class="collection-empty-drop"
             >
               <span class="flex min-w-0 w-full items-center justify-center">
-                empty
+                Empty
               </span>
             </li>
           </ul>
