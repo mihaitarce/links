@@ -68,6 +68,7 @@ const CollectionBookmarkSort = {
     this.expandTargetId = null
     this.pendingExpandSummary = null
     this.autoExpandedIds = new Set()
+    this.spilled = false
     this.sortables = []
     this.initSortables()
   },
@@ -280,6 +281,28 @@ const CollectionBookmarkSort = {
 
     return [...existingIds, movedId]
   },
+  isValidDropTarget(event) {
+    const pointerTarget = this.elementUnderPointer(event)
+
+    if (pointerTarget) {
+      return this.dropContainerFromPointerTarget(pointerTarget) != null
+    }
+
+    return isWritableSortContainer(event.to)
+  },
+  revertDraggedItem(event) {
+    const {item, from, oldIndex} = event
+
+    if (!from || !item) return
+
+    const anchor = from.children[oldIndex]
+
+    if (anchor && anchor !== item) {
+      from.insertBefore(item, anchor)
+    } else {
+      from.appendChild(item)
+    }
+  },
   bindDragOver() {
     if (this.onDragOver) return
 
@@ -324,7 +347,12 @@ const CollectionBookmarkSort = {
       fallbackOnBody: true,
       swapThreshold: 0.65,
       emptyInsertThreshold: 8,
+      revertOnSpill: true,
+      onSpill() {
+        hook.spilled = true
+      },
       onStart(event) {
+        hook.spilled = false
         hook.bindDragOver()
         hook.sourceSummary = hook.summaryForSortContainer(event.from)
         hook.setDropHighlight(hook.sourceSummary)
@@ -339,14 +367,28 @@ const CollectionBookmarkSort = {
       onEnd(event) {
         hook.unbindDragOver()
 
+        const validDrop = hook.isValidDropTarget(event)
         const targetContainer = hook.resolveDropContainer(event)
         const sourceContainer = event.from
-        const moved =
-          !(targetContainer === sourceContainer && event.oldIndex === event.newIndex)
 
         hook.clearDropHighlight()
         hook.clearExpandTimer()
         hook.sourceSummary = null
+
+        if (!validDrop) {
+          if (!hook.spilled) {
+            hook.revertDraggedItem(event)
+          }
+
+          hook.spilled = false
+          hook.autoExpandedIds.clear()
+          return
+        }
+
+        hook.spilled = false
+
+        const moved =
+          !(targetContainer === sourceContainer && event.oldIndex === event.newIndex)
 
         if (moved) {
           hook.ensureDropTargetExpanded(targetContainer, event)
