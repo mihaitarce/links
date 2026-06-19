@@ -54,14 +54,10 @@ defmodule LinksWeb.DashboardLive do
               </div>
               <ul id="bookmarks-zone-inbox" class={sidebar_menu_class()}>
                 <li :for={bookmark <- @dashboard.inbox} id={"bookmark-#{bookmark.id}"}>
-                  <a
-                    phx-click="select_bookmark"
-                    phx-value-id={bookmark.id}
-                    class={selected?(@selected, :bookmark, bookmark.id) && "menu-active"}
-                  >
-                    <.bookmark_icon bookmark={bookmark} />
-                    {bookmark_label(bookmark)}
-                  </a>
+                  <.bookmark_menu_link
+                    bookmark={bookmark}
+                    selected={selected?(@selected, :bookmark, bookmark.id)}
+                  />
                 </li>
               </ul>
             </section>
@@ -75,6 +71,7 @@ defmodule LinksWeb.DashboardLive do
               </div>
               <ul
                 id="collections-zone-root"
+                phx-hook="CollectionBookmarkSort"
                 class={sidebar_menu_class(["overflow-y-auto"])}
               >
                 <.tree_node
@@ -132,6 +129,35 @@ defmodule LinksWeb.DashboardLive do
     <% else %>
       <.file_icon class={@class} />
     <% end %>
+    """
+  end
+
+  attr :bookmark, Bookmark, required: true
+  attr :selected, :boolean, default: false
+  attr :show_drag_handle, :boolean, default: false
+
+  def bookmark_menu_link(assigns) do
+    ~H"""
+    <a
+      phx-click="select_bookmark"
+      phx-value-id={@bookmark.id}
+      class={[
+        "flex min-w-0 w-full items-center justify-start gap-2",
+        @selected && "menu-active"
+      ]}
+    >
+      <span
+        :if={@show_drag_handle}
+        class="bookmark-drag-handle shrink-0 cursor-grab text-base-content/40"
+        aria-hidden="true"
+      >
+        ⋮⋮
+      </span>
+      <.bookmark_icon bookmark={@bookmark} />
+      <span class="min-w-0 flex-1 truncate text-left">
+        {bookmark_label(@bookmark)}
+      </span>
+    </a>
     """
   end
 
@@ -212,7 +238,12 @@ defmodule LinksWeb.DashboardLive do
               {if @node.readonly, do: "read", else: "edit"}
             </span>
           </summary>
-          <ul id={"nested-zone-#{@effective.id}"}>
+          <ul
+            id={"nested-zone-#{@effective.id}"}
+            data-bookmark-sortable
+            data-collection-id={@effective.id}
+            data-readonly={to_string(@node.readonly || false)}
+          >
             <.tree_node
               :for={child <- @node.children}
               node={child}
@@ -220,15 +251,16 @@ defmodule LinksWeb.DashboardLive do
               collapsed={@collapsed}
               depth={@depth + 1}
             />
-            <li :for={bookmark <- @node.bookmarks} id={"bookmark-#{bookmark.id}"}>
-              <a
-                phx-click="select_bookmark"
-                phx-value-id={bookmark.id}
-                class={selected?(@selected, :bookmark, bookmark.id) && "menu-active"}
-              >
-                <.bookmark_icon bookmark={bookmark} />
-                {bookmark_label(bookmark)}
-              </a>
+            <li
+              :for={bookmark <- @node.bookmarks}
+              id={"bookmark-#{bookmark.id}"}
+              data-id={bookmark.id}
+            >
+              <.bookmark_menu_link
+                bookmark={bookmark}
+                selected={selected?(@selected, :bookmark, bookmark.id)}
+                show_drag_handle={!@node.readonly}
+              />
             </li>
           </ul>
         </details>
@@ -550,6 +582,22 @@ defmodule LinksWeb.DashboardLive do
     end
   end
 
+  def handle_event("move_bookmark", params, socket) do
+    with %{id: id, collection_id: collection_id, ordered_ids: ordered_ids} <-
+           normalize_move_bookmark_params(params),
+         {:ok, _bookmark} <-
+           Collections.move_bookmark(
+             socket.assigns.current_scope,
+             id,
+             collection_id,
+             ordered_ids
+           ) do
+      {:noreply, refresh_dashboard(socket)}
+    else
+      _ -> {:noreply, put_flash(socket, :error, "Could not move bookmark")}
+    end
+  end
+
   def handle_event("create_public_share", _params, socket) do
     collection = socket.assigns.selected_context.effective_collection
 
@@ -656,6 +704,20 @@ defmodule LinksWeb.DashboardLive do
   def bookmark_label(%Bookmark{title: title}), do: title
 
   defp sidebar_menu_class(extra \\ []) do
-    ["menu flex-col flex-nowrap bg-base-200 rounded-box w-full min-w-0" | extra]
+    [
+      "menu flex-col flex-nowrap bg-base-200 rounded-box w-full min-w-0",
+      "[&_li]:min-w-0 [&_a]:min-w-0"
+      | extra
+    ]
   end
+
+  defp normalize_move_bookmark_params(%{
+         "id" => id,
+         "collection_id" => collection_id,
+         "ordered_ids" => ordered_ids
+       }) do
+    %{id: id, collection_id: collection_id, ordered_ids: ordered_ids}
+  end
+
+  defp normalize_move_bookmark_params(_), do: :error
 end

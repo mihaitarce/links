@@ -5,6 +5,7 @@ defmodule Links.Collections do
 
   import Ecto.Query, warn: false
 
+  alias Ecto.Multi
   alias Links.Accounts
   alias Links.Accounts.Scope
   alias Links.Bookmarks.Bookmark
@@ -186,6 +187,24 @@ defmodule Links.Collections do
   def get_bookmark!(id), do: Repo.get!(Bookmark, id)
 
   def get_bookmark(id), do: Repo.get(Bookmark, id)
+
+  def move_bookmark(%Scope{} = scope, bookmark_id, collection_id, ordered_ids) do
+    bookmark = get_bookmark!(bookmark_id)
+    collection_id = to_integer(collection_id)
+    ordered_ids = Enum.map(ordered_ids, &to_integer/1)
+
+    with :ok <- authorize_bookmark_move(scope, bookmark, collection_id),
+         :ok <- validate_bookmark_order(bookmark, collection_id, ordered_ids) do
+      Multi.new()
+      |> Multi.update(:bookmark, Bookmark.changeset(bookmark, %{collection_id: collection_id}))
+      |> update_bookmark_positions(collection_id, ordered_ids)
+      |> Repo.transaction()
+      |> case do
+        {:ok, %{bookmark: bookmark}} -> {:ok, bookmark}
+        {:error, _name, reason, _changes} -> {:error, reason}
+      end
+    end
+  end
 
   def update_bookmark_metadata(%Bookmark{} = bookmark, attrs) do
     bookmark
@@ -452,6 +471,46 @@ defmodule Links.Collections do
 
   defp authorize_bookmark_parent(scope, collection_id) do
     if can_edit_collection?(scope, collection_id), do: :ok, else: {:error, :unauthorized}
+  end
+
+  defp authorize_bookmark_move(scope, bookmark, collection_id) do
+    with true <- can_edit_bookmark?(scope, bookmark),
+         :ok <- authorize_bookmark_parent(scope, collection_id) do
+      :ok
+    else
+      _ -> {:error, :unauthorized}
+    end
+  end
+
+  defp validate_bookmark_order(bookmark, collection_id, ordered_ids) do
+    existing_in_target =
+      Bookmark
+      |> where([b], b.collection_id == ^collection_id and b.id != ^bookmark.id)
+      |> select([b], b.id)
+      |> Repo.all()
+      |> MapSet.new()
+
+    expected = MapSet.put(existing_in_target, bookmark.id)
+    actual = MapSet.new(ordered_ids)
+
+    if MapSet.equal?(expected, actual), do: :ok, else: {:error, :invalid_order}
+  end
+
+  defp update_bookmark_positions(multi, collection_id, ordered_ids) do
+    ordered_ids
+    |> Enum.with_index()
+    |> Enum.reduce(multi, fn {id, position}, multi ->
+      Multi.update_all(
+        multi,
+        {:bookmark_position, id},
+        bookmark_position_query(id, collection_id),
+        set: [position: position]
+      )
+    end)
+  end
+
+  defp bookmark_position_query(id, collection_id) do
+    from(b in Bookmark, where: b.id == ^id and b.collection_id == ^collection_id)
   end
 
   defp next_collection_position(parent_id, owner_id \\ nil)

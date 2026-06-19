@@ -37,6 +37,26 @@ defmodule LinksWeb.DashboardLiveTest do
       assert html =~ "https://example.com/new"
     end
 
+    test "collection bookmark lists are sortable", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      collection = collection_fixture(scope, %{title: "Reading"})
+
+      {:ok, _bookmark} =
+        Collections.create_bookmark(scope, %{
+          title: "Docs",
+          url: "https://example.com/docs",
+          collection_id: collection.id
+        })
+
+      {:ok, _lv, html} = live(conn, ~p"/")
+
+      assert html =~ ~s(id="collections-zone-root")
+      assert html =~ ~s(phx-hook="CollectionBookmarkSort")
+      assert html =~ ~s(data-bookmark-sortable)
+      assert html =~ ~s(data-collection-id="#{collection.id}")
+      assert html =~ "bookmark-drag-handle"
+    end
+
     test "renders fetched page title after metadata is stored", %{conn: conn} do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
 

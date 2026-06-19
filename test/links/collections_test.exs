@@ -29,6 +29,58 @@ defmodule Links.CollectionsTest do
 
       assert bookmark_id == bookmark.id
     end
+
+    test "reorders bookmarks within a collection" do
+      scope = user_scope_fixture()
+      collection = collection_fixture(scope)
+
+      {:ok, first} =
+        Collections.create_bookmark(scope, %{
+          title: "First",
+          url: "https://example.com/1",
+          collection_id: collection.id
+        })
+
+      {:ok, second} =
+        Collections.create_bookmark(scope, %{
+          title: "Second",
+          url: "https://example.com/2",
+          collection_id: collection.id
+        })
+
+      assert {:ok, _bookmark} =
+               Collections.move_bookmark(scope, second.id, collection.id, [second.id, first.id])
+
+      assert Collections.get_bookmark!(second.id).position == 0
+      assert Collections.get_bookmark!(first.id).position == 1
+    end
+
+    test "moves bookmarks between collections" do
+      scope = user_scope_fixture()
+      source = collection_fixture(scope, %{title: "Source"})
+      target = collection_fixture(scope, %{title: "Target"})
+
+      {:ok, bookmark} =
+        Collections.create_bookmark(scope, %{
+          title: "Link",
+          url: "https://example.com/link",
+          collection_id: source.id
+        })
+
+      {:ok, existing} =
+        Collections.create_bookmark(scope, %{
+          title: "Existing",
+          url: "https://example.com/existing",
+          collection_id: target.id
+        })
+
+      assert {:ok, moved} =
+               Collections.move_bookmark(scope, bookmark.id, target.id, [existing.id, bookmark.id])
+
+      assert moved.collection_id == target.id
+      assert Collections.get_bookmark!(existing.id).position == 0
+      assert Collections.get_bookmark!(bookmark.id).position == 1
+    end
   end
 
   describe "public shares" do

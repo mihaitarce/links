@@ -23,13 +23,68 @@ import "phoenix_html"
 import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/links"
+import Sortable from "sortablejs"
 import topbar from "../vendor/topbar"
+
+const CollectionBookmarkSort = {
+  mounted() {
+    this.initSortables()
+  },
+  updated() {
+    this.destroySortables()
+    this.initSortables()
+  },
+  destroyed() {
+    this.destroySortables()
+  },
+  initSortables() {
+    this.sortables = []
+
+    this.el.querySelectorAll("[data-bookmark-sortable]").forEach((el) => {
+      if (el.dataset.readonly === "true") return
+
+      const sortable = new Sortable(el, {
+        group: "bookmarks",
+        animation: 150,
+        handle: ".bookmark-drag-handle",
+        draggable: "li[id^='bookmark-']",
+        filter: "summary, button, input, textarea, select",
+        preventOnFilter: false,
+        fallbackOnBody: true,
+        swapThreshold: 0.65,
+        onEnd: (event) => {
+          if (event.from === event.to && event.oldIndex === event.newIndex) return
+
+          const orderedIds = Array.from(event.to.children)
+            .filter((child) => child.id.startsWith("bookmark-"))
+            .map((child) => child.dataset.id)
+            .filter(Boolean)
+
+          this.pushEvent("move_bookmark", {
+            id: event.item.dataset.id,
+            collection_id: event.to.dataset.collectionId,
+            ordered_ids: orderedIds,
+          })
+        },
+      })
+
+      this.sortables.push(sortable)
+    })
+  },
+  destroySortables() {
+    if (this.sortables) {
+      this.sortables.forEach((sortable) => sortable.destroy())
+    }
+
+    this.sortables = []
+  },
+}
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks},
+  hooks: {...colocatedHooks, CollectionBookmarkSort},
 })
 
 // Show progress bar on live navigation and form submits
