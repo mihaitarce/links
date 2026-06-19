@@ -52,7 +52,11 @@ defmodule LinksWeb.DashboardLive do
             </.form>
           </div>
 
-          <div class="flex min-h-0 flex-1 flex-col">
+          <div
+            id="bookmarks-sidebar"
+            phx-hook="CollectionBookmarkSort"
+            class="flex min-h-0 flex-1 flex-col"
+          >
             <section class="shrink-0 border-b border-base-300 p-3">
               <div class="mb-2 flex items-center justify-between">
                 <h2 class="text-xs font-semibold uppercase tracking-wide text-base-content/60">
@@ -62,9 +66,8 @@ defmodule LinksWeb.DashboardLive do
               </div>
               <ul
                 id="bookmarks-zone-inbox"
-                phx-hook="CollectionBookmarkSort"
                 data-bookmark-sortable
-                data-collection-id=""
+                data-collection-id="inbox"
                 class={sidebar_menu_class()}
               >
                 <li
@@ -90,7 +93,6 @@ defmodule LinksWeb.DashboardLive do
               </div>
               <ul
                 id="collections-zone-root"
-                phx-hook="CollectionBookmarkSort"
                 class={sidebar_menu_class(["overflow-y-auto"])}
               >
                 <.tree_node
@@ -788,14 +790,23 @@ defmodule LinksWeb.DashboardLive do
     ]
   end
 
-  defp normalize_move_bookmark_params(%{
-         "id" => id,
-         "collection_id" => collection_id,
-         "ordered_ids" => ordered_ids
-       }) do
-    collection_id = if collection_id in [nil, ""], do: nil, else: collection_id
+  defp normalize_move_bookmark_params(%{"id" => id, "ordered_ids" => ordered_ids} = params) do
+    collection_id =
+      params
+      |> Map.get("collection_id")
+      |> normalize_move_collection_id()
+
     %{id: id, collection_id: collection_id, ordered_ids: ordered_ids}
   end
 
   defp normalize_move_bookmark_params(_), do: :error
+
+  defp normalize_move_collection_id(collection_id) when collection_id in [nil, "", "inbox"],
+    do: nil
+
+  defp normalize_move_collection_id(collection_id) when is_integer(collection_id),
+    do: collection_id
+
+  defp normalize_move_collection_id(collection_id) when is_binary(collection_id),
+    do: String.to_integer(collection_id)
 end

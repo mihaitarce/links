@@ -140,9 +140,14 @@ case Repo.one(from u in Accounts.User, order_by: [asc: u.id], limit: 1) do
 
     resolve_collection_id = fn link ->
       cond do
-        link[:inbox] -> nil
-        link[:subcollection] -> Map.fetch!(collection_ids, "#{link.collection}/#{link.subcollection}")
-        true -> Map.fetch!(collection_ids, link.collection)
+        link[:inbox] ->
+          nil
+
+        link[:subcollection] ->
+          Map.fetch!(collection_ids, "#{link.collection}/#{link.subcollection}")
+
+        true ->
+          Map.fetch!(collection_ids, link.collection)
       end
     end
 

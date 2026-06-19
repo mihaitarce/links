@@ -615,6 +615,7 @@ defmodule Links.Collections do
     case value do
       nil -> nil
       "" -> nil
+      "inbox" -> nil
       id when is_integer(id) -> id
       id when is_binary(id) -> String.to_integer(id)
     end

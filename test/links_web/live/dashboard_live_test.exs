@@ -42,10 +42,44 @@ defmodule LinksWeb.DashboardLiveTest do
       bookmark_fixture(scope, %{title: "Inbox link", url: "https://example.com/inbox"})
       {:ok, _lv, html} = live(conn, ~p"/")
 
+      assert html =~ ~s(id="bookmarks-sidebar")
       assert html =~ ~s(id="bookmarks-zone-inbox")
       assert html =~ ~s(phx-hook="CollectionBookmarkSort")
-      assert html =~ ~s(data-collection-id="")
+      assert html =~ ~s(data-collection-id="inbox")
       assert html =~ "bookmark-drag-handle"
+    end
+
+    test "moves bookmarks between inbox and collections from the dashboard", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      collection = collection_fixture(scope, %{title: "Reading"})
+
+      inbox_bookmark =
+        bookmark_fixture(scope, %{title: "Inbox link", url: "https://example.com/inbox"})
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      assert render_click_move_bookmark(lv, %{
+               "id" => to_string(inbox_bookmark.id),
+               "collection_id" => to_string(collection.id),
+               "ordered_ids" => [to_string(inbox_bookmark.id)]
+             })
+
+      assert Collections.get_bookmark!(inbox_bookmark.id).collection_id == collection.id
+
+      {:ok, collection_bookmark} =
+        Collections.create_bookmark(scope, %{
+          title: "Collection link",
+          url: "https://example.com/collection",
+          collection_id: collection.id
+        })
+
+      assert render_click_move_bookmark(lv, %{
+               "id" => to_string(collection_bookmark.id),
+               "collection_id" => nil,
+               "ordered_ids" => [to_string(collection_bookmark.id)]
+             })
+
+      assert Collections.get_bookmark!(collection_bookmark.id).collection_id == nil
     end
 
     test "collection bookmark lists are sortable", %{conn: conn} do
@@ -62,6 +96,7 @@ defmodule LinksWeb.DashboardLiveTest do
       {:ok, _lv, html} = live(conn, ~p"/")
 
       assert html =~ ~s(id="collections-zone-root")
+      assert html =~ ~s(id="bookmarks-sidebar")
       assert html =~ ~s(phx-hook="CollectionBookmarkSort")
       assert html =~ ~s(data-bookmark-sortable)
       assert html =~ ~s(data-collection-id="#{collection.id}")
@@ -89,5 +124,11 @@ defmodule LinksWeb.DashboardLiveTest do
       assert html =~ "Example Domain"
       assert html =~ ~s(/bookmarks/#{bookmark.id}/favicon)
     end
+  end
+
+  defp render_click_move_bookmark(view, params) do
+    view
+    |> element("#bookmarks-sidebar")
+    |> render_hook("move_bookmark", params)
   end
 end

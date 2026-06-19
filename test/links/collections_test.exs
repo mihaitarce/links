@@ -145,6 +145,44 @@ defmodule Links.CollectionsTest do
 
       assert_receive {:inbox_bookmarks_changed, user_id} when user_id == scope.user.id
     end
+
+    test "moves bookmarks between inbox and collections" do
+      scope = user_scope_fixture()
+      collection = collection_fixture(scope, %{title: "Reading"})
+
+      {:ok, inbox_bookmark} =
+        Collections.create_inbox_bookmark(scope, %{
+          title: "Inbox link",
+          url: "https://example.com/inbox"
+        })
+
+      assert {:ok, moved_to_collection} =
+               Collections.move_bookmark(
+                 scope,
+                 inbox_bookmark.id,
+                 collection.id,
+                 [inbox_bookmark.id]
+               )
+
+      assert moved_to_collection.collection_id == collection.id
+
+      {:ok, collection_bookmark} =
+        Collections.create_bookmark(scope, %{
+          title: "Collection link",
+          url: "https://example.com/collection",
+          collection_id: collection.id
+        })
+
+      assert {:ok, moved_to_inbox} =
+               Collections.move_bookmark(
+                 scope,
+                 collection_bookmark.id,
+                 nil,
+                 [collection_bookmark.id]
+               )
+
+      assert moved_to_inbox.collection_id == nil
+    end
   end
 
   describe "public shares" do

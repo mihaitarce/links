@@ -26,6 +26,21 @@ import {hooks as colocatedHooks} from "phoenix-colocated/links"
 import Sortable from "sortablejs"
 import topbar from "../vendor/topbar"
 
+const bookmarkSortContainers = (root) => [
+  ...(root.hasAttribute("data-bookmark-sortable") ? [root] : []),
+  ...root.querySelectorAll("[data-bookmark-sortable]"),
+]
+
+const targetCollectionId = (el) => {
+  const collectionId = el.dataset.collectionId
+
+  if (collectionId === "inbox" || collectionId == null) {
+    return null
+  }
+
+  return collectionId
+}
+
 const CollectionBookmarkSort = {
   mounted() {
     this.initSortables()
@@ -40,18 +55,11 @@ const CollectionBookmarkSort = {
   initSortables() {
     this.sortables = []
 
-    const containers = [
-      ...(this.el.hasAttribute("data-bookmark-sortable") ? [this.el] : []),
-      ...this.el.querySelectorAll("[data-bookmark-sortable]"),
-    ]
-
-    containers.forEach((el) => {
+    bookmarkSortContainers(this.el).forEach((el) => {
       if (el.dataset.readonly === "true") return
 
-      const isInbox = el.dataset.collectionId === ""
-
       const sortable = new Sortable(el, {
-        group: isInbox ? "inbox" : "bookmarks",
+        group: "bookmarks",
         animation: 150,
         handle: ".bookmark-drag-handle",
         draggable: "li[id^='bookmark-']",
@@ -59,6 +67,7 @@ const CollectionBookmarkSort = {
         preventOnFilter: false,
         fallbackOnBody: true,
         swapThreshold: 0.65,
+        emptyInsertThreshold: 8,
         onEnd: (event) => {
           if (event.from === event.to && event.oldIndex === event.newIndex) return
 
@@ -69,7 +78,7 @@ const CollectionBookmarkSort = {
 
           this.pushEvent("move_bookmark", {
             id: event.item.dataset.id,
-            collection_id: event.to.dataset.collectionId,
+            collection_id: targetCollectionId(event.to),
             ordered_ids: orderedIds,
           })
         },
