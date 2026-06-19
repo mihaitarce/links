@@ -125,6 +125,31 @@ defmodule LinksWeb.DashboardLiveTest do
       assert Collections.get_collection!(first.id).position == 1
     end
 
+    test "reorders read-only shared collection mounts from the dashboard", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+      {:ok, own} = Collections.create_collection(collaborator_scope, %{title: "Mine"})
+
+      conn = log_in_user(conn, collaborator)
+      {:ok, lv, html} = live(conn, ~p"/")
+
+      assert html =~ ~s(id="collection-#{mount.id}" data-readonly="true" data-reorderable="true")
+
+      assert render_reorder_collections(lv, %{
+               "parent_id" => "root",
+               "ordered_ids" => [to_string(mount.id), to_string(own.id)]
+             })
+
+      assert Collections.get_collection!(mount.id).position == 0
+      assert Collections.get_collection!(own.id).position == 1
+    end
+
     test "shows total bookmark counts including sub-collections", %{conn: conn} do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
       parent = collection_fixture(scope, %{title: "Parent"})

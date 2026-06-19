@@ -85,6 +85,47 @@ defmodule Links.CollectionsTest do
       assert Collections.get_collection!(first.id).position == 1
     end
 
+    test "collaborators can reorder read-only shared collection mounts among root siblings" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+      {:ok, own} = Collections.create_collection(collaborator_scope, %{title: "Mine"})
+
+      assert {:ok, :reordered} =
+               Collections.reorder_collections(collaborator_scope, "root", [mount.id, own.id])
+
+      assert Collections.get_collection!(mount.id).position == 0
+      assert Collections.get_collection!(own.id).position == 1
+    end
+
+    test "collaborators cannot reorder children inside read-only shared collections" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      parent = collection_fixture(owner_scope, %{title: "Shared Parent"})
+
+      {:ok, first} =
+        Collections.create_collection(owner_scope, %{title: "Child A", parent_id: parent.id})
+
+      {:ok, second} =
+        Collections.create_collection(owner_scope, %{title: "Child B", parent_id: parent.id})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, parent, collaborator.email, true)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:error, :invalid_order} =
+               Collections.reorder_collections(collaborator_scope, parent.id, [
+                 second.id,
+                 first.id
+               ])
+    end
+
     test "moves bookmarks between collections" do
       scope = user_scope_fixture()
       source = collection_fixture(scope, %{title: "Source"})

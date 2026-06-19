@@ -104,6 +104,7 @@ defmodule LinksWeb.DashboardLive do
                   selected={@selected}
                   collapsed={@collapsed}
                   depth={0}
+                  current_scope={@current_scope}
                 />
               </ul>
             </section>
@@ -231,6 +232,7 @@ defmodule LinksWeb.DashboardLive do
   attr :selected, :map, default: nil
   attr :collapsed, MapSet, required: true
   attr :depth, :integer, required: true
+  attr :current_scope, :map, required: true
 
   def tree_node(assigns) do
     assigns =
@@ -242,11 +244,16 @@ defmodule LinksWeb.DashboardLive do
         :collaboration_mount?,
         Collections.active_collaboration_mount?(assigns.node.collection)
       )
+      |> assign(
+        :reorderable?,
+        assigns.node.collection.owner_id == assigns.current_scope.user.id
+      )
 
     ~H"""
     <li
       id={"collection-#{@collection.id}"}
       data-readonly={to_string(@node.readonly || false)}
+      data-reorderable={to_string(@reorderable?)}
       class={[@node.revoked && "menu-disabled line-through opacity-50"]}
     >
       <%= if @node.revoked do %>
@@ -297,6 +304,7 @@ defmodule LinksWeb.DashboardLive do
               selected={@selected}
               collapsed={@collapsed}
               depth={@depth + 1}
+              current_scope={@current_scope}
             />
           </ul>
           <ul

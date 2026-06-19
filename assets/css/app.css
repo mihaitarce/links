@@ -43,7 +43,7 @@ summary.bookmark-drop-highlight {
   padding: 0;
 }
 
-[data-collection-sortable] > li[id^="collection-"]:not([data-readonly="true"]) > details > summary {
+[data-collection-sortable] > li[id^="collection-"][data-reorderable="true"] > details > summary {
   cursor: grab;
 }
 
