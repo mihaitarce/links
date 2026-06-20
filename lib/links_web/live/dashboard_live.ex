@@ -244,7 +244,7 @@ defmodule LinksWeb.DashboardLive do
         ]}
         aria-label="Open link in new tab"
       >
-        <.icon name="hero-ellipsis-horizontal" class="size-4" />
+        <.icon name="hero-arrow-top-right-on-square" class="size-4" />
       </a>
     </div>
     """
