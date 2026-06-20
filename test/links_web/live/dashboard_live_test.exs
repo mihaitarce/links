@@ -75,7 +75,7 @@ defmodule LinksWeb.DashboardLiveTest do
       |> render_click()
 
       refute has_element?(lv, "#bookmark-#{bookmark.id}")
-      assert has_element?(lv, "#inbox-empty-state", "Your inbox is empty.")
+      assert has_element?(lv, "#inbox-empty-state", "Your inbox is empty")
     end
 
     test "keeps the new link input visible when a bookmark is selected", %{conn: conn} do

@@ -91,7 +91,7 @@ defmodule LinksWeb.DashboardLive do
                   />
                 </li>
                 <li id="inbox-empty-state" class="inbox-empty-state" aria-hidden="true">
-                  <span class="inbox-empty-state-placeholder">Your inbox is empty.</span>
+                  <span class="inbox-empty-state-placeholder">Your inbox is empty</span>
                 </li>
               </ul>
             </section>
