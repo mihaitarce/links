@@ -84,7 +84,7 @@ The app service reads configuration from `links.env`. Postgres is included in `d
 
 ### Reverse-proxy authentication
 
-When `PHOENIX_FORWARD_AUTH=true`, Links trusts the `X-Authenticated-User` header from your reverse proxy and auto-provisions users. Local registration, login, logout, and settings are disabled.
+When `PHOENIX_FORWARD_AUTH=true`, Links trusts the `X-Authenticated-User` header from your reverse proxy and auto-provisions users. The header value is stored as the user identifier (in the email field) without requiring a valid email address. Local registration, login, logout, and settings are disabled.
 
 See `Caddyfile` for an example Caddy setup with a `/links` base path and forward auth.
 

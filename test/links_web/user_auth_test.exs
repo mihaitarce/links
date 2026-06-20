@@ -404,7 +404,7 @@ defmodule LinksWeb.UserAuthTest do
         |> put_req_header("x-authenticated-user", "alice")
         |> UserAuth.fetch_current_scope_for_user([])
 
-      assert conn.assigns.current_scope.user.email == "alice@forward-auth.local"
+      assert conn.assigns.current_scope.user.email == "alice"
       assert get_session(conn, :user_token)
     end
 

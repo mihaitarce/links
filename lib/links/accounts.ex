@@ -119,7 +119,7 @@ defmodule Links.Accounts do
   Finds or creates a user for reverse-proxy forward authentication.
   """
   def get_or_register_forward_auth_user(username) when is_binary(username) do
-    email = forward_auth_email(username)
+    email = String.trim(username)
 
     case get_user_by_email(email) do
       %User{} = user -> {:ok, user}
@@ -131,17 +131,6 @@ defmodule Links.Accounts do
     %User{}
     |> User.forward_auth_changeset(%{email: email})
     |> Repo.insert()
-  end
-
-  defp forward_auth_email(username) do
-    username = String.trim(username)
-
-    if String.contains?(username, "@") do
-      username
-    else
-      domain = Application.get_env(:links, :forward_auth_email_domain, "forward-auth.local")
-      "#{username}@#{domain}"
-    end
   end
 
   ## Settings
