@@ -86,29 +86,42 @@ defmodule LinksWeb.PublicShareLive do
   attr :node, :map, required: true
 
   def tree_node(assigns) do
-    assigns = assign(assigns, :collection, assigns.node.collection)
+    assigns =
+      assigns
+      |> assign(:collection, assigns.node.collection)
+      |> assign(:empty?, empty_collection?(assigns.node))
 
     ~H"""
     <li id={"collection-#{@collection.id}"}>
-      <details open>
-        <summary>
+      <%= if @empty? do %>
+        <span class="flex min-w-0 w-full items-center gap-2">
           <.folder_icon />
           <span class="flex min-w-0 items-center gap-1.5 leading-none">
             <span class="min-w-0 truncate leading-normal">{@node.title}</span>
-            <span class="badge badge-ghost badge-xs shrink-0 tabular-nums">
-              {@node.bookmark_count}
-            </span>
+            <span class="badge badge-ghost badge-xs shrink-0 tabular-nums">0</span>
           </span>
-        </summary>
-        <ul :if={@node.children != []}>
-          <.tree_node :for={child <- @node.children} node={child} />
-        </ul>
-        <ul :if={@node.bookmarks != []}>
-          <li :for={bookmark <- @node.bookmarks} id={"bookmark-#{bookmark.id}"}>
-            <.bookmark_menu_link bookmark={bookmark} />
-          </li>
-        </ul>
-      </details>
+        </span>
+      <% else %>
+        <details open>
+          <summary>
+            <.folder_icon />
+            <span class="flex min-w-0 items-center gap-1.5 leading-none">
+              <span class="min-w-0 truncate leading-normal">{@node.title}</span>
+              <span class="badge badge-ghost badge-xs shrink-0 tabular-nums">
+                {@node.bookmark_count}
+              </span>
+            </span>
+          </summary>
+          <ul :if={@node.children != []}>
+            <.tree_node :for={child <- @node.children} node={child} />
+          </ul>
+          <ul :if={@node.bookmarks != []}>
+            <li :for={bookmark <- @node.bookmarks} id={"bookmark-#{bookmark.id}"}>
+              <.bookmark_menu_link bookmark={bookmark} />
+            </li>
+          </ul>
+        </details>
+      <% end %>
     </li>
     """
   end
@@ -265,6 +278,10 @@ defmodule LinksWeb.PublicShareLive do
       "[&_li]:min-w-0 [&_a]:min-w-0"
       | extra
     ]
+  end
+
+  defp empty_collection?(node) do
+    node.children == [] and node.bookmarks == []
   end
 
   defp favicon_data_url(%Bookmark{favicon_data: data, favicon_content_type: content_type})

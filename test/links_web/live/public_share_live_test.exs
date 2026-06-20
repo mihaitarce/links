@@ -39,6 +39,20 @@ defmodule LinksWeb.PublicShareLiveTest do
       refute has_element?(lv, "#collection-#{collection.id}")
     end
 
+    test "does not show an expand control for empty sub-collections", %{conn: conn} do
+      scope = user_scope_fixture()
+      collection = collection_fixture(scope, %{title: "Public Reading"})
+      empty_child = collection_fixture(scope, %{title: "Empty Folder", parent_id: collection.id})
+
+      assert {:ok, share} = Collections.create_public_share(scope, collection)
+
+      {:ok, lv, _html} = live(conn, ~p"/share/#{share.token}")
+
+      assert has_element?(lv, "#collection-#{empty_child.id}", "Empty Folder")
+      refute has_element?(lv, "#collection-#{empty_child.id} details")
+      refute has_element?(lv, "#collection-#{empty_child.id} summary")
+    end
+
     test "shows unavailable message for invalid tokens", %{conn: conn} do
       {:ok, _lv, html} = live(conn, ~p"/share/not-a-valid-token")
 
