@@ -76,3 +76,10 @@ summary.bookmark-drop-highlight,
 [data-collection-sortable] > li[id^="collection-"].sortable-chosen > details > summary {
   cursor: grabbing;
 }
+
+[data-collection-sortable]::before,
+[data-bookmark-sortable]::before {
+  top: 0;
+  bottom: 0;
+  inset-inline-start: 0.2rem;
+}
