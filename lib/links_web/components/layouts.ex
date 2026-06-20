@@ -37,52 +37,52 @@ defmodule LinksWeb.Layouts do
     ~H"""
     <div class="flex h-dvh flex-col overflow-hidden">
       <header class="navbar min-h-12 shrink-0 border-b border-base-300 bg-base-100 px-3">
-      <div class="flex-1">
-        <a href="/" class="flex w-fit items-center gap-2">
-          <img src={~p"/images/logo.svg"} width="28" />
-          <span class="text-sm font-semibold tracking-tight">Links</span>
-        </a>
-      </div>
-      <div class="flex-none">
-        <div class="flex items-center gap-2">
-          <span
-            :if={@current_scope && @current_scope.user}
-            class="hidden text-xs text-base-content/60 sm:inline"
-          >
-            {@current_scope.user.email}
-          </span>
-          <.link
-            :if={@current_scope && @current_scope.user}
-            href={~p"/users/settings"}
-            class="btn btn-ghost btn-xs"
-          >
-            Settings
-          </.link>
-          <.link
-            :if={@current_scope && @current_scope.user}
-            href={~p"/users/log-out"}
-            method="delete"
-            class="btn btn-ghost btn-xs"
-          >
-            Log out
-          </.link>
-          <.link
-            :if={!(@current_scope && @current_scope.user)}
-            href={~p"/users/register"}
-            class="btn btn-ghost btn-xs"
-          >
-            Register
-          </.link>
-          <.link
-            :if={!(@current_scope && @current_scope.user)}
-            href={~p"/users/log-in"}
-            class="btn btn-primary btn-xs"
-          >
-            Log in
-          </.link>
-          <.theme_toggle />
+        <div class="flex-1">
+          <a href="/" class="flex w-fit items-center gap-2">
+            <img src={~p"/images/logo.svg"} width="28" />
+            <span class="text-sm font-semibold tracking-tight">Links</span>
+          </a>
         </div>
-      </div>
+        <div class="flex-none">
+          <div class="flex items-center gap-2">
+            <span
+              :if={@current_scope && @current_scope.user}
+              class="hidden text-xs text-base-content/60 sm:inline"
+            >
+              {@current_scope.user.email}
+            </span>
+            <.link
+              :if={@current_scope && @current_scope.user}
+              href={~p"/users/settings"}
+              class="btn btn-ghost btn-xs"
+            >
+              Settings
+            </.link>
+            <.link
+              :if={@current_scope && @current_scope.user}
+              href={~p"/users/log-out"}
+              method="delete"
+              class="btn btn-ghost btn-xs"
+            >
+              Log out
+            </.link>
+            <.link
+              :if={!(@current_scope && @current_scope.user)}
+              href={~p"/users/register"}
+              class="btn btn-ghost btn-xs"
+            >
+              Register
+            </.link>
+            <.link
+              :if={!(@current_scope && @current_scope.user)}
+              href={~p"/users/log-in"}
+              class="btn btn-primary btn-xs"
+            >
+              Log in
+            </.link>
+            <.theme_toggle />
+          </div>
+        </div>
       </header>
 
       <main class="min-h-0 flex-1 overflow-y-auto bg-base-200">
