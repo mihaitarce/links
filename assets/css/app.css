@@ -145,6 +145,52 @@ details > summary .sidebar-more-button {
   display: none;
 }
 
+#public-share-sidebar {
+  --tree-indent: 1rem;
+}
+
+#public-share-sidebar .menu {
+  width: 100%;
+  max-width: 100%;
+}
+
+#public-share-sidebar .menu :where(li) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+#public-share-sidebar li[id^="collection-"] details > ul {
+  margin-inline-start: var(--tree-indent);
+  padding-inline-start: calc(0.25rem * 2);
+  width: calc(100% - var(--tree-indent));
+  max-width: calc(100% - var(--tree-indent));
+  box-sizing: border-box;
+  white-space: normal;
+}
+
+#public-share-sidebar .menu :where(li > details) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+#public-share-sidebar .menu :where(li > details > summary:not(.menu-title)) {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  grid-auto-flow: column;
+  grid-auto-columns: unset;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+#public-share-sidebar .menu :where(li > details > summary:not(.menu-title))::after {
+  display: none;
+}
+
+#public-share-sidebar .bookmark-menu-row > a {
+  cursor: pointer;
+}
+
 [data-collection-sortable] > li[id^="collection-"][data-reorderable="true"] > details > summary {
   cursor: grab;
 }

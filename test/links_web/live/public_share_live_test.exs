@@ -35,6 +35,7 @@ defmodule LinksWeb.PublicShareLiveTest do
       assert html =~ ~s(href="https://example.com/docs")
       assert html =~ "data:image/png;base64,#{Base.encode64(<<1, 2, 3>>)}"
       refute html =~ ~s(/bookmarks/#{bookmark.id}/favicon)
+      assert has_element?(lv, "#public-share-sidebar")
       assert has_element?(lv, "#bookmark-#{bookmark.id}")
       refute has_element?(lv, "#collection-#{collection.id}")
     end

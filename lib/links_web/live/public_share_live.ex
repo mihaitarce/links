@@ -64,7 +64,10 @@ defmodule LinksWeb.PublicShareLive do
         </div>
       <% else %>
         <div class="h-full overflow-auto bg-base-200 p-4 text-sm">
-          <div class="mx-auto max-w-2xl rounded-box border border-base-300 bg-base-100 p-4">
+          <div
+            id="public-share-sidebar"
+            class="mx-auto w-full max-w-[120ch] rounded-box border border-base-300 bg-base-100 p-4"
+          >
             <p class="text-xs font-semibold uppercase tracking-wide text-base-content/60">
               Shared collection
             </p>
@@ -72,7 +75,11 @@ defmodule LinksWeb.PublicShareLive do
 
             <ul id="public-share-tree" class={sidebar_menu_class(["mt-4", "overflow-y-auto"])}>
               <.tree_node :for={node <- @sections} node={node} />
-              <li :for={bookmark <- @root_bookmarks} id={"bookmark-#{bookmark.id}"}>
+              <li
+                :for={bookmark <- @root_bookmarks}
+                id={"bookmark-#{bookmark.id}"}
+                class="min-w-0 max-w-full"
+              >
                 <.bookmark_menu_link bookmark={bookmark} />
               </li>
             </ul>
@@ -92,20 +99,20 @@ defmodule LinksWeb.PublicShareLive do
       |> assign(:empty?, empty_collection?(assigns.node))
 
     ~H"""
-    <li id={"collection-#{@collection.id}"}>
+    <li id={"collection-#{@collection.id}"} class="min-w-0 max-w-full">
       <%= if @empty? do %>
         <span class="flex min-w-0 w-full items-center gap-2">
           <.folder_icon />
-          <span class="flex min-w-0 items-center gap-1.5 leading-none">
+          <span class="flex min-w-0 flex-1 items-center gap-1.5 leading-none">
             <span class="min-w-0 truncate leading-normal">{@node.title}</span>
             <span class="badge badge-ghost badge-xs shrink-0 tabular-nums">0</span>
           </span>
         </span>
       <% else %>
-        <details open>
-          <summary>
+        <details class="min-w-0 max-w-full" open>
+          <summary class="min-w-0 max-w-full">
             <.folder_icon />
-            <span class="flex min-w-0 items-center gap-1.5 leading-none">
+            <span class="flex min-w-0 flex-1 items-center gap-1.5 leading-none">
               <span class="min-w-0 truncate leading-normal">{@node.title}</span>
               <span class="badge badge-ghost badge-xs shrink-0 tabular-nums">
                 {@node.bookmark_count}
@@ -116,7 +123,11 @@ defmodule LinksWeb.PublicShareLive do
             <.tree_node :for={child <- @node.children} node={child} />
           </ul>
           <ul :if={@node.bookmarks != []}>
-            <li :for={bookmark <- @node.bookmarks} id={"bookmark-#{bookmark.id}"}>
+            <li
+              :for={bookmark <- @node.bookmarks}
+              id={"bookmark-#{bookmark.id}"}
+              class="min-w-0 max-w-full"
+            >
               <.bookmark_menu_link bookmark={bookmark} />
             </li>
           </ul>
@@ -130,17 +141,19 @@ defmodule LinksWeb.PublicShareLive do
 
   def bookmark_menu_link(assigns) do
     ~H"""
-    <a
-      href={@bookmark.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      class="flex min-w-0 w-full items-center justify-start gap-2"
-    >
-      <.bookmark_icon bookmark={@bookmark} />
-      <span class="min-w-0 flex-1 truncate text-left leading-normal">
-        {bookmark_label(@bookmark)}
-      </span>
-    </a>
+    <div class="bookmark-menu-row flex min-w-0 w-full items-center gap-2">
+      <a
+        href={@bookmark.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="flex min-w-0 flex-1 items-center gap-2"
+      >
+        <.bookmark_icon bookmark={@bookmark} />
+        <span class="min-w-0 flex-1 truncate text-left leading-normal">
+          {bookmark_label(@bookmark)}
+        </span>
+      </a>
+    </div>
     """
   end
 
