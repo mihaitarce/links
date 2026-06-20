@@ -501,6 +501,30 @@ defmodule LinksWeb.DashboardLiveTest do
       assert has_element?(lv, ~s(#collection-#{mount.id}[data-reorderable="true"]))
     end
 
+    test "hides revoked shared collections after one hour", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Expired Shared"})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      assert {:ok, revoked} = Collections.revoke_collaboration(owner_scope, mount)
+
+      expired_at =
+        DateTime.utc_now(:second)
+        |> DateTime.add(-3601, :second)
+
+      revoked
+      |> Collection.changeset(%{collaboration_revoked_at: expired_at})
+      |> Repo.update!()
+
+      conn = log_in_user(conn, collaborator)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      refute has_element?(lv, "#collection-#{mount.id}")
+    end
+
     test "reorders revoked shared collection mounts from the dashboard", %{conn: conn} do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()

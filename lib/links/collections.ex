@@ -5,6 +5,8 @@ defmodule Links.Collections do
 
   import Ecto.Query, warn: false
 
+  @revoked_mount_visibility_seconds 3600
+
   alias Ecto.Multi
   alias Links.Accounts
   alias Links.Accounts.Scope
@@ -16,10 +18,15 @@ defmodule Links.Collections do
 
   def list_dashboard(%Scope{} = scope) do
     user_id = scope.user.id
+    revoked_mount_cutoff = revoked_mount_visible_cutoff()
 
     own_collections =
       Collection
       |> where([c], c.owner_id == ^user_id)
+      |> where(
+        [c],
+        is_nil(c.collaboration_revoked_at) or c.collaboration_revoked_at > ^revoked_mount_cutoff
+      )
       |> order_by([c], asc: c.position, asc: c.title, asc: c.id)
       |> Repo.all()
 
@@ -599,6 +606,11 @@ defmodule Links.Collections do
     not is_nil(collaboration_id) and not is_nil(revoked_at)
   end
 
+  def visible_revoked_collaboration_mount?(%Collection{} = collection) do
+    revoked_collaboration_mount?(collection) and
+      recent_revoked_collaboration_mount?(collection)
+  end
+
   def can_manage_collection?(%Scope{} = scope, %Collection{} = collection) do
     effective = effective_collection(collection)
     effective && effective.id in editable_collaboration_ids(scope)
@@ -623,8 +635,9 @@ defmodule Links.Collections do
     user_id = scope.user.id
 
     case Repo.get(Collection, collection_id) do
-      %Collection{owner_id: ^user_id} ->
-        true
+      %Collection{owner_id: ^user_id} = collection ->
+        not revoked_collaboration_mount?(collection) or
+          recent_revoked_collaboration_mount?(collection)
 
       %Collection{} ->
         collection_id in editable_collaboration_ids(scope)
@@ -1092,6 +1105,18 @@ defmodule Links.Collections do
 
   defp to_integer(value) when is_integer(value), do: value
   defp to_integer(value) when is_binary(value), do: String.to_integer(value)
+
+  defp revoked_mount_visible_cutoff do
+    DateTime.utc_now(:second)
+    |> DateTime.add(-@revoked_mount_visibility_seconds, :second)
+  end
+
+  defp recent_revoked_collaboration_mount?(%Collection{collaboration_revoked_at: revoked_at})
+       when not is_nil(revoked_at) do
+    DateTime.compare(revoked_at, revoked_mount_visible_cutoff()) == :gt
+  end
+
+  defp recent_revoked_collaboration_mount?(_), do: false
 
   defp uniq_by_id(collections), do: Map.values(Map.new(collections, &{&1.id, &1}))
 

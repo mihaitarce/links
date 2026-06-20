@@ -685,7 +685,7 @@ defmodule Links.CollectionsTest do
       assert Collections.list_inbox_bookmarks(owner_scope) == []
     end
 
-    test "revoked collaborations stay in the tree but stop granting access" do
+    test "recently revoked collaborations stay in the tree but stop granting access" do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()
       source = collection_fixture(owner_scope, %{title: "Revoked"})
@@ -703,6 +703,31 @@ defmodule Links.CollectionsTest do
       refute Collections.can_edit_collection?(collaborator_scope, source.id)
       refute Collections.can_edit_collection?(collaborator_scope, mount.id)
       assert Collections.can_reorder_collection?(collaborator_scope, mount.id)
+    end
+
+    test "revoked collaborations disappear from the tree after one hour" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Expired Revoke"})
+
+      {:ok, mount} =
+        Collections.create_collaboration(owner_scope, source, collaborator.email, false)
+
+      assert {:ok, revoked} = Collections.revoke_collaboration(owner_scope, mount)
+
+      expired_at =
+        DateTime.utc_now(:second)
+        |> DateTime.add(-3601, :second)
+
+      revoked
+      |> Collection.changeset(%{collaboration_revoked_at: expired_at})
+      |> Repo.update!()
+
+      collaborator_scope = user_scope_fixture(collaborator)
+      dashboard = Collections.list_dashboard(collaborator_scope)
+
+      assert dashboard.tree == []
+      refute Collections.can_reorder_collection?(collaborator_scope, mount.id)
     end
 
     test "lists collaborators for a collection" do
