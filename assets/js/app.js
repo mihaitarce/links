@@ -434,6 +434,15 @@ const CollectionBookmarkSort = {
         hook.beginBookmarkDrag()
         hook.bindDragTracking()
 
+        const sidebar = hook.el.closest("#bookmarks-sidebar")
+
+        if (sidebar) {
+          document.documentElement.style.setProperty(
+            "--bookmarks-sidebar-width",
+            `${sidebar.getBoundingClientRect().width}px`
+          )
+        }
+
         if (isInboxContainer(event.from)) {
           hook.sourceSummary = null
           hook.setInboxDropHighlight(event.from)
@@ -462,6 +471,7 @@ const CollectionBookmarkSort = {
       onEnd(event) {
         try {
           hook.unbindDragTracking()
+          document.documentElement.style.removeProperty("--bookmarks-sidebar-width")
 
           if (readonly) {
             const targetContainer = hook.resolveDropContainer(event)

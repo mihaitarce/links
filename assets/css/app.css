@@ -28,13 +28,6 @@
 
 /* This file is for your main application CSS */
 
-summary.bookmark-drop-highlight,
-#bookmarks-zone-inbox.bookmark-drop-highlight {
-  background-color: color-mix(in oklch, var(--color-primary) 14%, transparent);
-  box-shadow: inset 0 0 0 2px var(--color-primary);
-  border-radius: var(--radius-field);
-}
-
 .inbox-empty-state:not(:only-child) {
   display: none;
 }
@@ -98,12 +91,54 @@ li[id^="collection-"].sortable-fallback > .revoked-collection > summary {
   outline-style: none;
 }
 
+@media (hover: hover) {
+  #bookmarks-sidebar .menu :where(li > details > summary:not(.menu-title):hover),
+  #bookmarks-sidebar .menu :where(li > .revoked-collection > summary:hover),
+  #bookmarks-sidebar .menu :where(li:not(.menu-title, .disabled) > .bookmark-menu-row:hover) {
+    color: var(--color-base-content);
+    background-color: color-mix(in oklab, var(--color-base-content) 10%, transparent);
+    background-image: none;
+    background-size: auto;
+    box-shadow:
+      0 1px oklch(0% 0 0 / 0.01) inset,
+      0 -1px oklch(100% 0 0 / 0.01) inset;
+    outline-style: none;
+  }
+}
+
+#bookmarks-sidebar .menu summary.bookmark-drop-highlight,
+#bookmarks-sidebar
+  .menu
+  :where(li > details > summary.sidebar-item-active.bookmark-drop-highlight:not(.menu-title)),
+#bookmarks-sidebar .menu :where(li > .revoked-collection > summary.bookmark-drop-highlight),
+#bookmarks-zone-inbox.bookmark-drop-highlight {
+  color: var(--color-base-content);
+  background-color: color-mix(in oklch, var(--color-primary) 14%, transparent);
+  background-image: none;
+  box-shadow: inset 0 0 0 2px var(--color-primary);
+  border-radius: var(--radius-field);
+  outline-style: none;
+}
+
 #bookmarks-sidebar .menu :where(li > .bookmark-menu-row) {
   padding-block: calc(0.25rem * 1);
 }
 
 [data-bookmark-sortable] > li[id^="bookmark-"] > .bookmark-menu-row {
   cursor: grab;
+}
+
+[data-bookmark-sortable] > li[id^="bookmark-"].sortable-ghost,
+[data-bookmark-sortable] > li[id^="bookmark-"].sortable-chosen,
+[data-bookmark-sortable] > li[id^="bookmark-"].sortable-drag,
+li[id^="bookmark-"].sortable-fallback {
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+body.bookmark-dragging li[id^="bookmark-"].sortable-fallback {
+  max-width: var(--bookmarks-sidebar-width, 100%);
 }
 
 #bookmarks-sidebar .bookmark-menu-row .bookmark-select-button {
@@ -145,6 +180,11 @@ details > summary .sidebar-more-button {
 
 #bookmarks-sidebar {
   --tree-indent: 1rem;
+  overflow-x: hidden;
+}
+
+#bookmarks-sidebar .menu :where(li ul) {
+  white-space: normal;
 }
 
 #bookmarks-sidebar .menu {
@@ -163,15 +203,17 @@ details > summary .sidebar-more-button {
   max-width: 100%;
   margin-inline-start: 0;
   white-space: normal;
+  overflow-x: hidden;
 }
 
 #bookmarks-sidebar li[id^="collection-"] details > ul {
-  margin-inline-start: var(--tree-indent);
-  padding-inline-start: calc(0.25rem * 2);
-  width: calc(100% - var(--tree-indent));
-  max-width: calc(100% - var(--tree-indent));
+  margin-inline-start: 0;
+  padding-inline-start: calc(var(--tree-indent) + 0.5rem);
+  width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
   white-space: normal;
+  overflow-x: hidden;
 }
 
 #bookmarks-sidebar .menu :where(li > details) {
@@ -208,12 +250,13 @@ details > summary .sidebar-more-button {
 }
 
 #public-share-sidebar li[id^="collection-"] details > ul {
-  margin-inline-start: var(--tree-indent);
-  padding-inline-start: calc(0.25rem * 2);
-  width: calc(100% - var(--tree-indent));
-  max-width: calc(100% - var(--tree-indent));
+  margin-inline-start: 0;
+  padding-inline-start: calc(var(--tree-indent) + 0.5rem);
+  width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
   white-space: normal;
+  overflow-x: hidden;
 }
 
 #public-share-sidebar .menu :where(li > details) {

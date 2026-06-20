@@ -120,7 +120,7 @@ defmodule LinksWeb.DashboardLive do
                 id="collections-zone-root"
                 data-collection-sortable
                 data-parent-id="root"
-                class={sidebar_menu_class(["overflow-y-auto"])}
+                class={sidebar_menu_class(["overflow-y-auto overflow-x-hidden"])}
               >
                 <.tree_node
                   :for={node <- @dashboard.tree}
