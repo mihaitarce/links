@@ -260,14 +260,14 @@ defmodule Links.CollectionsTest do
     test "formats inbox bookmark badges" do
       scope = user_scope_fixture()
 
-      assert Collections.inbox_bookmark_badge([]) == "0 / 0"
+      assert Collections.inbox_bookmark_badge([]) == "0"
 
       {:ok, first} = Collections.create_inbox_bookmark(scope, %{url: "https://example.com/1"})
-      {:ok, second} = Collections.create_inbox_bookmark(scope, %{url: "https://example.com/2"})
+      {:ok, _second} = Collections.create_inbox_bookmark(scope, %{url: "https://example.com/2"})
       assert {:ok, _} = Collections.update_bookmark(scope, first, %{completed: true})
 
       inbox = Collections.list_inbox_bookmarks(scope)
-      assert Collections.inbox_bookmark_badge(inbox) == "1 / 2"
+      assert Collections.inbox_bookmark_badge(inbox) == "2"
     end
 
     test "broadcasts collection bookmark list changes" do
@@ -626,6 +626,31 @@ defmodule Links.CollectionsTest do
       refute restored.revoked_at
       assert Collections.get_public_share_by_token(first_share.token)
     end
+
+    test "lists active public shares before revoked public shares" do
+      owner_scope = user_scope_fixture()
+      collection = collection_fixture(owner_scope)
+
+      assert {:ok, revoked_share} = Collections.create_public_share(owner_scope, collection)
+      assert {:ok, _} = Collections.revoke_public_share(owner_scope, revoked_share)
+      assert {:ok, active_share} = Collections.create_public_share(owner_scope, collection)
+
+      assert [first, second] = Collections.list_public_shares(owner_scope, collection)
+      assert first.id == active_share.id
+      assert second.id == revoked_share.id
+    end
+
+    test "orders active public shares by last modified date descending" do
+      owner_scope = user_scope_fixture()
+      collection = collection_fixture(owner_scope)
+
+      assert {:ok, older_share} = Collections.create_public_share(owner_scope, collection)
+      assert {:ok, newer_share} = Collections.create_public_share(owner_scope, collection)
+
+      assert [first, second] = Collections.list_public_shares(owner_scope, collection)
+      assert first.id == newer_share.id
+      assert second.id == older_share.id
+    end
   end
 
   describe "collaboration mounts" do
@@ -905,6 +930,42 @@ defmodule Links.CollectionsTest do
       assert listed.owner.email == collaborator.email
       assert listed.collaboration_readonly
       refute listed.collaboration_revoked_at
+    end
+
+    test "lists active collaborators before revoked collaborators" do
+      owner_scope = user_scope_fixture()
+      active = user_fixture(%{email: "active-collaborator@example.com"})
+      revoked = user_fixture(%{email: "revoked-collaborator@example.com"})
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+
+      assert {:ok, active_mount} =
+               Collections.create_collaboration(owner_scope, source, active.email, false)
+
+      assert {:ok, revoked_mount} =
+               Collections.create_collaboration(owner_scope, source, revoked.email, false)
+
+      assert {:ok, _} = Collections.revoke_collaboration(owner_scope, revoked_mount)
+
+      assert [first, second] = Collections.list_collaborators(owner_scope, source)
+      assert first.id == active_mount.id
+      assert second.id == revoked_mount.id
+    end
+
+    test "orders active collaborators by last modified date descending" do
+      owner_scope = user_scope_fixture()
+      older = user_fixture(%{email: "older-collaborator@example.com"})
+      newer = user_fixture(%{email: "newer-collaborator@example.com"})
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+
+      assert {:ok, older_mount} =
+               Collections.create_collaboration(owner_scope, source, older.email, false)
+
+      assert {:ok, newer_mount} =
+               Collections.create_collaboration(owner_scope, source, newer.email, false)
+
+      assert [first, second] = Collections.list_collaborators(owner_scope, source)
+      assert first.id == newer_mount.id
+      assert second.id == older_mount.id
     end
 
     test "cannot revoke an already revoked collaboration" do

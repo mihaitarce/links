@@ -115,7 +115,7 @@ defmodule LinksWeb.DashboardLive do
                   Collections
                 </h2>
                 <button class="btn btn-primary btn-soft" phx-click="new_collection">
-                  New
+                  New collection
                 </button>
               </div>
               <ul
@@ -841,7 +841,7 @@ defmodule LinksWeb.DashboardLive do
               value={@collection_form[:title].value}
               class="input join-item w-full"
             />
-            <button class="btn btn-primary join-item">Save collection</button>
+            <button class="btn btn-primary btn-soft join-item">Save collection</button>
           </div>
         </.form>
       </div>
@@ -863,7 +863,7 @@ defmodule LinksWeb.DashboardLive do
                 value={@child_collection_form[:title].value}
                 class="input join-item w-full"
               />
-              <button class="btn btn-primary join-item">Create</button>
+              <button class="btn btn-primary btn-soft join-item">Create</button>
             </div>
           </.form>
         </div>
@@ -1007,7 +1007,7 @@ defmodule LinksWeb.DashboardLive do
                     class="checkbox checkbox-sm"
                   /> Read-only
                 </label>
-                <button class="btn btn-primary shrink-0">Share</button>
+                <button class="btn btn-accent shrink-0">Share</button>
               </div>
             </.form>
           </div>
@@ -1031,7 +1031,7 @@ defmodule LinksWeb.DashboardLive do
               <button
                 :if={is_nil(collaborator.collaboration_revoked_at)}
                 id={"revoke-collaborator-#{collaborator.id}"}
-                class="btn btn-ghost"
+                class="btn btn-dash btn-sm"
                 phx-click="confirm_revoke_collaboration"
                 phx-value-id={collaborator.id}
               >
@@ -1040,7 +1040,7 @@ defmodule LinksWeb.DashboardLive do
               <button
                 :if={collaborator.collaboration_revoked_at && @context.can_restore_collaborators}
                 id={"restore-collaborator-#{collaborator.id}"}
-                class="btn btn-ghost"
+                class="btn btn-outline btn-sm"
                 phx-click="restore_collaboration"
                 phx-value-id={collaborator.id}
               >
@@ -1060,7 +1060,7 @@ defmodule LinksWeb.DashboardLive do
       >
         <div class="mb-3 flex items-center justify-between">
           <h2 class="font-semibold">Public Sharing</h2>
-          <button class="btn btn-primary" phx-click="create_public_share">Create public link</button>
+          <button class="btn btn-accent" phx-click="create_public_share">Create public link</button>
         </div>
         <ul class="space-y-2">
           <li
@@ -1075,18 +1075,18 @@ defmodule LinksWeb.DashboardLive do
                 {if share.revoked_at, do: "Revoked", else: "Active"}
               </p>
             </div>
-            <div :if={is_nil(share.revoked_at)} class="flex shrink-0 items-center gap-1">
+            <div :if={is_nil(share.revoked_at)} class="flex shrink-0 items-center gap-2">
               <button
                 id={"copy-public-share-#{share.id}"}
                 type="button"
-                class="btn btn-ghost"
+                class="btn btn-soft btn-sm"
                 phx-click={JS.dispatch("phx:copy", detail: %{text: public_share_url(share)})}
               >
-                Copy link
+                <.icon name="hero-clipboard-document" class="size-4" /> Copy link
               </button>
               <button
                 id={"revoke-public-share-#{share.id}"}
-                class="btn btn-ghost"
+                class="btn btn-dash btn-sm"
                 phx-click="confirm_revoke_public_share"
                 phx-value-id={share.id}
               >
@@ -1097,7 +1097,7 @@ defmodule LinksWeb.DashboardLive do
               :if={share.revoked_at && @context.can_restore_collaborators}
               id={"restore-public-share-#{share.id}"}
               type="button"
-              class="btn btn-ghost shrink-0"
+              class="btn btn-outline btn-sm shrink-0"
               phx-click="restore_public_share"
               phx-value-id={share.id}
             >

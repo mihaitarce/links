@@ -27,7 +27,7 @@ defmodule LinksWeb.DashboardLiveTest do
       assert html =~ "Collections"
       assert html =~ "Reading"
       assert html =~ "Inbox link"
-      assert has_element?(lv, "#inbox-bookmark-count", "0 / 1")
+      assert has_element?(lv, "#inbox-bookmark-count", "1")
     end
 
     test "creates new links in the inbox", %{conn: conn} do

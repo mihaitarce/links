@@ -429,7 +429,7 @@ defmodule Links.Collections do
     if can_manage_collection?(scope, collection) do
       PublicShare
       |> where([s], s.collection_id == ^collection.id)
-      |> order_by([s], desc: s.inserted_at, desc: s.id)
+      |> order_by([s], asc_nulls_first: s.revoked_at, desc: s.updated_at, desc: s.id)
       |> Repo.all()
     else
       []
@@ -667,7 +667,11 @@ defmodule Links.Collections do
     if can_manage_collection?(scope, collection) do
       Collection
       |> where([c], c.collaboration_id == ^collection.id)
-      |> order_by([c], asc: c.collaboration_revoked_at, desc: c.inserted_at)
+      |> order_by([c],
+        asc_nulls_first: c.collaboration_revoked_at,
+        desc: c.updated_at,
+        desc: c.id
+      )
       |> preload(:owner)
       |> Repo.all()
     else
@@ -919,10 +923,10 @@ defmodule Links.Collections do
   end
 
   @doc """
-  Formats an inbox bookmark badge as completed/total.
+  Formats an inbox bookmark badge as the total link count.
   """
   def inbox_bookmark_badge(bookmarks) when is_list(bookmarks) do
-    bookmark_badge(Enum.count(bookmarks, & &1.completed), length(bookmarks))
+    length(bookmarks) |> Integer.to_string()
   end
 
   defp shared_collection_ids(user_id) do
