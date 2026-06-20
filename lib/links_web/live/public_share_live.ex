@@ -71,10 +71,10 @@ defmodule LinksWeb.PublicShareLive do
             <h1 class="truncate text-xl font-semibold">{@root.title}</h1>
 
             <ul id="public-share-tree" class={sidebar_menu_class(["mt-4", "overflow-y-auto"])}>
+              <.tree_node :for={node <- @sections} node={node} />
               <li :for={bookmark <- @root_bookmarks} id={"bookmark-#{bookmark.id}"}>
                 <.bookmark_menu_link bookmark={bookmark} />
               </li>
-              <.tree_node :for={node <- @sections} node={node} />
             </ul>
           </div>
         </div>
@@ -103,7 +103,7 @@ defmodule LinksWeb.PublicShareLive do
         <ul :if={@node.children != []}>
           <.tree_node :for={child <- @node.children} node={child} />
         </ul>
-        <ul>
+        <ul :if={@node.bookmarks != []}>
           <li :for={bookmark <- @node.bookmarks} id={"bookmark-#{bookmark.id}"}>
             <.bookmark_menu_link bookmark={bookmark} />
           </li>
