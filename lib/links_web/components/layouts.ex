@@ -35,7 +35,8 @@ defmodule LinksWeb.Layouts do
 
   def app(assigns) do
     ~H"""
-    <header class="navbar min-h-12 border-b border-base-300 bg-base-100 px-3">
+    <div class="flex h-dvh flex-col overflow-hidden">
+      <header class="navbar min-h-12 shrink-0 border-b border-base-300 bg-base-100 px-3">
       <div class="flex-1">
         <a href="/" class="flex w-fit items-center gap-2">
           <img src={~p"/images/logo.svg"} width="28" />
@@ -82,11 +83,12 @@ defmodule LinksWeb.Layouts do
           <.theme_toggle />
         </div>
       </div>
-    </header>
+      </header>
 
-    <main class="min-h-[calc(100vh-3rem)] bg-base-200">
-      {render_slot(@inner_block)}
-    </main>
+      <main class="min-h-0 flex-1 overflow-y-auto bg-base-200">
+        {render_slot(@inner_block)}
+      </main>
+    </div>
 
     <.flash_group flash={@flash} />
     """

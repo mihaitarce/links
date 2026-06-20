@@ -54,7 +54,7 @@ defmodule LinksWeb.PublicShareLive do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
       <%= if @not_found do %>
-        <div class="flex min-h-[calc(100vh-3rem)] items-center justify-center p-4">
+        <div class="flex h-full items-center justify-center p-4">
           <div class="max-w-md rounded-box border border-dashed border-base-300 bg-base-100 p-8 text-center">
             <h1 class="text-lg font-semibold">Shared collection unavailable</h1>
             <p class="mt-2 text-base-content/60">
@@ -63,7 +63,7 @@ defmodule LinksWeb.PublicShareLive do
           </div>
         </div>
       <% else %>
-        <div class="min-h-[calc(100vh-3rem)] overflow-auto bg-base-200 p-4 text-sm">
+        <div class="h-full overflow-auto bg-base-200 p-4 text-sm">
           <div class="mx-auto max-w-2xl rounded-box border border-base-300 bg-base-100 p-4">
             <p class="text-xs font-semibold uppercase tracking-wide text-base-content/60">
               Shared collection

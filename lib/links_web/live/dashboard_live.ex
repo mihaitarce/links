@@ -41,7 +41,7 @@ defmodule LinksWeb.DashboardLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <div class="flex h-[calc(100vh-3rem)] w-full overflow-hidden bg-base-200 text-sm">
+      <div class="flex h-full min-h-0 w-full overflow-hidden bg-base-200 text-sm">
         <aside class="flex w-1/2 min-w-0 shrink-0 flex-col border-r border-base-300 bg-base-100">
           <div class="border-b border-base-300 p-3">
             <.form for={@new_bookmark_form} id="new-link-form" phx-submit="create_link">
