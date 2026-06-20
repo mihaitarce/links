@@ -385,6 +385,68 @@ defmodule Links.Collections do
 
   def get_public_share!(id), do: Repo.get!(PublicShare, id)
 
+  def get_public_share_by_token(token) when is_binary(token) do
+    PublicShare
+    |> where([s], s.token == ^token and is_nil(s.revoked_at))
+    |> preload(:collection)
+    |> Repo.one()
+  end
+
+  def fetch_public_share_dashboard(token) when is_binary(token) do
+    case get_public_share_by_token(token) do
+      %PublicShare{collection: %Collection{} = root} = share ->
+        collection_ids = public_share_collection_ids(root.id)
+
+        collections =
+          Collection
+          |> where([c], c.id in ^collection_ids)
+          |> order_by([c], asc: c.position, asc: c.title, asc: c.id)
+          |> Repo.all()
+
+        bookmarks =
+          Bookmark
+          |> where([b], b.collection_id in ^collection_ids)
+          |> order_by([b], asc: b.position, asc: b.title, asc: b.id)
+          |> Repo.all()
+
+        by_id = Map.new(collections, &{&1.id, &1})
+        by_parent = Enum.group_by(collections, & &1.parent_id)
+        bookmarks_by_collection = Enum.group_by(bookmarks, & &1.collection_id)
+        shared_ids = MapSet.new()
+
+        tree = [
+          build_node(root, by_id, by_parent, bookmarks_by_collection, nil, shared_ids)
+        ]
+
+        {:ok,
+         %{
+           share: share,
+           root: root,
+           tree: tree,
+           collection_ids: collection_ids
+         }}
+
+      _ ->
+        {:error, :not_found}
+    end
+  end
+
+  def public_share_collection_ids(root_id) do
+    [root_id | descendant_ids([root_id])]
+  end
+
+  def public_share_topic(token) when is_binary(token) do
+    "public_share:#{token}"
+  end
+
+  def broadcast_public_share_changed(token) when is_binary(token) do
+    Phoenix.PubSub.broadcast(
+      Links.PubSub,
+      public_share_topic(token),
+      {:public_share_changed, token}
+    )
+  end
+
   def revoke_public_share(%Scope{} = scope, %PublicShare{} = public_share) do
     public_share = Repo.preload(public_share, :collection)
 
@@ -392,6 +454,10 @@ defmodule Links.Collections do
       public_share
       |> PublicShare.changeset(%{revoked_at: DateTime.utc_now(:second)})
       |> Repo.update()
+      |> tap(fn
+        {:ok, share} -> broadcast_public_share_changed(share.token)
+        _ -> :ok
+      end)
     else
       {:error, :unauthorized}
     end

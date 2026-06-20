@@ -307,6 +307,22 @@ defmodule LinksWeb.DashboardLiveTest do
       refute Repo.get(Collection, mount.id)
     end
 
+    test "shows a copy link button for active public shares", %{conn: conn} do
+      scope = user_scope_fixture()
+      collection = collection_fixture(scope, %{title: "Shared Publicly"})
+
+      assert {:ok, share} = Collections.create_public_share(scope, collection)
+
+      conn = log_in_user(conn, scope.user)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv
+      |> element("#collection-#{collection.id} summary")
+      |> render_click()
+
+      assert has_element?(lv, "#copy-public-share-#{share.id}", "Copy link")
+    end
+
     test "shows collaboration icons only on shared root collections", %{conn: conn} do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()

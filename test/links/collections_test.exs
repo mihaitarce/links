@@ -333,6 +333,42 @@ defmodule Links.CollectionsTest do
       assert [%{shared: true}] = Collections.list_dashboard(scope).tree
       assert Collections.shared_collection?(scope, collection.id)
     end
+
+    test "loads a public share dashboard by token" do
+      scope = user_scope_fixture()
+      collection = collection_fixture(scope, %{title: "Public Root"})
+      child = collection_fixture(scope, %{title: "Public Child", parent_id: collection.id})
+
+      {:ok, bookmark} =
+        Collections.create_bookmark(scope, %{
+          title: "Public Link",
+          url: "https://example.com/public",
+          collection_id: child.id
+        })
+
+      assert {:ok, share} = Collections.create_public_share(scope, collection)
+      assert {:ok, dashboard} = Collections.fetch_public_share_dashboard(share.token)
+
+      assert dashboard.root.id == collection.id
+      assert dashboard.collection_ids == Collections.public_share_collection_ids(collection.id)
+      assert [root_node] = dashboard.tree
+      assert root_node.title == "Public Root"
+      assert hd(root_node.children).title == "Public Child"
+      assert hd(hd(root_node.children).bookmarks).id == bookmark.id
+    end
+
+    test "broadcasts public share changes when a link is revoked" do
+      scope = user_scope_fixture()
+      collection = collection_fixture(scope)
+
+      assert {:ok, share} = Collections.create_public_share(scope, collection)
+
+      Phoenix.PubSub.subscribe(Links.PubSub, Collections.public_share_topic(share.token))
+
+      assert {:ok, _revoked} = Collections.revoke_public_share(scope, share)
+      assert_receive {:public_share_changed, token} when token == share.token
+      refute Collections.get_public_share_by_token(share.token)
+    end
   end
 
   describe "collaboration mounts" do

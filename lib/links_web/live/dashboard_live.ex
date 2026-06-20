@@ -552,14 +552,23 @@ defmodule LinksWeb.DashboardLive do
                 {if share.revoked_at, do: "Revoked", else: "Active"}
               </p>
             </div>
-            <button
-              :if={is_nil(share.revoked_at)}
-              class="btn btn-ghost btn-xs"
-              phx-click="revoke_public_share"
-              phx-value-id={share.id}
-            >
-              Revoke
-            </button>
+            <div :if={is_nil(share.revoked_at)} class="flex shrink-0 items-center gap-1">
+              <button
+                id={"copy-public-share-#{share.id}"}
+                type="button"
+                class="btn btn-ghost btn-xs"
+                phx-click={JS.dispatch("phx:copy", detail: %{text: public_share_url(share)})}
+              >
+                Copy link
+              </button>
+              <button
+                class="btn btn-ghost btn-xs"
+                phx-click="revoke_public_share"
+                phx-value-id={share.id}
+              >
+                Revoke
+              </button>
+            </div>
           </li>
           <li :if={@public_shares == []} class="text-sm text-base-content/60">
             No public shares yet.
@@ -964,6 +973,10 @@ defmodule LinksWeb.DashboardLive do
 
     status = if revoked_at, do: "Revoked", else: "Active"
     "#{access} · #{status}"
+  end
+
+  defp public_share_url(%{token: token}) do
+    url(~p"/share/#{token}")
   end
 
   defp sidebar_menu_class(extra \\ []) do
