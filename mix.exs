@@ -6,6 +6,7 @@ defmodule Links.MixProject do
       app: :links,
       version: "0.1.0",
       elixir: "~> 1.15",
+      licenses: ["AGPL-3.0-only"],
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
