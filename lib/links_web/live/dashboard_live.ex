@@ -459,8 +459,17 @@ defmodule LinksWeb.DashboardLive do
           phx-submit="save_collection"
           phx-change="validate_collection"
         >
-          <.input field={@collection_form[:title]} label="Title" />
-          <button class="btn btn-primary btn-sm mt-2">Save collection</button>
+          <label for={@collection_form[:title].id} class="label mb-1">Title</label>
+          <div class="join w-full">
+            <input
+              type="text"
+              name={@collection_form[:title].name}
+              id={@collection_form[:title].id}
+              value={@collection_form[:title].value}
+              class="input input-sm join-item w-full"
+            />
+            <button class="btn btn-primary btn-sm join-item">Save collection</button>
+          </div>
         </.form>
       </div>
 
@@ -472,30 +481,43 @@ defmodule LinksWeb.DashboardLive do
             id="child-collection-form"
             phx-submit="create_child_collection"
           >
-            <.input field={@child_collection_form[:title]} label="Title" />
-            <button class="btn btn-primary btn-sm mt-2">Create</button>
+            <label for={@child_collection_form[:title].id} class="label mb-1">Title</label>
+            <div class="join w-full">
+              <input
+                type="text"
+                name={@child_collection_form[:title].name}
+                id={@child_collection_form[:title].id}
+                value={@child_collection_form[:title].value}
+                class="input input-sm join-item w-full"
+              />
+              <button class="btn btn-primary btn-sm join-item">Create</button>
+            </div>
           </.form>
         </div>
 
         <div :if={@context.can_manage} class="rounded-box border border-base-300 bg-base-100 p-4">
           <h2 class="mb-3 font-semibold">Collaborators</h2>
           <.form for={%{}} id="collaboration-form" phx-submit="create_collaboration">
-            <.input
-              name="collaboration[email]"
-              value={@collaboration_email}
-              type="email"
-              label="User email"
-            />
-            <label class="label cursor-pointer justify-start gap-2">
+            <label for="collaboration-email" class="label mb-1">User email</label>
+            <div class="flex items-center gap-2">
               <input
-                type="checkbox"
-                name="collaboration[readonly]"
-                value="true"
-                checked={@collaboration_readonly}
-                class="checkbox checkbox-sm"
-              /> Read-only
-            </label>
-            <button class="btn btn-primary btn-sm mt-2">Add collaborator</button>
+                id="collaboration-email"
+                type="email"
+                name="collaboration[email]"
+                value={@collaboration_email}
+                class="input input-sm min-w-0 flex-1"
+              />
+              <label class="label shrink-0 cursor-pointer gap-2 whitespace-nowrap">
+                <input
+                  type="checkbox"
+                  name="collaboration[readonly]"
+                  value="true"
+                  checked={@collaboration_readonly}
+                  class="checkbox checkbox-sm"
+                /> Read-only
+              </label>
+              <button class="btn btn-primary btn-sm shrink-0">Add collaborator</button>
+            </div>
           </.form>
           <ul id="collaborators-list" class="mt-4 space-y-2">
             <li
