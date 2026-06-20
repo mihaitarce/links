@@ -25,7 +25,15 @@ defmodule Links.Bookmarks.Bookmark do
 
   def changeset(bookmark, attrs) do
     bookmark
-    |> cast(attrs, [:title, :url, :description, :position, :completed, :collection_id, :created_by_id])
+    |> cast(attrs, [
+      :title,
+      :url,
+      :description,
+      :position,
+      :completed,
+      :collection_id,
+      :created_by_id
+    ])
     |> normalize_title()
     |> validate_required([:title, :url, :created_by_id])
     |> validate_length(:title, min: 1, max: 240)

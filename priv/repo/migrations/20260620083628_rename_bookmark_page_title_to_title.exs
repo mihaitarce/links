@@ -3,10 +3,10 @@ defmodule Links.Repo.Migrations.RenameBookmarkPageTitleToTitle do
 
   def change do
     execute """
-    UPDATE bookmarks
-    SET title = page_title
-    WHERE page_title IS NOT NULL AND page_title != ''
-    """,
+            UPDATE bookmarks
+            SET title = page_title
+            WHERE page_title IS NOT NULL AND page_title != ''
+            """,
             ""
 
     alter table(:bookmarks) do
