@@ -694,12 +694,75 @@ defmodule LinksWeb.DashboardLiveTest do
       {:ok, lv, _html} = live(conn, ~p"/")
 
       lv = open_collection_details(lv, collection.id)
+      lv = show_collaborator_suggestions(lv)
 
       lv
       |> form("#collaboration-form form", collaboration: %{email: "collaborator-search"})
       |> render_change()
 
       assert has_element?(lv, "#collaboration-email-suggestions", collaborator.email)
+
+      lv = select_collaborator_suggestion(lv, collaborator.email)
+
+      assert has_element?(
+               lv,
+               "#collaboration-form input[type='text'][value='#{collaborator.email}']"
+             )
+
+      refute has_element?(lv, "#collaboration-email-suggestions")
+    end
+
+    test "hides collaborator suggestions after field loses focus", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      _collaborator = user_fixture(%{email: "blur-test@example.com"})
+      collection = collection_fixture(owner_scope, %{title: "Team Project"})
+
+      conn = log_in_user(conn, owner_scope.user)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv = open_collection_details(lv, collection.id)
+      lv = show_collaborator_suggestions(lv)
+
+      lv
+      |> form("#collaboration-form form", collaboration: %{email: "blur-test"})
+      |> render_change()
+
+      assert has_element?(lv, "#collaboration-email-suggestions", "blur-test@example.com")
+
+      lv = hide_collaborator_suggestions(lv)
+
+      refute has_element?(lv, "#collaboration-email-suggestions")
+
+      lv
+      |> form("#collaboration-form form", collaboration: %{email: "blur-test"})
+      |> render_change()
+
+      refute has_element?(lv, "#collaboration-email-suggestions")
+    end
+
+    test "hides collaborator suggestions when the form is submitted", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture(%{email: "submit-hide@example.com"})
+      collection = collection_fixture(owner_scope, %{title: "Team Project"})
+
+      conn = log_in_user(conn, owner_scope.user)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv = open_collection_details(lv, collection.id)
+      lv = show_collaborator_suggestions(lv)
+
+      lv
+      |> form("#collaboration-form form", collaboration: %{email: "submit-hide"})
+      |> render_change()
+
+      assert has_element?(lv, "#collaboration-email-suggestions", collaborator.email)
+
+      lv
+      |> form("#collaboration-form form", collaboration: %{email: collaborator.email})
+      |> render_submit()
+
+      refute has_element?(lv, "#collaboration-email-suggestions")
+      assert has_element?(lv, "#collaborators-list", collaborator.email)
     end
 
     test "shows validation when inviting an active collaborator again", %{conn: conn} do
@@ -752,6 +815,7 @@ defmodule LinksWeb.DashboardLiveTest do
       {:ok, lv, _html} = live(conn, ~p"/")
 
       lv = open_collection_details(lv, collection.id)
+      lv = show_collaborator_suggestions(lv)
 
       lv
       |> form("#collaboration-form form", collaboration: %{email: "active-collaborator"})
@@ -781,6 +845,7 @@ defmodule LinksWeb.DashboardLiveTest do
       {:ok, lv, _html} = live(conn, ~p"/")
 
       lv = open_collection_details(lv, collection.id)
+      lv = show_collaborator_suggestions(lv)
 
       lv
       |> form("#collaboration-form form", collaboration: %{email: "nobody-here"})
@@ -1271,6 +1336,21 @@ defmodule LinksWeb.DashboardLiveTest do
 
   defp open_collection_details(view, collection_id) do
     render_click(view, "select_collection", %{"id" => to_string(collection_id)})
+    view
+  end
+
+  defp show_collaborator_suggestions(view) do
+    render_click(view, "show_collaborator_email_suggestions")
+    view
+  end
+
+  defp hide_collaborator_suggestions(view) do
+    render_click(view, "hide_collaborator_email_suggestions")
+    view
+  end
+
+  defp select_collaborator_suggestion(view, email) do
+    render_click(view, "select_collaborator_email", %{"email" => email})
     view
   end
 

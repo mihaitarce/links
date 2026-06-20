@@ -161,6 +161,7 @@ defmodule LinksWeb.DashboardLive do
                 collaborators={@collaborators}
                 collaboration_form={@collaboration_form}
                 collaborator_email_suggestions={@collaborator_email_suggestions}
+                collaborator_email_suggestions_open?={@collaborator_email_suggestions_open?}
                 pending_metadata_ids={@pending_metadata_ids}
               />
             </div>
@@ -693,6 +694,7 @@ defmodule LinksWeb.DashboardLive do
   attr :collaborators, :list, default: []
   attr :collaboration_form, :any, required: true
   attr :collaborator_email_suggestions, :any, default: nil
+  attr :collaborator_email_suggestions_open?, :boolean, default: false
   attr :pending_metadata_ids, MapSet, default: MapSet.new()
 
   def detail_panel(%{selected: %{type: :bookmark}} = assigns) do
@@ -880,6 +882,7 @@ defmodule LinksWeb.DashboardLive do
                 <div
                   class="relative min-w-0 flex-1"
                   id="collaboration-email-field"
+                  phx-hook=".CollaboratorEmailSearch"
                 >
                   <div class="relative">
                     <input
@@ -896,7 +899,10 @@ defmodule LinksWeb.DashboardLive do
                       required
                     />
                     <ul
-                      :if={is_list(@collaborator_email_suggestions)}
+                      :if={
+                        @collaborator_email_suggestions_open? &&
+                          is_list(@collaborator_email_suggestions)
+                      }
                       id="collaboration-email-suggestions"
                       role="listbox"
                       class="menu absolute left-0 right-0 top-full z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-box border border-base-300 bg-base-100 p-1 shadow-lg"
@@ -912,6 +918,8 @@ defmodule LinksWeb.DashboardLive do
                       <li :for={email <- @collaborator_email_suggestions}>
                         <button
                           type="button"
+                          data-suggestion
+                          data-email={email}
                           id={"collaboration-email-option-#{email_option_dom_id(email)}"}
                         >
                           {email}
@@ -927,6 +935,69 @@ defmodule LinksWeb.DashboardLive do
                     {msg}
                   </p>
                 </div>
+                <script :type={Phoenix.LiveView.ColocatedHook} name=".CollaboratorEmailSearch">
+                  export default {
+                    mounted() {
+                      this.blurTimer = null
+                      this.form = this.el.closest("form")
+
+                      this.onFocusIn = (event) => {
+                        if (!event.target.matches("input[type='text']")) return
+                        clearTimeout(this.blurTimer)
+                        this.pushEvent("show_collaborator_email_suggestions")
+                      }
+
+                      this.onFocusOut = (event) => {
+                        if (!event.target.matches("input[type='text']")) return
+
+                        this.blurTimer = setTimeout(() => {
+                          this.pushEvent("hide_collaborator_email_suggestions")
+                        }, 200)
+                      }
+
+                      this.onMouseDown = (event) => {
+                        const suggestion = event.target.closest("[data-suggestion]")
+                        if (!suggestion) return
+
+                        event.preventDefault()
+                        clearTimeout(this.blurTimer)
+
+                        const email = suggestion.dataset.email
+                        const input = this.el.querySelector("input[type='text']")
+                        if (!email || !input) return
+
+                        input.value = email
+                        input.dispatchEvent(new Event("input", { bubbles: true }))
+                        input.blur()
+                        this.pushEvent("select_collaborator_email", { email })
+                      }
+
+                      this.onSubmit = () => {
+                        clearTimeout(this.blurTimer)
+                        this.pushEvent("hide_collaborator_email_suggestions")
+                      }
+
+                      this.el.addEventListener("focusin", this.onFocusIn)
+                      this.el.addEventListener("focusout", this.onFocusOut)
+                      this.el.addEventListener("mousedown", this.onMouseDown, true)
+                      this.form?.addEventListener("submit", this.onSubmit)
+
+                      this.handleEvent("collaborator-selected", ({ email }) => {
+                        const input = this.el.querySelector("input[type='text']")
+                        if (input && email) {
+                          input.value = email
+                        }
+                      })
+                    },
+                    destroyed() {
+                      clearTimeout(this.blurTimer)
+                      this.el.removeEventListener("focusin", this.onFocusIn)
+                      this.el.removeEventListener("focusout", this.onFocusOut)
+                      this.el.removeEventListener("mousedown", this.onMouseDown, true)
+                      this.form?.removeEventListener("submit", this.onSubmit)
+                    }
+                  }
+                </script>
                 <label class="label shrink-0 cursor-pointer gap-2 whitespace-nowrap">
                   <input
                     type="checkbox"
@@ -1356,7 +1427,33 @@ defmodule LinksWeb.DashboardLive do
     {:noreply, update_collaboration_form(socket, params)}
   end
 
+  def handle_event("show_collaborator_email_suggestions", _params, socket) do
+    {:noreply, show_collaborator_email_suggestions(socket)}
+  end
+
+  def handle_event("hide_collaborator_email_suggestions", _params, socket) do
+    {:noreply, hide_collaborator_suggestions(socket)}
+  end
+
+  def handle_event("select_collaborator_email", %{"email" => email}, socket) do
+    readonly =
+      collaboration_readonly_checked?(socket.assigns.collaboration_form)
+
+    collection = socket.assigns.selected_context.effective_collection
+    params = %{"email" => email, "readonly" => readonly}
+    errors = collaboration_email_errors(collection, email)
+
+    {:noreply,
+     socket
+     |> push_event("collaborator-selected", %{email: email})
+     |> assign(:collaborator_email_suggestions, nil)
+     |> assign(:collaborator_email_suggestions_open?, false)
+     |> assign_collaboration_form(params, readonly, errors)}
+  end
+
   def handle_event("create_collaboration", %{"collaboration" => params}, socket) do
+    socket = hide_collaborator_suggestions(socket)
+
     collection = socket.assigns.selected_context.effective_collection
     readonly = Map.get(params, "readonly") == "true"
     email = Map.get(params, "email", "")
@@ -1583,10 +1680,35 @@ defmodule LinksWeb.DashboardLive do
 
     socket
     |> assign(:collaborator_email_suggestions, nil)
+    |> assign(:collaborator_email_field_focused?, false)
+    |> assign(:collaborator_email_suggestions_open?, false)
     |> assign(
       :collaboration_form,
       collaboration_form(%{"email" => "", "readonly" => false}, "collaboration-#{key}")
     )
+  end
+
+  defp hide_collaborator_suggestions(socket) do
+    socket
+    |> assign(:collaborator_email_field_focused?, false)
+    |> assign(:collaborator_email_suggestions_open?, false)
+  end
+
+  defp show_collaborator_email_suggestions(socket) do
+    email = socket.assigns.collaboration_form[:email].value
+    collection = socket.assigns.selected_context.effective_collection
+
+    suggestions =
+      collaborator_email_suggestions(
+        socket.assigns.current_scope,
+        collection,
+        email
+      )
+
+    socket
+    |> assign(:collaborator_email_field_focused?, true)
+    |> assign(:collaborator_email_suggestions, suggestions)
+    |> assign(:collaborator_email_suggestions_open?, is_list(suggestions))
   end
 
   defp update_collaboration_form(socket, params) do
@@ -1603,8 +1725,13 @@ defmodule LinksWeb.DashboardLive do
 
     errors = collaboration_email_errors(collection, email)
 
+    open? =
+      Map.get(socket.assigns, :collaborator_email_field_focused?, false) &&
+        is_list(suggestions)
+
     socket
     |> assign(:collaborator_email_suggestions, suggestions)
+    |> assign(:collaborator_email_suggestions_open?, open?)
     |> assign_collaboration_form(params, readonly, errors)
   end
 
