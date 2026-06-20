@@ -69,12 +69,26 @@ summary.bookmark-drop-highlight,
   color: color-mix(in oklch, currentColor 45%, transparent);
 }
 
-#bookmarks-sidebar .menu .sidebar-item-active {
-  color: var(--menu-active-fg);
-  background-color: var(--menu-active-bg);
-  background-size: auto, calc(var(--noise) * 100%);
-  background-image: none, var(--fx-noise);
-  box-shadow: 0 2px calc(var(--depth) * 3px) -2px var(--menu-active-bg);
+#bookmarks-sidebar .menu .sidebar-item-active,
+#bookmarks-sidebar .menu :where(li:not(.menu-title, .disabled) > .bookmark-menu-row:active),
+#bookmarks-sidebar .menu :where(li:not(.menu-title, .disabled) > details > summary:not(.menu-title):active),
+[data-bookmark-sortable] > li[id^="bookmark-"].sortable-chosen > .bookmark-menu-row,
+[data-bookmark-sortable] > li[id^="bookmark-"].sortable-drag > .bookmark-menu-row,
+[data-collection-sortable] > li[id^="collection-"].sortable-chosen > details > summary,
+[data-collection-sortable]
+  > li[id^="collection-"].sortable-chosen[data-revoked="true"]
+  > .revoked-collection
+  > summary,
+li[id^="bookmark-"].sortable-fallback > .bookmark-menu-row,
+li[id^="collection-"].sortable-fallback > details > summary,
+li[id^="collection-"].sortable-fallback > .revoked-collection > summary {
+  color: var(--color-base-content);
+  background-color: color-mix(in oklab, var(--color-base-content) 10%, transparent);
+  background-image: none;
+  background-size: auto;
+  box-shadow:
+    0 1px oklch(0% 0 0 / 0.01) inset,
+    0 -1px oklch(100% 0 0 / 0.01) inset;
   outline-style: none;
 }
 

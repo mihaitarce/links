@@ -238,10 +238,7 @@ defmodule LinksWeb.DashboardLive do
         href={@bookmark.url}
         target="_blank"
         rel="noopener noreferrer"
-        class={[
-          "sidebar-more-button btn btn-ghost btn-xs shrink-0",
-          @selected && "btn-active"
-        ]}
+        class="sidebar-more-button btn btn-ghost btn-xs shrink-0"
         aria-label="Open link in new tab"
       >
         <.icon name="hero-arrow-top-right-on-square" class="size-4" />
