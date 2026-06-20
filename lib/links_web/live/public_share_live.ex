@@ -52,7 +52,7 @@ defmodule LinksWeb.PublicShareLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope}>
+    <Layouts.app flash={@flash} current_scope={@current_scope} show_home_link={false}>
       <%= if @not_found do %>
         <div class="flex h-full items-center justify-center p-4">
           <div class="max-w-md rounded-box border border-dashed border-base-300 bg-base-100 p-8 text-center">

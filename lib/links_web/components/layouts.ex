@@ -31,6 +31,10 @@ defmodule LinksWeb.Layouts do
     default: nil,
     doc: "the current [scope](https://hexdocs.pm/phoenix/scopes.html)"
 
+  attr :show_home_link, :boolean,
+    default: true,
+    doc: "when false, renders the app title without linking to the authenticated home page"
+
   slot :inner_block, required: true
 
   def app(assigns) do
@@ -40,10 +44,17 @@ defmodule LinksWeb.Layouts do
     <div class="flex h-dvh flex-col overflow-hidden">
       <header class="navbar min-h-12 shrink-0 border-b border-base-300 bg-base-100 px-3">
         <div class="flex-1">
-          <a href={~p"/"} class="flex w-fit items-center gap-2">
-            <img src={~p"/images/logo.svg"} width="28" />
-            <span class="text-sm font-semibold tracking-tight">Links</span>
-          </a>
+          <%= if @show_home_link do %>
+            <a href={~p"/"} class="flex w-fit items-center gap-2">
+              <img src={~p"/images/logo.svg"} width="28" />
+              <span class="text-sm font-semibold tracking-tight">Links</span>
+            </a>
+          <% else %>
+            <span id="app-brand" class="flex w-fit items-center gap-2">
+              <img src={~p"/images/logo.svg"} width="28" alt="" />
+              <span class="text-sm font-semibold tracking-tight">Links</span>
+            </span>
+          <% end %>
         </div>
         <div class="flex-none">
           <div class="flex items-center gap-2">

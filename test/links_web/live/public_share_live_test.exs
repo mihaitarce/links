@@ -38,6 +38,8 @@ defmodule LinksWeb.PublicShareLiveTest do
       refute html =~ ~s(/bookmarks/#{bookmark.id}/favicon)
       assert has_element?(lv, "#public-share-sidebar")
       assert has_element?(lv, "#bookmark-#{bookmark.id}")
+      refute has_element?(lv, "header.navbar a[href=\"/\"]")
+      assert has_element?(lv, "#app-brand")
       refute has_element?(lv, "#collection-#{collection.id}")
     end
 
