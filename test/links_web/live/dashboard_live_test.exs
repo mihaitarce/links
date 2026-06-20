@@ -411,6 +411,31 @@ defmodule LinksWeb.DashboardLiveTest do
              )
     end
 
+    test "clears the collaborator form after sharing", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      collection = collection_fixture(owner_scope, %{title: "Team Project"})
+
+      conn = log_in_user(conn, owner_scope.user)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv = open_collection_details(lv, collection.id)
+
+      lv
+      |> form("#collaboration-form form",
+        collaboration: %{email: collaborator.email, readonly: "true"}
+      )
+      |> render_submit()
+
+      assert has_element?(lv, "#collaborators-list", collaborator.email)
+      assert has_element?(lv, "#collaboration-form input[type='email'][value='']")
+
+      refute has_element?(
+               lv,
+               "#collaboration-form input[name='collaboration[readonly]'][checked]"
+             )
+    end
+
     test "lists collaborators in the detail panel and revokes access", %{conn: conn} do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()

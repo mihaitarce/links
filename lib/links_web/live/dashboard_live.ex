@@ -30,8 +30,6 @@ defmodule LinksWeb.DashboardLive do
      |> assign(:selected_context, nil)
      |> assign(:public_shares, [])
      |> assign(:collaborators, [])
-     |> assign(:collaboration_email, "")
-     |> assign(:collaboration_readonly, false)
      |> assign(:pending_metadata_ids, MapSet.new())
      |> assign_forms()
      |> refresh_dashboard()
@@ -162,8 +160,7 @@ defmodule LinksWeb.DashboardLive do
                   bookmark_form={@bookmark_form}
                   public_shares={@public_shares}
                   collaborators={@collaborators}
-                  collaboration_email={@collaboration_email}
-                  collaboration_readonly={@collaboration_readonly}
+                  collaboration_form={@collaboration_form}
                   pending_metadata_ids={@pending_metadata_ids}
                 />
               </div>
@@ -497,8 +494,7 @@ defmodule LinksWeb.DashboardLive do
   attr :bookmark_form, :any, required: true
   attr :public_shares, :list, default: []
   attr :collaborators, :list, default: []
-  attr :collaboration_email, :string, default: ""
-  attr :collaboration_readonly, :boolean, default: false
+  attr :collaboration_form, :any, required: true
   attr :pending_metadata_ids, MapSet, default: MapSet.new()
 
   def detail_panel(%{selected: %{type: :bookmark}} = assigns) do
@@ -627,28 +623,36 @@ defmodule LinksWeb.DashboardLive do
 
         <div :if={@context.can_manage} class="rounded-box border border-base-300 bg-base-100 p-4">
           <h2 class="mb-3 font-semibold">Collaborators</h2>
-          <.form for={%{}} id="collaboration-form" phx-submit="create_collaboration">
-            <label for="collaboration-email" class="label mb-1">User email</label>
-            <div class="flex items-center gap-4">
-              <input
-                id="collaboration-email"
-                type="email"
-                name="collaboration[email]"
-                value={@collaboration_email}
-                class="input min-w-0 flex-1"
-              />
-              <label class="label shrink-0 cursor-pointer gap-2 whitespace-nowrap">
+          <div id="collaboration-form">
+            <.form
+              for={@collaboration_form}
+              id={"collaboration-form-fields-#{@collaboration_form.id}"}
+              phx-submit="create_collaboration"
+            >
+              <label for={@collaboration_form[:email].id} class="label mb-1">User email</label>
+              <div class="flex items-center gap-4">
                 <input
-                  type="checkbox"
-                  name="collaboration[readonly]"
-                  value="true"
-                  checked={@collaboration_readonly}
-                  class="checkbox checkbox-sm"
-                /> Read-only
-              </label>
-              <button class="btn btn-primary shrink-0">Share</button>
-            </div>
-          </.form>
+                  type="email"
+                  name={@collaboration_form[:email].name}
+                  id={@collaboration_form[:email].id}
+                  value={@collaboration_form[:email].value}
+                  class="input min-w-0 flex-1"
+                  autocomplete="off"
+                  required
+                />
+                <label class="label shrink-0 cursor-pointer gap-2 whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    name={@collaboration_form[:readonly].name}
+                    value="true"
+                    checked={collaboration_readonly_checked?(@collaboration_form)}
+                    class="checkbox checkbox-sm"
+                  /> Read-only
+                </label>
+                <button class="btn btn-primary shrink-0">Share</button>
+              </div>
+            </.form>
+          </div>
           <ul id="collaborators-list" class="mt-4 space-y-2">
             <li
               :for={collaborator <- @collaborators}
@@ -991,7 +995,6 @@ defmodule LinksWeb.DashboardLive do
         {:noreply,
          socket
          |> put_flash(:info, "Collaborator added")
-         |> assign(:collaboration_email, "")
          |> refresh_dashboard()
          |> select_collection(collection.id)}
 
@@ -1127,9 +1130,28 @@ defmodule LinksWeb.DashboardLive do
   defp assign_forms(socket) do
     socket
     |> assign(:new_bookmark_form, new_bookmark_form())
+    |> reset_collaboration_form()
     |> assign(:collection_form, to_form(Collection.changeset(%Collection{}, %{})))
     |> assign(:child_collection_form, child_collection_form())
     |> assign(:bookmark_form, to_form(Bookmark.changeset(%Bookmark{}, %{})))
+  end
+
+  defp reset_collaboration_form(socket) do
+    key = System.unique_integer([:positive])
+
+    assign(
+      socket,
+      :collaboration_form,
+      collaboration_form(%{"email" => "", "readonly" => false}, "collaboration-#{key}")
+    )
+  end
+
+  defp collaboration_form(attrs, id) do
+    to_form(attrs, as: :collaboration, id: id)
+  end
+
+  defp collaboration_readonly_checked?(form) do
+    Phoenix.HTML.Form.normalize_value("checkbox", form[:readonly].value)
   end
 
   defp new_bookmark_form do
@@ -1176,6 +1198,7 @@ defmodule LinksWeb.DashboardLive do
         |> assign(:selected_context, context)
         |> assign(:public_shares, shares)
         |> assign(:collaborators, collaborators)
+        |> reset_collaboration_form()
         |> assign(
           :collection_form,
           to_form(Collection.changeset(context.effective_collection, %{}))
