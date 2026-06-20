@@ -397,6 +397,26 @@ defmodule Links.CollectionsTest do
                )
 
       assert moved_to_inbox.collection_id == nil
+      refute moved_to_inbox.completed
+    end
+
+    test "clears completed when moving a bookmark back to the inbox" do
+      scope = user_scope_fixture()
+      collection = collection_fixture(scope, %{title: "Reading"})
+
+      {:ok, bookmark} =
+        Collections.create_bookmark(scope, %{
+          title: "Done link",
+          url: "https://example.com/done",
+          collection_id: collection.id,
+          completed: true
+        })
+
+      assert {:ok, moved} =
+               Collections.move_bookmark(scope, bookmark.id, nil, [bookmark.id])
+
+      assert moved.collection_id == nil
+      refute moved.completed
     end
   end
 

@@ -44,33 +44,72 @@ defmodule LinksWeb.DashboardLiveTest do
       assert has_element?(lv, "#new-link-form input[type=\"url\"][value=\"\"]")
     end
 
-    test "toggles completed on inbox links", %{conn: conn} do
+    test "does not show completed checkbox for inbox links", %{conn: conn} do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
       bookmark = bookmark_fixture(scope, %{title: "Read me", url: "https://example.com/read"})
       {:ok, lv, _html} = live(conn, ~p"/")
 
-      refute Collections.get_bookmark!(bookmark.id).completed
-      assert has_element?(lv, "#bookmark-completed-#{bookmark.id} input:not([checked])")
+      refute has_element?(lv, "#bookmark-completed-#{bookmark.id}")
 
-      render_click(lv, "toggle_bookmark_completed", %{
-        "id" => to_string(bookmark.id),
-        "completed" => "true"
-      })
+      lv
+      |> element("#bookmark-select-#{bookmark.id}")
+      |> render_click()
+
+      refute has_element?(lv, "#bookmark-completed-input")
+    end
+
+    test "toggles completed on collection links", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      collection = collection_fixture(scope, %{title: "Reading"})
+
+      {:ok, bookmark} =
+        Collections.create_bookmark(scope, %{
+          title: "Read me",
+          url: "https://example.com/read",
+          collection_id: collection.id
+        })
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      refute Collections.get_bookmark!(bookmark.id).completed
+      assert has_element?(lv, "#bookmark-completed-#{bookmark.id}:not([checked])")
+
+      lv
+      |> element("#bookmark-completed-#{bookmark.id}")
+      |> render_click()
 
       assert Collections.get_bookmark!(bookmark.id).completed
-      assert has_element?(lv, "#bookmark-completed-#{bookmark.id} input[checked]")
+      assert has_element?(lv, "#bookmark-completed-#{bookmark.id}[checked]")
       assert has_element?(lv, "#bookmark-#{bookmark.id} .bookmark-completed")
-      assert has_element?(lv, "#inbox-bookmark-count", "1 / 1")
+    end
 
-      render_click(lv, "toggle_bookmark_completed", %{
-        "id" => to_string(bookmark.id),
-        "completed" => "false"
-      })
+    test "toggles completed from the link detail page", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      collection = collection_fixture(scope, %{title: "Reading"})
+
+      {:ok, bookmark} =
+        Collections.create_bookmark(scope, %{
+          title: "Detail link",
+          url: "https://example.com/detail",
+          collection_id: collection.id
+        })
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv
+      |> element("#bookmark-select-#{bookmark.id}")
+      |> render_click()
 
       refute Collections.get_bookmark!(bookmark.id).completed
-      assert has_element?(lv, "#bookmark-completed-#{bookmark.id} input:not([checked])")
-      refute has_element?(lv, "#bookmark-#{bookmark.id} .bookmark-completed")
-      assert has_element?(lv, "#inbox-bookmark-count", "0 / 1")
+      assert has_element?(lv, "#bookmark-completed-input:not([checked])")
+
+      lv
+      |> element("#bookmark-completed-input")
+      |> render_click()
+
+      assert Collections.get_bookmark!(bookmark.id).completed
+      assert has_element?(lv, "#bookmark-completed-input[checked]")
+      assert has_element?(lv, "#bookmark-#{bookmark.id} .bookmark-completed")
     end
 
     test "disables completed checkbox on read-only collection links", %{conn: conn} do
@@ -298,6 +337,33 @@ defmodule LinksWeb.DashboardLiveTest do
              })
 
       assert Collections.get_bookmark!(collection_bookmark.id).collection_id == nil
+      refute Collections.get_bookmark!(collection_bookmark.id).completed
+    end
+
+    test "clears completed when moving a completed link back to the inbox", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      collection = collection_fixture(scope, %{title: "Reading"})
+
+      {:ok, bookmark} =
+        Collections.create_bookmark(scope, %{
+          title: "Done link",
+          url: "https://example.com/done",
+          collection_id: collection.id,
+          completed: true
+        })
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      assert render_click_move_bookmark(lv, %{
+               "id" => to_string(bookmark.id),
+               "collection_id" => nil,
+               "ordered_ids" => [to_string(bookmark.id)]
+             })
+
+      moved = Collections.get_bookmark!(bookmark.id)
+      assert moved.collection_id == nil
+      refute moved.completed
+      refute has_element?(lv, "#bookmark-completed-#{bookmark.id}")
     end
 
     test "collection bookmark lists are sortable", %{conn: conn} do
@@ -1155,6 +1221,8 @@ defmodule LinksWeb.DashboardLiveTest do
 
       bookmark = bookmark_fixture(scope, %{url: "https://example.com"})
 
+      fetched_at = ~U[2026-06-20 12:34:56Z]
+
       {:ok, _bookmark} =
         Collections.update_bookmark_metadata(bookmark, %{
           title: "Example Domain",
@@ -1162,13 +1230,20 @@ defmodule LinksWeb.DashboardLiveTest do
           favicon_content_type: "image/png",
           favicon_byte_size: 3,
           favicon_source_url: "https://example.com/favicon.ico",
-          metadata_fetched_at: DateTime.utc_now(:second)
+          metadata_fetched_at: fetched_at
         })
 
-      {:ok, _lv, html} = live(conn, ~p"/")
+      {:ok, lv, html} = live(conn, ~p"/")
 
       assert html =~ "Example Domain"
       assert html =~ ~s(/bookmarks/#{bookmark.id}/favicon)
+
+      lv
+      |> element("#bookmark-select-#{bookmark.id}")
+      |> render_click()
+
+      assert has_element?(lv, "#bookmark-metadata-fetched-at")
+      assert render(lv) =~ "Metadata fetched at 2026-06-20 12:34:56 UTC"
     end
   end
 

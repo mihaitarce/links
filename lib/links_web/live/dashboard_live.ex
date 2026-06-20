@@ -402,25 +402,11 @@ defmodule LinksWeb.DashboardLive do
           </span>
         </span>
       </button>
-      <button
-        type="button"
-        id={"bookmark-completed-#{@bookmark.id}"}
-        phx-click="toggle_bookmark_completed"
-        phx-value-id={@bookmark.id}
-        phx-value-completed={to_string(!@bookmark.completed)}
-        disabled={not @editable}
-        class="bookmark-completed-toggle shrink-0"
-        aria-label={"Mark \"#{bookmark_label(@bookmark)}\" complete"}
-        aria-pressed={to_string(@bookmark.completed)}
-      >
-        <input
-          type="checkbox"
-          checked={@bookmark.completed}
-          tabindex="-1"
-          aria-hidden="true"
-          class="checkbox checkbox-sm pointer-events-none"
-        />
-      </button>
+      <.bookmark_completed_toggle
+        :if={@bookmark.collection_id}
+        bookmark={@bookmark}
+        editable={@editable}
+      />
       <a
         id={"bookmark-more-#{@bookmark.id}"}
         href={@bookmark.url}
@@ -432,6 +418,47 @@ defmodule LinksWeb.DashboardLive do
         <.icon name="hero-arrow-top-right-on-square" class="size-4" />
       </a>
     </div>
+    """
+  end
+
+  attr :bookmark, Bookmark, required: true
+  attr :editable, :boolean, default: true
+  attr :id, :string, default: nil
+
+  attr :checkbox_class, :string,
+    default: "checkbox checkbox-sm shrink-0 bookmark-completed-toggle"
+
+  def bookmark_completed_toggle(assigns) do
+    assigns =
+      assign_new(assigns, :input_id, fn ->
+        assigns.id || "bookmark-completed-#{assigns.bookmark.id}"
+      end)
+
+    ~H"""
+    <%= if @bookmark.completed do %>
+      <input
+        type="checkbox"
+        id={@input_id}
+        phx-click="toggle_bookmark_completed"
+        phx-value-id={@bookmark.id}
+        phx-value-completed="false"
+        checked
+        disabled={not @editable}
+        class={@checkbox_class}
+        aria-label={"Mark \"#{bookmark_label(@bookmark)}\" complete"}
+      />
+    <% else %>
+      <input
+        type="checkbox"
+        id={@input_id}
+        phx-click="toggle_bookmark_completed"
+        phx-value-id={@bookmark.id}
+        phx-value-completed="true"
+        disabled={not @editable}
+        class={@checkbox_class}
+        aria-label={"Mark \"#{bookmark_label(@bookmark)}\" complete"}
+      />
+    <% end %>
     """
   end
 
@@ -676,46 +703,93 @@ defmodule LinksWeb.DashboardLive do
     ~H"""
     <div class="mx-auto max-w-3xl space-y-4">
       <div class="rounded-box border border-base-300 bg-base-100 p-4">
-        <div class="mb-4 flex items-start gap-3">
-          <.bookmark_status_icon
-            bookmark={@context.bookmark}
-            metadata_pending={@metadata_pending}
-            class="mt-1 size-8"
-          />
-          <div class="min-w-0">
-            <h1 class="truncate text-lg font-semibold">{bookmark_label(@context.bookmark)}</h1>
-            <p class="truncate text-sm text-base-content/60">{@context.bookmark.url}</p>
-            <p :if={@metadata_pending} class="mt-1 text-xs text-base-content/50">
-              Fetching page title and icon…
-            </p>
+        <div class="mb-4 flex items-start justify-between gap-4">
+          <div class="flex min-w-0 flex-1 items-center gap-3">
+            <.bookmark_status_icon
+              bookmark={@context.bookmark}
+              metadata_pending={@metadata_pending}
+              class="size-8 shrink-0"
+            />
+            <div class="min-w-0 flex-1">
+              <a
+                id="bookmark-url"
+                href={@context.bookmark.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="link link-hover break-all text-sm text-base-content/60"
+              >
+                {@context.bookmark.url}
+              </a>
+              <p :if={@metadata_pending} class="mt-1 text-xs text-base-content/50">
+                Fetching page title and icon…
+              </p>
+            </div>
           </div>
+          <button
+            :if={!@context.readonly}
+            type="button"
+            id="delete-bookmark-button"
+            class="btn btn-error btn-soft shrink-0"
+            phx-click="confirm_delete_bookmark"
+          >
+            Delete
+          </button>
         </div>
+
         <.form
           for={@bookmark_form}
           id="bookmark-form"
           phx-submit="save_bookmark"
           phx-change="validate_bookmark"
         >
-          <.input field={@bookmark_form[:title]} label="Title" disabled={@context.readonly} />
-          <.input field={@bookmark_form[:url]} type="url" label="URL" disabled={@context.readonly} />
+          <.input
+            field={@bookmark_form[:title]}
+            id="bookmark-title-input"
+            label="Title"
+            disabled={@context.readonly}
+          />
           <.input
             field={@bookmark_form[:description]}
             type="textarea"
             label="Description"
             disabled={@context.readonly}
           />
-          <div :if={!@context.readonly} class="mt-4 flex gap-2">
-            <button class="btn btn-primary">Save</button>
-            <button
-              type="button"
-              id="delete-bookmark-button"
-              class="btn btn-error btn-soft"
-              phx-click="confirm_delete_bookmark"
-            >
-              Delete
-            </button>
-          </div>
+          <p
+            :if={@context.bookmark.metadata_fetched_at}
+            id="bookmark-metadata-fetched-at"
+            class="mt-2 text-xs text-base-content/50"
+          >
+            Metadata fetched at {format_metadata_fetched_at(@context.bookmark.metadata_fetched_at)}
+          </p>
         </.form>
+        <div class={[
+          "mt-4 flex items-center gap-4",
+          @context.bookmark.collection_id && "justify-between",
+          is_nil(@context.bookmark.collection_id) && "justify-end"
+        ]}>
+          <div :if={@context.bookmark.collection_id} class="flex items-center gap-2">
+            <.bookmark_completed_toggle
+              bookmark={@context.bookmark}
+              editable={!@context.readonly}
+              id="bookmark-completed-input"
+              checkbox_class="checkbox checkbox-lg"
+            />
+            <label
+              for="bookmark-completed-input"
+              class={["text-base", !@context.readonly && "cursor-pointer"]}
+            >
+              Completed
+            </label>
+          </div>
+          <button
+            :if={!@context.readonly}
+            type="submit"
+            form="bookmark-form"
+            class="btn btn-primary shrink-0"
+          >
+            Save
+          </button>
+        </div>
       </div>
     </div>
     """
@@ -1709,7 +1783,10 @@ defmodule LinksWeb.DashboardLive do
   end
 
   defp new_bookmark_form do
-    to_form(%{"url" => ""}, as: :new_bookmark, id: "new-bookmark-#{System.unique_integer([:positive])}")
+    to_form(%{"url" => ""},
+      as: :new_bookmark,
+      id: "new-bookmark-#{System.unique_integer([:positive])}"
+    )
   end
 
   defp child_collection_form do
@@ -1792,6 +1869,10 @@ defmodule LinksWeb.DashboardLive do
   def bookmark_label(%Bookmark{url: url}) when is_binary(url), do: url
 
   def bookmark_label(_), do: "Untitled"
+
+  defp format_metadata_fetched_at(%DateTime{} = datetime) do
+    Calendar.strftime(datetime, "%Y-%m-%d %H:%M:%S UTC")
+  end
 
   def collaborator_access_label(%Collection{collaboration_revoked_at: revoked_at} = collaborator) do
     access =

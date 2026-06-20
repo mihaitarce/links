@@ -1266,7 +1266,7 @@ defmodule Links.Collections do
   end
 
   defp move_bookmark_attrs(%Scope{} = scope, nil) do
-    %{collection_id: nil, created_by_id: scope.user.id}
+    %{collection_id: nil, created_by_id: scope.user.id, completed: false}
   end
 
   defp move_bookmark_attrs(_scope, collection_id) do
