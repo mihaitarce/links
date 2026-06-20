@@ -356,7 +356,10 @@ defmodule LinksWeb.DashboardLive do
       id={"collection-#{@collection.id}"}
       data-readonly={to_string(@node.readonly || false)}
       data-reorderable={to_string(@reorderable?)}
-      class={[@node.revoked && "menu-disabled line-through opacity-50"]}
+      class={[
+        "min-w-0 max-w-full",
+        @node.revoked && "menu-disabled line-through opacity-50"
+      ]}
     >
       <%= if @node.revoked do %>
         <a>
@@ -364,9 +367,12 @@ defmodule LinksWeb.DashboardLive do
           {@node.title}
         </a>
       <% else %>
-        <details open={@expanded}>
+        <details class="min-w-0 max-w-full" open={@expanded}>
           <summary
-            class={selected?(@selected, :collection, @collection.id) && "menu-active"}
+            class={[
+              "min-w-0 max-w-full",
+              selected?(@selected, :collection, @collection.id) && "menu-active"
+            ]}
             phx-click="toggle_collection"
             phx-value-id={@collection.id}
           >
@@ -1188,8 +1194,8 @@ defmodule LinksWeb.DashboardLive do
 
   defp sidebar_menu_class(extra \\ []) do
     [
-      "menu flex-col flex-nowrap bg-base-200 rounded-box w-full min-w-0",
-      "[&_li]:min-w-0 [&_a]:min-w-0"
+      "menu flex-col flex-nowrap bg-base-200 rounded-box w-full min-w-0 max-w-full",
+      "[&_li]:min-w-0 [&_li]:max-w-full [&_a]:min-w-0 [&_details]:min-w-0 [&_details]:max-w-full"
       | extra
     ]
   end
