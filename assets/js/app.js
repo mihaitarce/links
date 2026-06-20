@@ -98,7 +98,7 @@ const CollectionBookmarkSort = {
     this.clearDropHighlight()
     this.clearExpandTimer()
     this.endBookmarkDrag()
-    this.unbindDragOver()
+    this.unbindDragTracking()
     this.sourceSummary = null
   },
   beginBookmarkDrag() {
@@ -283,18 +283,31 @@ const CollectionBookmarkSort = {
 
     return container.closest("details")?.querySelector("summary") ?? null
   },
-  elementUnderPointer(event) {
-    const originalEvent = event.originalEvent ?? event
-    const clientX = originalEvent.clientX
-    const clientY = originalEvent.clientY
+  pointerCoordinates(event) {
+    if (!event) return null
 
-    if (clientX == null || clientY == null) return null
+    if (event.touches?.length > 0) {
+      return event.touches[0]
+    }
 
-    const draggedItem = event.item
+    if (event.changedTouches?.length > 0) {
+      return event.changedTouches[0]
+    }
+
+    if (event.clientX != null && event.clientY != null) {
+      return event
+    }
+
+    return null
+  },
+  targetFromPointer(event, draggedItem = null) {
+    const pointer = this.pointerCoordinates(event?.originalEvent ?? event)
+
+    if (!pointer) return null
 
     return (
       document
-        .elementsFromPoint(clientX, clientY)
+        .elementsFromPoint(pointer.clientX, pointer.clientY)
         .find(
           (el) =>
             el !== draggedItem &&
@@ -303,6 +316,9 @@ const CollectionBookmarkSort = {
             !el.classList.contains("sortable-fallback")
         ) ?? null
     )
+  },
+  elementUnderPointer(event) {
+    return this.targetFromPointer(event, event.item)
   },
   resolveDropContainer(event) {
     const pointerTarget = this.elementUnderPointer(event)
@@ -352,19 +368,25 @@ const CollectionBookmarkSort = {
       from.appendChild(item)
     }
   },
-  bindDragOver() {
-    if (this.onDragOver) return
+  bindDragTracking() {
+    if (this.onDragTracking) return
 
-    this.onDragOver = (event) => {
-      this.updateDropHighlightFromTarget(event.target)
+    this.onDragTracking = (event) => {
+      const target = this.targetFromPointer(event, this.draggedItem)
+
+      this.updateDropHighlightFromTarget(target)
     }
 
-    document.addEventListener("dragover", this.onDragOver)
+    document.addEventListener("dragover", this.onDragTracking)
+    document.addEventListener("touchmove", this.onDragTracking, {passive: true})
+    document.addEventListener("pointermove", this.onDragTracking)
   },
-  unbindDragOver() {
-    if (this.onDragOver) {
-      document.removeEventListener("dragover", this.onDragOver)
-      this.onDragOver = null
+  unbindDragTracking() {
+    if (this.onDragTracking) {
+      document.removeEventListener("dragover", this.onDragTracking)
+      document.removeEventListener("touchmove", this.onDragTracking)
+      document.removeEventListener("pointermove", this.onDragTracking)
+      this.onDragTracking = null
     }
   },
   syncAutoExpandedCollections() {
@@ -403,8 +425,9 @@ const CollectionBookmarkSort = {
       },
       onStart(event) {
         hook.spilled = false
+        hook.draggedItem = event.item
         hook.beginBookmarkDrag()
-        hook.bindDragOver()
+        hook.bindDragTracking()
 
         if (isInboxContainer(event.from)) {
           hook.sourceSummary = null
@@ -423,7 +446,7 @@ const CollectionBookmarkSort = {
       },
       onEnd(event) {
         try {
-          hook.unbindDragOver()
+          hook.unbindDragTracking()
 
           const validDrop = hook.isValidDropTarget(event)
           const targetContainer = hook.resolveDropContainer(event)
@@ -432,6 +455,7 @@ const CollectionBookmarkSort = {
           hook.clearDropHighlight()
           hook.clearExpandTimer()
           hook.sourceSummary = null
+          hook.draggedItem = null
 
           if (!validDrop) {
             if (!hook.spilled) {
