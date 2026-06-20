@@ -92,8 +92,24 @@ li[id^="collection-"].sortable-fallback > .revoked-collection > summary {
   outline-style: none;
 }
 
+#bookmarks-sidebar .menu :where(li > .bookmark-menu-row) {
+  padding-block: calc(0.25rem * 1);
+}
+
 [data-bookmark-sortable] > li[id^="bookmark-"] > .bookmark-menu-row {
   cursor: grab;
+}
+
+#bookmarks-sidebar .bookmark-menu-row .bookmark-select-button {
+  min-height: 0;
+  padding: 0;
+}
+
+#bookmarks-sidebar .bookmark-menu-row .sidebar-more-button {
+  --size: 1rem;
+  height: 1rem;
+  min-height: 0;
+  padding: 0;
 }
 
 [data-bookmark-sortable] > li[id^="bookmark-"].sortable-chosen > .bookmark-menu-row,
@@ -115,7 +131,6 @@ body.bookmark-dragging * {
 .sidebar-more-button {
   min-height: 0;
   height: auto;
-  padding: 0.25rem;
 }
 
 details > summary .sidebar-more-button {
