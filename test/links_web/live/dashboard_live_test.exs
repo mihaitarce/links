@@ -650,6 +650,11 @@ defmodule LinksWeb.DashboardLiveTest do
                "#bookmark-more-#{bookmark.id}[href='https://example.com/external'][target='_blank']"
              )
 
+      assert has_element?(
+               lv,
+               "#bookmark-select-#{bookmark.id}[data-url='https://example.com/external']"
+             )
+
       lv
       |> element("#bookmark-select-#{bookmark.id}")
       |> render_click()

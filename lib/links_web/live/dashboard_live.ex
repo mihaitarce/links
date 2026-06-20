@@ -143,6 +143,24 @@ defmodule LinksWeb.DashboardLive do
               </ul>
             </section>
           </div>
+          <script :type={Phoenix.LiveView.ColocatedHook} name=".BookmarkOpenOnDblClick">
+            export default {
+              mounted() {
+                this.onDblClick = () => {
+                  const url = this.el.dataset.url
+
+                  if (url) {
+                    window.open(url, "_blank", "noopener,noreferrer")
+                  }
+                }
+
+                this.el.addEventListener("dblclick", this.onDblClick)
+              },
+              destroyed() {
+                this.el.removeEventListener("dblclick", this.onDblClick)
+              }
+            }
+          </script>
         </aside>
 
         <%= if @selected_context do %>
@@ -387,6 +405,8 @@ defmodule LinksWeb.DashboardLive do
       <button
         type="button"
         id={"bookmark-select-#{@bookmark.id}"}
+        phx-hook=".BookmarkOpenOnDblClick"
+        data-url={@bookmark.url}
         phx-click="select_bookmark"
         phx-value-id={@bookmark.id}
         class="bookmark-select-button flex min-w-0 flex-1 items-center gap-2 text-left"
