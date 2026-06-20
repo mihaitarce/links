@@ -144,8 +144,7 @@ defmodule LinksWeb.DashboardLive do
               <div class="max-w-md rounded-box border border-dashed border-base-300 bg-base-100 p-8 text-center">
                 <h1 class="text-lg font-semibold">Select a collection or bookmark</h1>
                 <p class="mt-2 text-base-content/60">
-                  The inbox is always visible on the left. Use the project tree for details,
-                  sharing, collaboration, and editing.
+                  Use More on a collection or link to edit details, share, and collaborate.
                 </p>
               </div>
             </div>
@@ -179,19 +178,64 @@ defmodule LinksWeb.DashboardLive do
 
   def bookmark_menu_link(assigns) do
     ~H"""
-    <a
-      phx-click="select_bookmark"
-      phx-value-id={@bookmark.id}
+    <div class={[
+      "bookmark-menu-row flex min-w-0 w-full items-center gap-2",
+      @selected && "menu-active"
+    ]}>
+      <a
+        href={@bookmark.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="flex min-w-0 flex-1 items-center gap-2"
+      >
+        <.bookmark_status_icon bookmark={@bookmark} metadata_pending={@metadata_pending} />
+        <span class="min-w-0 flex-1 truncate text-left leading-normal">
+          {bookmark_label(@bookmark)}
+        </span>
+      </a>
+      <.sidebar_more_button
+        id={"bookmark-more-#{@bookmark.id}"}
+        event="select_bookmark"
+        value_id={@bookmark.id}
+        selected={@selected}
+      />
+    </div>
+    """
+  end
+
+  attr :id, :string, required: true
+  attr :event, :string, required: true
+  attr :value_id, :integer, required: true
+  attr :selected, :boolean, default: false
+
+  def sidebar_more_button(assigns) do
+    ~H"""
+    <button
+      type="button"
+      id={@id}
       class={[
-        "flex min-w-0 w-full items-center justify-start gap-2",
-        @selected && "menu-active"
+        "sidebar-more-button btn btn-ghost btn-xs shrink-0",
+        @selected && "btn-active"
       ]}
+      phx-click={@event}
+      phx-value-id={@value_id}
+      phx-stop-propagation
+      phx-hook=".PreventSummaryToggle"
+      aria-label="More options"
     >
-      <.bookmark_status_icon bookmark={@bookmark} metadata_pending={@metadata_pending} />
-      <span class="min-w-0 flex-1 truncate text-left leading-normal">
-        {bookmark_label(@bookmark)}
-      </span>
-    </a>
+      <.icon name="hero-ellipsis-horizontal" class="size-4" />
+    </button>
+    <script :type={Phoenix.LiveView.ColocatedHook} name=".PreventSummaryToggle">
+      export default {
+        mounted() {
+          this.onClick = (event) => event.preventDefault()
+          this.el.addEventListener("click", this.onClick, true)
+        },
+        destroyed() {
+          this.el.removeEventListener("click", this.onClick, true)
+        }
+      }
+    </script>
     """
   end
 
@@ -296,7 +340,7 @@ defmodule LinksWeb.DashboardLive do
             phx-value-id={@collection.id}
           >
             <.folder_icon />
-            <span class="flex min-w-0 items-center gap-1.5 leading-none">
+            <span class="flex min-w-0 flex-1 items-center gap-1.5 leading-none">
               <span class="min-w-0 truncate leading-normal">{@node.title}</span>
               <span class="badge badge-ghost badge-xs shrink-0 tabular-nums">
                 {@node.bookmark_count}
@@ -324,6 +368,12 @@ defmodule LinksWeb.DashboardLive do
                 />
               </span>
             </span>
+            <.sidebar_more_button
+              id={"collection-more-#{@collection.id}"}
+              event="select_collection"
+              value_id={@collection.id}
+              selected={selected?(@selected, :collection, @collection.id)}
+            />
           </summary>
           <ul
             :if={@node.children != []}
@@ -681,6 +731,7 @@ defmodule LinksWeb.DashboardLive do
   end
 
   def handle_event("select_collection", %{"id" => id}, socket) do
+    id = String.to_integer(id)
     {:noreply, select_collection(socket, id)}
   end
 
@@ -704,27 +755,15 @@ defmodule LinksWeb.DashboardLive do
   def handle_event("toggle_collection", %{"id" => id}, socket) do
     id = String.to_integer(id)
     collapsed = socket.assigns.collapsed
-    was_collapsed = MapSet.member?(collapsed, id)
 
     collapsed =
-      if was_collapsed do
+      if MapSet.member?(collapsed, id) do
         MapSet.delete(collapsed, id)
       else
         MapSet.put(collapsed, id)
       end
 
-    socket = assign(socket, :collapsed, collapsed)
-
-    socket =
-      if was_collapsed do
-        select_collection(socket, id)
-      else
-        socket
-        |> assign(:selected, nil)
-        |> assign(:selected_context, nil)
-      end
-
-    {:noreply, socket}
+    {:noreply, assign(socket, :collapsed, collapsed)}
   end
 
   def handle_event("expand_collection", %{"id" => id}, socket) do

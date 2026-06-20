@@ -67,7 +67,7 @@ defmodule LinksWeb.DashboardLiveTest do
       {:ok, lv, _html} = live(conn, ~p"/")
 
       lv
-      |> element("#bookmark-#{bookmark.id} a")
+      |> element("#bookmark-more-#{bookmark.id}")
       |> render_click()
 
       lv
@@ -84,7 +84,7 @@ defmodule LinksWeb.DashboardLiveTest do
       {:ok, lv, _html} = live(conn, ~p"/")
 
       lv
-      |> element("#bookmark-#{bookmark.id} a")
+      |> element("#bookmark-more-#{bookmark.id}")
       |> render_click()
 
       assert has_element?(lv, "#new-link-form")
@@ -308,25 +308,71 @@ defmodule LinksWeb.DashboardLiveTest do
       refute html =~ ~s(<details open)
     end
 
-    test "collapsing a collection clears the detail panel", %{conn: conn} do
+    test "collapsing a collection keeps the detail panel when opened via more", %{conn: conn} do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
       parent = collection_fixture(scope, %{title: "Parent"})
 
       {:ok, lv, _html} = live(conn, ~p"/")
+
+      open_collection_details(lv, parent.id)
+
+      assert has_element?(lv, "#collection-form")
 
       lv
       |> element("#collection-#{parent.id} summary")
       |> render_click()
 
       assert has_element?(lv, "#collection-form")
+    end
 
-      html =
-        lv
-        |> element("#collection-#{parent.id} summary")
-        |> render_click()
+    test "more button opens detail panel without expanding the collection tree", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      parent = collection_fixture(scope, %{title: "Parent"})
+      _child = collection_fixture(scope, %{title: "Child", parent_id: parent.id})
 
-      refute html =~ ~s(id="collection-form")
-      assert html =~ "Select a collection or bookmark"
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      refute has_element?(lv, "#collection-#{parent.id} > details[open]")
+
+      open_collection_details(lv, parent.id)
+
+      assert has_element?(lv, "#collection-form")
+      refute has_element?(lv, "#collection-#{parent.id} > details[open]")
+    end
+
+    test "more button does not collapse an expanded collection", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      parent = collection_fixture(scope, %{title: "Parent"})
+      _child = collection_fixture(scope, %{title: "Child", parent_id: parent.id})
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv
+      |> element("#collection-#{parent.id} > details > summary")
+      |> render_click()
+
+      assert has_element?(lv, "#collection-#{parent.id} > details[open]")
+
+      open_collection_details(lv, parent.id)
+
+      assert has_element?(lv, "#collection-form")
+      assert has_element?(lv, "#collection-#{parent.id} > details[open]")
+    end
+
+    test "opens bookmark links in a new tab from the sidebar", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+
+      bookmark =
+        bookmark_fixture(scope, %{title: "External link", url: "https://example.com/external"})
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      assert has_element?(
+               lv,
+               "#bookmark-#{bookmark.id} a[href='https://example.com/external'][target='_blank']"
+             )
+
+      refute has_element?(lv, "#bookmark-form")
     end
 
     test "shows shared icon on owned collections shared with collaborators", %{conn: conn} do
@@ -362,9 +408,7 @@ defmodule LinksWeb.DashboardLiveTest do
       conn = log_in_user(conn, owner_scope.user)
       {:ok, lv, _html} = live(conn, ~p"/")
 
-      lv
-      |> element("#collection-#{collection.id} summary")
-      |> render_click()
+      lv = open_collection_details(lv, collection.id)
 
       assert has_element?(lv, "#collaborators-list")
       assert has_element?(lv, "#collaborator-#{mount.id}", collaborator.email)
@@ -423,9 +467,7 @@ defmodule LinksWeb.DashboardLiveTest do
       conn = log_in_user(conn, collaborator)
       {:ok, lv, _html} = live(conn, ~p"/")
 
-      lv
-      |> element("#collection-#{mount.id} summary")
-      |> render_click()
+      lv = open_collection_details(lv, mount.id)
 
       assert has_element?(lv, "button", "Remove")
 
@@ -448,9 +490,7 @@ defmodule LinksWeb.DashboardLiveTest do
       conn = log_in_user(conn, scope.user)
       {:ok, lv, _html} = live(conn, ~p"/")
 
-      lv
-      |> element("#collection-#{collection.id} summary")
-      |> render_click()
+      lv = open_collection_details(lv, collection.id)
 
       assert has_element?(lv, "#copy-public-share-#{share.id}", "Copy link")
     end
@@ -466,9 +506,7 @@ defmodule LinksWeb.DashboardLiveTest do
       conn = log_in_user(conn, collaborator)
       {:ok, lv, _html} = live(conn, ~p"/")
 
-      lv
-      |> element("#collection-#{mount.id} > details > summary")
-      |> render_click()
+      lv = open_collection_details(lv, mount.id)
 
       assert has_element?(lv, "#collaboration-form")
       assert has_element?(lv, "button", "Create public link")
@@ -492,9 +530,7 @@ defmodule LinksWeb.DashboardLiveTest do
       conn = log_in_user(conn, collaborator)
       {:ok, lv, _html} = live(conn, ~p"/")
 
-      lv
-      |> element("#collection-#{mount.id} > details > summary")
-      |> render_click()
+      lv = open_collection_details(lv, mount.id)
 
       html = render(lv)
       refute html =~ ~s(id="collaboration-form")
@@ -537,9 +573,7 @@ defmodule LinksWeb.DashboardLiveTest do
 
       {:ok, lv, _html} = live(conn, ~p"/")
 
-      lv
-      |> element("#collection-#{parent.id} summary")
-      |> render_click()
+      open_collection_details(lv, parent.id)
 
       html =
         lv
@@ -571,6 +605,14 @@ defmodule LinksWeb.DashboardLiveTest do
       assert html =~ "Example Domain"
       assert html =~ ~s(/bookmarks/#{bookmark.id}/favicon)
     end
+  end
+
+  defp open_collection_details(view, collection_id) do
+    view
+    |> element("#collection-more-#{collection_id}")
+    |> render_click()
+
+    view
   end
 
   defp render_click_move_bookmark(view, params) do
