@@ -253,7 +253,7 @@ defmodule LinksWeb.DashboardLive do
       )
       |> assign(
         :reorderable?,
-        assigns.node.collection.owner_id == assigns.current_scope.user.id
+        Collections.can_edit_collection?(assigns.current_scope, assigns.node.collection.id)
       )
 
     ~H"""

@@ -127,6 +127,60 @@ defmodule LinksWeb.DashboardLiveTest do
       assert Collections.get_collection!(first.id).position == 1
     end
 
+    test "reorders deeply nested collections from the dashboard", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      parent = collection_fixture(scope, %{title: "Parent"})
+      child = collection_fixture(scope, %{title: "Child", parent_id: parent.id})
+
+      {:ok, first} =
+        Collections.create_collection(scope, %{title: "Grand A", parent_id: child.id})
+
+      {:ok, second} =
+        Collections.create_collection(scope, %{title: "Grand B", parent_id: child.id})
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      assert has_element?(lv, ~s(#collection-#{first.id}[data-reorderable="true"]))
+      assert has_element?(lv, ~s(#collection-#{second.id}[data-reorderable="true"]))
+
+      assert render_reorder_collections(lv, %{
+               "parent_id" => to_string(child.id),
+               "ordered_ids" => [to_string(second.id), to_string(first.id)]
+             })
+
+      assert Collections.get_collection!(second.id).position == 0
+      assert Collections.get_collection!(first.id).position == 1
+    end
+
+    test "marks nested collections as reorderable for editable collaborators", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      parent = collection_fixture(owner_scope, %{title: "Shared Parent"})
+
+      {:ok, first} =
+        Collections.create_collection(owner_scope, %{title: "Child A", parent_id: parent.id})
+
+      {:ok, second} =
+        Collections.create_collection(owner_scope, %{title: "Child B", parent_id: parent.id})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, parent, collaborator.email, false)
+
+      conn = log_in_user(conn, collaborator)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      assert has_element?(lv, ~s(#collection-#{first.id}[data-reorderable="true"]))
+      assert has_element?(lv, ~s(#collection-#{second.id}[data-reorderable="true"]))
+
+      assert render_reorder_collections(lv, %{
+               "parent_id" => to_string(parent.id),
+               "ordered_ids" => [to_string(second.id), to_string(first.id)]
+             })
+
+      assert Collections.get_collection!(second.id).position == 0
+      assert Collections.get_collection!(first.id).position == 1
+    end
+
     test "reorders read-only shared collection mounts from the dashboard", %{conn: conn} do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()
