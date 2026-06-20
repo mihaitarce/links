@@ -60,6 +60,9 @@ const sortContainerForSummary = (summary) => {
 const isWritableSortContainer = (container) =>
   container != null && container.dataset.readonly !== "true"
 
+const isReadonlySortContainer = (container) =>
+  container != null && container.dataset.readonly === "true"
+
 const isInboxContainer = (container) =>
   container != null && container.dataset.collectionId === "inbox"
 
@@ -407,9 +410,11 @@ const CollectionBookmarkSort = {
   },
   createBookmarkSortable(el) {
     const hook = this
+    const readonly = isReadonlySortContainer(el)
 
     return new Sortable(el, {
-      group: "bookmarks",
+      group: readonly ? {name: "bookmarks", pull: "clone", put: false} : "bookmarks",
+      sort: !readonly,
       animation: 150,
       draggable: "li[id^='bookmark-']",
       filter: "summary, .sidebar-more-button, input, textarea, select, #inbox-empty-state",
@@ -438,6 +443,16 @@ const CollectionBookmarkSort = {
         }
       },
       onMove(event) {
+        if (readonly) {
+          if (event.to === event.from) return false
+
+          const pointerTarget = hook.elementUnderPointer(event)
+
+          hook.updateDropHighlightFromTarget(pointerTarget || event.related)
+
+          return isWritableSortContainer(event.to)
+        }
+
         const pointerTarget = hook.elementUnderPointer(event)
 
         hook.updateDropHighlightFromTarget(pointerTarget || event.related)
@@ -447,6 +462,31 @@ const CollectionBookmarkSort = {
       onEnd(event) {
         try {
           hook.unbindDragTracking()
+
+          if (readonly) {
+            const targetContainer = hook.resolveDropContainer(event)
+
+            hook.clearDropHighlight()
+            hook.clearExpandTimer()
+            hook.sourceSummary = null
+            hook.draggedItem = null
+            hook.spilled = false
+            hook.autoExpandedIds.clear()
+
+            if (isWritableSortContainer(targetContainer)) {
+              hook.ensureDropTargetExpanded(targetContainer, event)
+              hook.syncAutoExpandedCollections()
+
+              hook.pushEvent("copy_bookmark", {
+                id: event.item.dataset.id,
+                collection_id: targetCollectionId(targetContainer),
+                ordered_ids: hook.orderedBookmarkIds(targetContainer, event.item),
+              })
+            }
+
+            event.item.remove()
+            return
+          }
 
           const validDrop = hook.isValidDropTarget(event)
           const targetContainer = hook.resolveDropContainer(event)
@@ -527,7 +567,6 @@ const CollectionBookmarkSort = {
     this.collectionSortables = []
 
     bookmarkSortContainers(this.el).forEach((el) => {
-      if (el.dataset.readonly === "true") return
       if (isEmptyBookmarkContainer(el)) return
 
       this.bookmarkSortables.push(this.createBookmarkSortable(el))

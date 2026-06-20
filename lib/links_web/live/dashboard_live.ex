@@ -1178,6 +1178,22 @@ defmodule LinksWeb.DashboardLive do
     end
   end
 
+  def handle_event("copy_bookmark", params, socket) do
+    with %{id: id, collection_id: collection_id, ordered_ids: ordered_ids} <-
+           normalize_move_bookmark_params(params),
+         {:ok, _bookmark} <-
+           Collections.copy_bookmark(
+             socket.assigns.current_scope,
+             id,
+             collection_id,
+             ordered_ids
+           ) do
+      {:noreply, refresh_dashboard(socket)}
+    else
+      _ -> {:noreply, put_flash(socket, :error, "Could not copy bookmark")}
+    end
+  end
+
   def handle_event("reorder_collections", params, socket) do
     parent_id = params["parent_id"]
     ordered_ids = params["ordered_ids"] || []

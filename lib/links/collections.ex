@@ -375,6 +375,36 @@ defmodule Links.Collections do
     end
   end
 
+  def copy_bookmark(%Scope{} = scope, bookmark_id, collection_id, ordered_ids) do
+    bookmark = get_bookmark!(bookmark_id)
+    collection_id = normalize_collection_id(collection_id)
+    ordered_ids = Enum.map(ordered_ids, &to_integer/1)
+
+    with :ok <- authorize_bookmark_copy(scope, bookmark, collection_id),
+         :ok <- validate_copy_bookmark_order(scope, bookmark, collection_id, ordered_ids) do
+      Multi.new()
+      |> Multi.insert(:bookmark, duplicate_bookmark_changeset(scope, bookmark, collection_id))
+      |> Multi.merge(fn %{bookmark: new_bookmark} ->
+        final_ordered_ids =
+          Enum.map(ordered_ids, fn
+            id when id == bookmark.id -> new_bookmark.id
+            id -> id
+          end)
+
+        update_bookmark_positions(Multi.new(), scope, collection_id, final_ordered_ids)
+      end)
+      |> Repo.transaction()
+      |> case do
+        {:ok, %{bookmark: bookmark}} ->
+          broadcast_bookmark_list_changes(scope, collection_id)
+          {:ok, bookmark}
+
+        {:error, _name, reason, _changes} ->
+          {:error, reason}
+      end
+    end
+  end
+
   def update_bookmark_metadata(%Bookmark{} = bookmark, attrs) do
     bookmark
     |> Bookmark.metadata_changeset(attrs)
@@ -981,6 +1011,87 @@ defmodule Links.Collections do
       :ok
     else
       _ -> {:error, :unauthorized}
+    end
+  end
+
+  defp authorize_bookmark_copy(scope, bookmark, collection_id) do
+    with true <- can_view_bookmark?(scope, bookmark),
+         false <- can_edit_bookmark?(scope, bookmark),
+         :ok <- authorize_bookmark_parent(scope, collection_id),
+         false <- same_bookmark_collection?(bookmark, collection_id) do
+      :ok
+    else
+      _ -> {:error, :unauthorized}
+    end
+  end
+
+  defp same_bookmark_collection?(%Bookmark{collection_id: nil}, nil), do: true
+
+  defp same_bookmark_collection?(%Bookmark{collection_id: collection_id}, collection_id),
+    do: true
+
+  defp same_bookmark_collection?(_, _), do: false
+
+  defp duplicate_bookmark_changeset(%Scope{} = scope, %Bookmark{} = source, collection_id) do
+    %Bookmark{}
+    |> Bookmark.changeset(%{
+      title: source.title,
+      url: source.url,
+      description: source.description,
+      created_by_id: scope.user.id,
+      collection_id: collection_id
+    })
+    |> Ecto.Changeset.put_change(:page_title, source.page_title)
+    |> Ecto.Changeset.put_change(:favicon_data, source.favicon_data)
+    |> Ecto.Changeset.put_change(:favicon_content_type, source.favicon_content_type)
+    |> Ecto.Changeset.put_change(:favicon_byte_size, source.favicon_byte_size)
+    |> Ecto.Changeset.put_change(:favicon_source_url, source.favicon_source_url)
+    |> Ecto.Changeset.put_change(:metadata_fetched_at, source.metadata_fetched_at)
+  end
+
+  defp validate_copy_bookmark_order(%Scope{} = scope, source, nil, ordered_ids) do
+    user_id = scope.user.id
+
+    if source.id in ordered_ids do
+      existing_in_target =
+        Bookmark
+        |> where([b], b.created_by_id == ^user_id and is_nil(b.collection_id))
+        |> select([b], b.id)
+        |> Repo.all()
+        |> MapSet.new()
+
+      actual_without_source =
+        ordered_ids
+        |> List.delete(source.id)
+        |> MapSet.new()
+
+      if MapSet.equal?(existing_in_target, actual_without_source),
+        do: :ok,
+        else: {:error, :invalid_order}
+    else
+      {:error, :invalid_order}
+    end
+  end
+
+  defp validate_copy_bookmark_order(_scope, source, collection_id, ordered_ids) do
+    if source.id in ordered_ids do
+      existing_in_target =
+        Bookmark
+        |> where([b], b.collection_id == ^collection_id)
+        |> select([b], b.id)
+        |> Repo.all()
+        |> MapSet.new()
+
+      actual_without_source =
+        ordered_ids
+        |> List.delete(source.id)
+        |> MapSet.new()
+
+      if MapSet.equal?(existing_in_target, actual_without_source),
+        do: :ok,
+        else: {:error, :invalid_order}
+    else
+      {:error, :invalid_order}
     end
   end
 

@@ -1023,5 +1023,121 @@ defmodule Links.CollectionsTest do
 
       assert Collections.list_collaborators(collaborator_scope, source) == []
     end
+
+    test "read-only collaborators can copy bookmarks into their own collections" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+      target = collection_fixture(user_scope_fixture(collaborator), %{title: "Saved"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      {:ok, bookmark} =
+        Collections.create_bookmark(owner_scope, %{
+          title: "Shared link",
+          url: "https://example.com/shared",
+          collection_id: source.id
+        })
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:ok, copied} =
+               Collections.copy_bookmark(
+                 collaborator_scope,
+                 bookmark.id,
+                 target.id,
+                 [bookmark.id]
+               )
+
+      assert copied.id != bookmark.id
+      assert copied.collection_id == target.id
+      assert copied.url == bookmark.url
+      assert copied.created_by_id == collaborator.id
+      assert Collections.get_bookmark!(bookmark.id).collection_id == source.id
+    end
+
+    test "read-only collaborators can copy bookmarks into inbox" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      {:ok, bookmark} =
+        Collections.create_bookmark(owner_scope, %{
+          title: "Shared link",
+          url: "https://example.com/shared",
+          collection_id: source.id
+        })
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:ok, copied} =
+               Collections.copy_bookmark(collaborator_scope, bookmark.id, nil, [bookmark.id])
+
+      assert copied.collection_id == nil
+      assert copied.created_by_id == collaborator.id
+      assert Collections.get_bookmark!(bookmark.id).collection_id == source.id
+      assert Collections.list_inbox_bookmarks(collaborator_scope) == [copied]
+    end
+
+    test "copy_bookmark rejects reordering within the same collection" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      {:ok, first} =
+        Collections.create_bookmark(owner_scope, %{
+          title: "First",
+          url: "https://example.com/first",
+          collection_id: source.id
+        })
+
+      {:ok, second} =
+        Collections.create_bookmark(owner_scope, %{
+          title: "Second",
+          url: "https://example.com/second",
+          collection_id: source.id
+        })
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:error, :unauthorized} =
+               Collections.copy_bookmark(
+                 collaborator_scope,
+                 first.id,
+                 source.id,
+                 [second.id, first.id]
+               )
+    end
+
+    test "read-only collaborators cannot move shared bookmarks" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+      target = collection_fixture(user_scope_fixture(collaborator), %{title: "Saved"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      {:ok, bookmark} =
+        Collections.create_bookmark(owner_scope, %{
+          title: "Shared link",
+          url: "https://example.com/shared",
+          collection_id: source.id
+        })
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:error, :unauthorized} =
+               Collections.move_bookmark(collaborator_scope, bookmark.id, target.id, [bookmark.id])
+
+      assert Collections.get_bookmark!(bookmark.id).collection_id == source.id
+    end
   end
 end

@@ -363,6 +363,51 @@ defmodule LinksWeb.DashboardLiveTest do
       assert Collections.get_collection!(own.id).position == 1
     end
 
+    test "copies bookmarks from read-only collections via drag hook", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared Reading"})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      {:ok, bookmark} =
+        Collections.create_bookmark(owner_scope, %{
+          title: "Shared link",
+          url: "https://example.com/shared",
+          collection_id: source.id
+        })
+
+      collaborator_scope = user_scope_fixture(collaborator)
+      target = collection_fixture(collaborator_scope, %{title: "Saved"})
+
+      conn = log_in_user(conn, collaborator)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv
+      |> element("#collection-#{mount.id} > details > summary")
+      |> render_click()
+
+      assert has_element?(lv, "#nested-zone-#{source.id}[data-readonly=\"true\"]")
+
+      assert render_click_copy_bookmark(lv, %{
+               "id" => to_string(bookmark.id),
+               "collection_id" => to_string(target.id),
+               "ordered_ids" => [to_string(bookmark.id)]
+             })
+
+      copied =
+        Repo.get_by!(Bookmark,
+          collection_id: target.id,
+          url: "https://example.com/shared",
+          created_by_id: collaborator.id
+        )
+
+      assert copied.id != bookmark.id
+      assert Collections.get_bookmark!(bookmark.id).collection_id == source.id
+      assert has_element?(lv, "#bookmark-#{copied.id}")
+    end
+
     test "shows total bookmark counts including sub-collections", %{conn: conn} do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
       parent = collection_fixture(scope, %{title: "Parent"})
@@ -1080,6 +1125,12 @@ defmodule LinksWeb.DashboardLiveTest do
     view
     |> element("#bookmarks-sidebar")
     |> render_hook("move_bookmark", params)
+  end
+
+  defp render_click_copy_bookmark(view, params) do
+    view
+    |> element("#bookmarks-sidebar")
+    |> render_hook("copy_bookmark", params)
   end
 
   defp render_reorder_collections(view, params) do
