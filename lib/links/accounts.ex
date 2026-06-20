@@ -60,6 +60,35 @@ defmodule Links.Accounts do
   """
   def get_user!(id), do: Repo.get!(User, id)
 
+  @doc """
+  Returns user emails matching a query substring, ordered for autocomplete.
+  """
+  def search_users_by_email(query, opts \\ []) when is_binary(query) do
+    exclude_user_id = Keyword.get(opts, :exclude_user_id)
+    limit = Keyword.get(opts, :limit, 8)
+    trimmed = String.trim(query)
+
+    if trimmed == "" do
+      []
+    else
+      pattern = "%#{String.downcase(trimmed)}%"
+
+      User
+      |> exclude_user_from_search(exclude_user_id)
+      |> where([u], fragment("LOWER(?) LIKE ?", u.email, ^pattern))
+      |> order_by([u], asc: u.email)
+      |> limit(^limit)
+      |> select([u], u.email)
+      |> Repo.all()
+    end
+  end
+
+  defp exclude_user_from_search(query, nil), do: query
+
+  defp exclude_user_from_search(query, user_id) do
+    where(query, [u], u.id != ^user_id)
+  end
+
   ## User registration
 
   @doc """

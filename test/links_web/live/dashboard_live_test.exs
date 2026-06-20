@@ -411,6 +411,34 @@ defmodule LinksWeb.DashboardLiveTest do
              )
     end
 
+    test "suggests existing account emails while typing collaborator email", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture(%{email: "collaborator-search@example.com"})
+      collection = collection_fixture(owner_scope, %{title: "Team Project"})
+
+      conn = log_in_user(conn, owner_scope.user)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv = open_collection_details(lv, collection.id)
+
+      lv
+      |> form("#collaboration-form form", collaboration: %{email: "collaborator-search"})
+      |> render_change()
+
+      assert has_element?(lv, "#collaboration-email-suggestions", collaborator.email)
+
+      lv
+      |> element("#collaboration-email-option-collaborator-search-example-com")
+      |> render_click()
+
+      assert has_element?(
+               lv,
+               "#collaboration-form input[type='email'][value='#{collaborator.email}']"
+             )
+
+      refute has_element?(lv, "#collaboration-email-suggestions")
+    end
+
     test "clears the collaborator form after sharing", %{conn: conn} do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()

@@ -35,6 +35,42 @@ defmodule Links.AccountsTest do
     end
   end
 
+  describe "search_users_by_email/2" do
+    test "returns empty list for blank query" do
+      user_fixture()
+      assert Accounts.search_users_by_email("") == []
+      assert Accounts.search_users_by_email("   ") == []
+    end
+
+    test "returns matching emails ordered alphabetically" do
+      user_fixture(%{email: "zebra@example.com"})
+      user_fixture(%{email: "alice@example.com"})
+      user_fixture(%{email: "alice.smith@example.com"})
+
+      assert Accounts.search_users_by_email("alice") == [
+               "alice.smith@example.com",
+               "alice@example.com"
+             ]
+    end
+
+    test "excludes the given user id" do
+      owner = user_fixture(%{email: "owner@example.com"})
+      user_fixture(%{email: "owner.backup@example.com"})
+
+      assert Accounts.search_users_by_email("owner", exclude_user_id: owner.id) == [
+               "owner.backup@example.com"
+             ]
+    end
+
+    test "respects the result limit" do
+      for index <- 1..10 do
+        user_fixture(%{email: "match#{index}@example.com"})
+      end
+
+      assert length(Accounts.search_users_by_email("match", limit: 3)) == 3
+    end
+  end
+
   describe "get_user!/1" do
     test "raises if id is invalid" do
       assert_raise Ecto.NoResultsError, fn ->
