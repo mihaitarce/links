@@ -477,7 +477,7 @@ defmodule LinksWeb.DashboardLive do
 
       <div :if={!@readonly} class="space-y-4">
         <div class="rounded-box border border-base-300 bg-base-100 p-4">
-          <h2 class="mb-3 font-semibold">Add Sub-Collection</h2>
+          <h2 class="mb-3 font-semibold">New child collection</h2>
           <.form
             for={@child_collection_form}
             id="child-collection-form"
@@ -501,7 +501,7 @@ defmodule LinksWeb.DashboardLive do
           <h2 class="mb-3 font-semibold">Collaborators</h2>
           <.form for={%{}} id="collaboration-form" phx-submit="create_collaboration">
             <label for="collaboration-email" class="label mb-1">User email</label>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-4">
               <input
                 id="collaboration-email"
                 type="email"
@@ -518,7 +518,7 @@ defmodule LinksWeb.DashboardLive do
                   class="checkbox checkbox-sm"
                 /> Read-only
               </label>
-              <button class="btn btn-primary shrink-0">Add collaborator</button>
+              <button class="btn btn-primary shrink-0">Share</button>
             </div>
           </.form>
           <ul id="collaborators-list" class="mt-4 space-y-2">
