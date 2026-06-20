@@ -972,9 +972,6 @@ defmodule LinksWeb.DashboardLive do
          |> refresh_dashboard()
          |> select_collection(collection.id)}
 
-      {:error, :active_share_exists} ->
-        {:noreply, put_flash(socket, :error, "Another public link is already active")}
-
       {:error, _reason} ->
         {:noreply, put_flash(socket, :error, "Could not restore public share")}
     end

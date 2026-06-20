@@ -490,9 +490,6 @@ defmodule Links.Collections do
       is_nil(public_share.revoked_at) ->
         {:error, :unauthorized}
 
-      active_public_share_exists?(collection.id) ->
-        {:error, :active_share_exists}
-
       true ->
         public_share
         |> PublicShare.changeset(%{revoked_at: nil})
@@ -502,12 +499,6 @@ defmodule Links.Collections do
           _ -> :ok
         end)
     end
-  end
-
-  defp active_public_share_exists?(collection_id) do
-    PublicShare
-    |> where([s], s.collection_id == ^collection_id and is_nil(s.revoked_at))
-    |> Repo.exists?()
   end
 
   def create_collaboration(%Scope{} = scope, %Collection{} = source, collaborator_email, readonly) do

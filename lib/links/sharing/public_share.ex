@@ -24,6 +24,5 @@ defmodule Links.Sharing.PublicShare do
     |> foreign_key_constraint(:collection_id)
     |> foreign_key_constraint(:created_by_id)
     |> unique_constraint(:token)
-    |> unique_constraint(:collection_id, name: :collection_public_shares_one_active_share_index)
   end
 end

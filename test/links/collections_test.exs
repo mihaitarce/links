@@ -332,6 +332,22 @@ defmodule Links.CollectionsTest do
       assert revoked.revoked_at
     end
 
+    test "allows multiple active public shares for the same collection" do
+      scope = user_scope_fixture()
+      collection = collection_fixture(scope)
+
+      assert {:ok, first_share} = Collections.create_public_share(scope, collection)
+      assert {:ok, second_share} = Collections.create_public_share(scope, collection)
+      refute first_share.token == second_share.token
+
+      shares = Collections.list_public_shares(scope, collection)
+      active_ids = shares |> Enum.reject(& &1.revoked_at) |> Enum.map(& &1.id) |> MapSet.new()
+
+      assert MapSet.equal?(active_ids, MapSet.new([first_share.id, second_share.id]))
+      assert Collections.get_public_share_by_token(first_share.token)
+      assert Collections.get_public_share_by_token(second_share.token)
+    end
+
     test "marks owned collections as shared when a public link exists" do
       scope = user_scope_fixture()
       collection = collection_fixture(scope)
@@ -444,7 +460,7 @@ defmodule Links.CollectionsTest do
                Collections.restore_public_share(collaborator_scope, revoked)
     end
 
-    test "cannot restore a public share while another link is active" do
+    test "owner can restore revoked public shares while another link is active" do
       owner_scope = user_scope_fixture()
       collection = collection_fixture(owner_scope)
 
@@ -452,8 +468,9 @@ defmodule Links.CollectionsTest do
       assert {:ok, revoked} = Collections.revoke_public_share(owner_scope, first_share)
       assert {:ok, _active_share} = Collections.create_public_share(owner_scope, collection)
 
-      assert {:error, :active_share_exists} =
-               Collections.restore_public_share(owner_scope, revoked)
+      assert {:ok, restored} = Collections.restore_public_share(owner_scope, revoked)
+      refute restored.revoked_at
+      assert Collections.get_public_share_by_token(first_share.token)
     end
   end
 
