@@ -39,7 +39,12 @@ summary.bookmark-drop-highlight,
   display: none;
 }
 
-.inbox-empty-state > .inbox-empty-state-placeholder {
+#bookmarks-sidebar .inbox-empty-state > .bookmark-menu-row {
+  min-height: calc(1rem + 0.25rem * 2);
+}
+
+.inbox-empty-state > .inbox-empty-state-placeholder,
+.inbox-empty-state .inbox-empty-state-placeholder {
   display: block;
   width: 100%;
   user-select: none;
@@ -50,7 +55,8 @@ summary.bookmark-drop-highlight,
 }
 
 @media (hover: hover) {
-  .inbox-empty-state > .inbox-empty-state-placeholder:hover {
+  .inbox-empty-state > .inbox-empty-state-placeholder:hover,
+  .inbox-empty-state .inbox-empty-state-placeholder:hover {
     background-color: transparent;
     box-shadow: none;
   }

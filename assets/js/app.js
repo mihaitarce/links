@@ -507,7 +507,7 @@ const CollectionBookmarkSort = {
       },
       animation: 150,
       draggable: "li[id^='collection-'][data-reorderable='true']",
-      filter: "button, input, textarea, select, a",
+      filter: "button, input, textarea, select, a, #collections-empty-state",
       preventOnFilter: true,
       delay: 200,
       delayOnTouchOnly: false,

@@ -92,7 +92,9 @@ defmodule LinksWeb.DashboardLive do
                   />
                 </li>
                 <li id="inbox-empty-state" class="inbox-empty-state" aria-hidden="true">
-                  <span class="inbox-empty-state-placeholder">Your inbox is empty</span>
+                  <div class="bookmark-menu-row flex min-w-0 w-full items-center justify-center">
+                    <span class="inbox-empty-state-placeholder">Your inbox is empty</span>
+                  </div>
                 </li>
               </ul>
             </section>
@@ -121,6 +123,13 @@ defmodule LinksWeb.DashboardLive do
                   current_scope={@current_scope}
                   pending_metadata_ids={@pending_metadata_ids}
                 />
+                <li id="collections-empty-state" class="inbox-empty-state" aria-hidden="true">
+                  <div class="bookmark-menu-row flex min-w-0 w-full items-center justify-center">
+                    <span class="inbox-empty-state-placeholder">
+                      You don't have any collections yet
+                    </span>
+                  </div>
+                </li>
               </ul>
             </section>
           </div>

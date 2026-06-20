@@ -98,7 +98,15 @@ defmodule LinksWeb.DashboardLiveTest do
       {:ok, lv, html} = live(conn, ~p"/")
 
       assert html =~ ~s(id="inbox-empty-state")
-      assert has_element?(lv, "#inbox-empty-state", "Your inbox is empty.")
+      assert has_element?(lv, "#inbox-empty-state", "Your inbox is empty")
+    end
+
+    test "shows an empty label when there are no collections", %{conn: conn} do
+      %{conn: conn} = register_and_log_in_user(%{conn: conn})
+      {:ok, lv, html} = live(conn, ~p"/")
+
+      assert html =~ ~s(id="collections-empty-state")
+      assert has_element?(lv, "#collections-empty-state", "You don't have any collections yet")
     end
 
     test "keeps the inbox empty label in the list when bookmarks are present", %{conn: conn} do
