@@ -68,7 +68,7 @@ defmodule LinksWeb.DashboardLiveTest do
       {:ok, lv, _html} = live(conn, ~p"/")
 
       lv
-      |> element("#bookmark-more-#{bookmark.id}")
+      |> element("#bookmark-select-#{bookmark.id}")
       |> render_click()
 
       lv
@@ -85,7 +85,7 @@ defmodule LinksWeb.DashboardLiveTest do
       {:ok, lv, _html} = live(conn, ~p"/")
 
       lv
-      |> element("#bookmark-more-#{bookmark.id}")
+      |> element("#bookmark-select-#{bookmark.id}")
       |> render_click()
 
       assert has_element?(lv, "#new-link-form")
@@ -309,7 +309,7 @@ defmodule LinksWeb.DashboardLiveTest do
       refute html =~ ~s(<details open)
     end
 
-    test "collapsing a collection keeps the detail panel when opened via more", %{conn: conn} do
+    test "collapsing a collection keeps the detail panel when it is selected", %{conn: conn} do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
       parent = collection_fixture(scope, %{title: "Parent"})
 
@@ -320,13 +320,31 @@ defmodule LinksWeb.DashboardLiveTest do
       assert has_element?(lv, "#collection-form")
 
       lv
-      |> element("#collection-#{parent.id} summary")
+      |> element("#collection-#{parent.id} > details > summary")
       |> render_click()
 
       assert has_element?(lv, "#collection-form")
     end
 
-    test "more button opens detail panel without expanding the collection tree", %{conn: conn} do
+    test "clicking a collection selects it and shows the detail panel", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      parent = collection_fixture(scope, %{title: "Parent"})
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      refute has_element?(lv, "#collection-form")
+
+      lv
+      |> element("#collection-#{parent.id} > details > summary")
+      |> render_click()
+
+      assert has_element?(lv, "#collection-form")
+      assert has_element?(lv, "#collection-#{parent.id} summary.sidebar-item-active")
+    end
+
+    test "clicking a collapsed collection with children expands it and opens the detail panel", %{
+      conn: conn
+    } do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
       parent = collection_fixture(scope, %{title: "Parent"})
       _child = collection_fixture(scope, %{title: "Child", parent_id: parent.id})
@@ -335,13 +353,15 @@ defmodule LinksWeb.DashboardLiveTest do
 
       refute has_element?(lv, "#collection-#{parent.id} > details[open]")
 
-      open_collection_details(lv, parent.id)
+      lv
+      |> element("#collection-#{parent.id} > details > summary")
+      |> render_click()
 
       assert has_element?(lv, "#collection-form")
-      refute has_element?(lv, "#collection-#{parent.id} > details[open]")
+      assert has_element?(lv, "#collection-#{parent.id} > details[open]")
     end
 
-    test "more button does not collapse an expanded collection", %{conn: conn} do
+    test "selecting a collection does not change whether it is expanded", %{conn: conn} do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
       parent = collection_fixture(scope, %{title: "Parent"})
       _child = collection_fixture(scope, %{title: "Child", parent_id: parent.id})
@@ -379,7 +399,7 @@ defmodule LinksWeb.DashboardLiveTest do
       refute has_element?(lv, "#detail-panel")
     end
 
-    test "opens bookmark links in a new tab from the sidebar", %{conn: conn} do
+    test "opens bookmark links in a new tab from the more button", %{conn: conn} do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
 
       bookmark =
@@ -389,10 +409,14 @@ defmodule LinksWeb.DashboardLiveTest do
 
       assert has_element?(
                lv,
-               "#bookmark-#{bookmark.id} a[href='https://example.com/external'][target='_blank']"
+               "#bookmark-more-#{bookmark.id}[href='https://example.com/external'][target='_blank']"
              )
 
-      refute has_element?(lv, "#bookmark-form")
+      lv
+      |> element("#bookmark-select-#{bookmark.id}")
+      |> render_click()
+
+      assert has_element?(lv, "#bookmark-form")
     end
 
     test "shows shared icon on owned collections shared with collaborators", %{conn: conn} do
@@ -846,10 +870,7 @@ defmodule LinksWeb.DashboardLiveTest do
   end
 
   defp open_collection_details(view, collection_id) do
-    view
-    |> element("#collection-more-#{collection_id}")
-    |> render_click()
-
+    render_click(view, "select_collection", %{"id" => to_string(collection_id)})
     view
   end
 

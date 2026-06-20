@@ -153,7 +153,7 @@ defmodule LinksWeb.PublicShareLive do
           <span class="min-w-0 truncate">{bookmark_label(@bookmark)}</span>
           <span
             :if={domain = Bookmark.display_host(@bookmark)}
-            class="shrink-0 truncate text-base-content/50"
+            class="bookmark-domain shrink-0 truncate"
           >
             {domain}
           </span>

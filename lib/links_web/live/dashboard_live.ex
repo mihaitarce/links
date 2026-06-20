@@ -213,68 +213,40 @@ defmodule LinksWeb.DashboardLive do
     ~H"""
     <div class={[
       "bookmark-menu-row flex min-w-0 w-full items-center gap-2",
-      @selected && "menu-active"
+      @selected && "sidebar-item-active"
     ]}>
-      <a
-        href={@bookmark.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        class="flex min-w-0 flex-1 items-center gap-2"
+      <button
+        type="button"
+        id={"bookmark-select-#{@bookmark.id}"}
+        phx-click="select_bookmark"
+        phx-value-id={@bookmark.id}
+        class="bookmark-select-button flex min-w-0 flex-1 items-center gap-2 text-left"
       >
         <.bookmark_status_icon bookmark={@bookmark} metadata_pending={@metadata_pending} />
-        <span class="flex min-w-0 flex-1 items-baseline gap-1 overflow-hidden text-left leading-normal">
+        <span class="flex min-w-0 flex-1 items-baseline gap-1 overflow-hidden leading-normal">
           <span class="min-w-0 truncate">{bookmark_label(@bookmark)}</span>
           <span
             :if={domain = Bookmark.display_host(@bookmark)}
-            class="shrink-0 truncate text-base-content/50"
+            class="bookmark-domain shrink-0 truncate"
           >
             {domain}
           </span>
         </span>
-      </a>
-      <.sidebar_more_button
+      </button>
+      <a
         id={"bookmark-more-#{@bookmark.id}"}
-        event="select_bookmark"
-        value_id={@bookmark.id}
-        selected={@selected}
-      />
+        href={@bookmark.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        class={[
+          "sidebar-more-button btn btn-ghost btn-xs shrink-0",
+          @selected && "btn-active"
+        ]}
+        aria-label="Open link in new tab"
+      >
+        <.icon name="hero-ellipsis-horizontal" class="size-4" />
+      </a>
     </div>
-    """
-  end
-
-  attr :id, :string, required: true
-  attr :event, :string, required: true
-  attr :value_id, :integer, required: true
-  attr :selected, :boolean, default: false
-
-  def sidebar_more_button(assigns) do
-    ~H"""
-    <button
-      type="button"
-      id={@id}
-      class={[
-        "sidebar-more-button btn btn-ghost btn-xs shrink-0",
-        @selected && "btn-active"
-      ]}
-      phx-click={@event}
-      phx-value-id={@value_id}
-      phx-stop-propagation
-      phx-hook=".PreventSummaryToggle"
-      aria-label="More options"
-    >
-      <.icon name="hero-ellipsis-horizontal" class="size-4" />
-    </button>
-    <script :type={Phoenix.LiveView.ColocatedHook} name=".PreventSummaryToggle">
-      export default {
-        mounted() {
-          this.onClick = (event) => event.preventDefault()
-          this.el.addEventListener("click", this.onClick, true)
-        },
-        destroyed() {
-          this.el.removeEventListener("click", this.onClick, true)
-        }
-      }
-    </script>
     """
   end
 
@@ -382,7 +354,7 @@ defmodule LinksWeb.DashboardLive do
           <summary
             class={[
               "min-w-0 max-w-full",
-              selected?(@selected, :collection, @collection.id) && "menu-active"
+              selected?(@selected, :collection, @collection.id) && "sidebar-item-active"
             ]}
             phx-click="toggle_collection"
             phx-value-id={@collection.id}
@@ -416,12 +388,6 @@ defmodule LinksWeb.DashboardLive do
                 />
               </span>
             </span>
-            <.sidebar_more_button
-              id={"collection-more-#{@collection.id}"}
-              event="select_collection"
-              value_id={@collection.id}
-              selected={selected?(@selected, :collection, @collection.id)}
-            />
           </summary>
           <ul
             :if={@node.children != []}
@@ -918,7 +884,10 @@ defmodule LinksWeb.DashboardLive do
         MapSet.put(collapsed, id)
       end
 
-    {:noreply, assign(socket, :collapsed, collapsed)}
+    {:noreply,
+     socket
+     |> assign(:collapsed, collapsed)
+     |> select_collection(id)}
   end
 
   def handle_event("expand_collection", %{"id" => id}, socket) do

@@ -65,18 +65,31 @@ summary.bookmark-drop-highlight,
   padding: 0;
 }
 
+.bookmark-domain {
+  color: color-mix(in oklch, currentColor 45%, transparent);
+}
+
+#bookmarks-sidebar .menu .sidebar-item-active {
+  color: var(--menu-active-fg);
+  background-color: var(--menu-active-bg);
+  background-size: auto, calc(var(--noise) * 100%);
+  background-image: none, var(--fx-noise);
+  box-shadow: 0 2px calc(var(--depth) * 3px) -2px var(--menu-active-bg);
+  outline-style: none;
+}
+
 [data-bookmark-sortable] > li[id^="bookmark-"] > .bookmark-menu-row {
   cursor: grab;
 }
 
 [data-bookmark-sortable] > li[id^="bookmark-"].sortable-chosen > .bookmark-menu-row,
-[data-bookmark-sortable] > li[id^="bookmark-"].sortable-chosen > .bookmark-menu-row > a,
+[data-bookmark-sortable] > li[id^="bookmark-"].sortable-chosen > .bookmark-menu-row > .bookmark-select-button,
 .sortable-drag,
 .sortable-fallback {
   cursor: grabbing !important;
 }
 
-[data-bookmark-sortable] > li[id^="bookmark-"] > .bookmark-menu-row > a {
+[data-bookmark-sortable] > li[id^="bookmark-"] > .bookmark-menu-row > .bookmark-select-button {
   cursor: pointer;
 }
 
@@ -138,7 +151,7 @@ details > summary .sidebar-more-button {
   overflow: hidden;
   grid-auto-flow: column;
   grid-auto-columns: unset;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
 }
 
 #bookmarks-sidebar .menu :where(li > details > summary:not(.menu-title))::after {
