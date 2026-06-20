@@ -20,39 +20,58 @@ defmodule Links.Workers.FetchBookmarkMetadataWorker do
   ]
 
   @impl Oban.Worker
-  def perform(%Oban.Job{args: %{"bookmark_id" => bookmark_id}}) do
-    with {:ok, bookmark} <- fetch_bookmark(bookmark_id),
-         {:ok, html_response} <- fetch(bookmark.url),
-         :ok <- validate_html_response(html_response),
-         {:ok, html} <- bounded_body(html_response.body, @html_limit) do
-      title = extract_title(html)
+  def perform(%Oban.Job{args: %{"bookmark_id" => bookmark_id}} = job) do
+    result =
+      with {:ok, bookmark} <- fetch_bookmark(bookmark_id),
+           {:ok, html_response} <- fetch(bookmark.url),
+           :ok <- validate_html_response(html_response),
+           {:ok, html} <- bounded_body(html_response.body, @html_limit) do
+        title = extract_title(html)
 
-      favicon_attrs =
-        html
-        |> favicon_url(bookmark.url)
-        |> fetch_favicon_attrs()
+        favicon_attrs =
+          html
+          |> favicon_url(bookmark.url)
+          |> fetch_favicon_attrs()
 
-      {:ok, _bookmark} =
-        Collections.update_bookmark_metadata(
-          bookmark,
-          favicon_attrs
-          |> Map.put(:page_title, title)
-          |> Map.put(:metadata_fetched_at, DateTime.utc_now(:second))
+        {:ok, _bookmark} =
+          Collections.update_bookmark_metadata(
+            bookmark,
+            favicon_attrs
+            |> Map.put(:page_title, title)
+            |> Map.put(:metadata_fetched_at, DateTime.utc_now(:second))
+          )
+
+        Phoenix.PubSub.broadcast(
+          Links.PubSub,
+          "bookmarks",
+          {:bookmark_metadata_updated, bookmark.id}
         )
 
-      Phoenix.PubSub.broadcast(
-        Links.PubSub,
-        "bookmarks",
-        {:bookmark_metadata_updated, bookmark.id}
-      )
+        Collections.broadcast_bookmark_list_changed(bookmark)
 
-      Collections.broadcast_collection_bookmarks_changed(bookmark.collection_id)
+        :ok
+      else
+        {:cancel, reason} ->
+          broadcast_metadata_finished(bookmark_id)
+          {:cancel, reason}
 
-      :ok
-    else
-      {:cancel, reason} -> {:cancel, reason}
-      {:error, reason} -> {:error, reason}
-    end
+        {:error, reason} ->
+          if job.attempt >= job.max_attempts do
+            broadcast_metadata_finished(bookmark_id)
+          end
+
+          {:error, reason}
+      end
+
+    result
+  end
+
+  defp broadcast_metadata_finished(bookmark_id) do
+    Phoenix.PubSub.broadcast(
+      Links.PubSub,
+      "bookmarks",
+      {:bookmark_metadata_failed, bookmark_id}
+    )
   end
 
   defp fetch(url) do

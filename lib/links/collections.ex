@@ -87,6 +87,23 @@ defmodule Links.Collections do
     )
   end
 
+  def broadcast_bookmark_list_changed(%Bookmark{collection_id: nil, created_by_id: user_id}) do
+    broadcast_inbox_bookmarks_changed(user_id)
+  end
+
+  def broadcast_bookmark_list_changed(%Bookmark{collection_id: collection_id})
+      when not is_nil(collection_id) do
+    broadcast_collection_bookmarks_changed(collection_id)
+  end
+
+  def broadcast_bookmark_list_changed(%Scope{} = scope, collection_id) do
+    if is_nil(collection_id) do
+      broadcast_inbox_bookmarks_changed(scope.user.id)
+    else
+      broadcast_collection_bookmarks_changed(collection_id)
+    end
+  end
+
   def user_collections_topic(user_id) do
     "user_collections:#{user_id}"
   end
@@ -300,7 +317,7 @@ defmodule Links.Collections do
       |> Bookmark.changeset(normalize_attrs(attrs))
       |> Repo.update()
       |> tap(fn {:ok, bookmark} ->
-        broadcast_collection_bookmarks_changed(bookmark.collection_id)
+        broadcast_bookmark_list_changed(scope, bookmark.collection_id)
       end)
     else
       {:error, :unauthorized}
@@ -312,8 +329,7 @@ defmodule Links.Collections do
       collection_id = bookmark.collection_id
 
       with {:ok, bookmark} <- Repo.delete(bookmark) do
-        broadcast_inbox_bookmarks_changed(scope.user.id)
-        broadcast_collection_bookmarks_changed(collection_id)
+        broadcast_bookmark_list_changed(scope, collection_id)
         {:ok, bookmark}
       end
     else
@@ -940,12 +956,8 @@ defmodule Links.Collections do
     from(b in Bookmark, where: b.id == ^id and b.collection_id == ^collection_id)
   end
 
-  defp broadcast_bookmark_list_changes(%Scope{} = scope, nil) do
-    broadcast_inbox_bookmarks_changed(scope.user.id)
-  end
-
-  defp broadcast_bookmark_list_changes(_scope, collection_id) do
-    broadcast_collection_bookmarks_changed(collection_id)
+  defp broadcast_bookmark_list_changes(scope, collection_id) do
+    broadcast_bookmark_list_changed(scope, collection_id)
   end
 
   defp broadcast_parent_collection_changed(%Collection{parent_id: parent_id}) do

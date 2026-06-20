@@ -21,6 +21,14 @@ defmodule Links.CollectionsTest do
       assert bookmark.title == "https://example.com"
     end
 
+    test "deletes inbox bookmarks without error" do
+      scope = user_scope_fixture()
+      {:ok, bookmark} = Collections.create_inbox_bookmark(scope, %{url: "https://example.com"})
+
+      assert {:ok, _deleted} = Collections.delete_bookmark(scope, bookmark)
+      assert Collections.list_inbox_bookmarks(scope) == []
+    end
+
     test "enqueues metadata fetch jobs when bookmarks are created" do
       scope = user_scope_fixture()
       {:ok, bookmark} = Collections.create_inbox_bookmark(scope, %{url: "https://example.com"})

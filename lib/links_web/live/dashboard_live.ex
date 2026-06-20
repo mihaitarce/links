@@ -32,6 +32,7 @@ defmodule LinksWeb.DashboardLive do
      |> assign(:collaborators, [])
      |> assign(:collaboration_email, "")
      |> assign(:collaboration_readonly, false)
+     |> assign(:pending_metadata_ids, MapSet.new())
      |> assign_forms()
      |> refresh_dashboard()
      |> collapse_all_collections()}
@@ -48,8 +49,9 @@ defmodule LinksWeb.DashboardLive do
               <div class="join w-full">
                 <input
                   type="url"
-                  name="bookmark[url]"
-                  value=""
+                  name={@new_bookmark_form[:url].name}
+                  id={@new_bookmark_form[:url].id}
+                  value={@new_bookmark_form[:url].value || ""}
                   placeholder="Paste a new link..."
                   class="input join-item w-full"
                   required
@@ -86,6 +88,7 @@ defmodule LinksWeb.DashboardLive do
                     bookmark={bookmark}
                     selected={selected?(@selected, :bookmark, bookmark.id)}
                     show_drag_handle
+                    metadata_pending={MapSet.member?(@pending_metadata_ids, bookmark.id)}
                   />
                 </li>
                 <li id="inbox-empty-state" class="inbox-empty-state" aria-hidden="true">
@@ -116,6 +119,7 @@ defmodule LinksWeb.DashboardLive do
                   collapsed={@collapsed}
                   depth={0}
                   current_scope={@current_scope}
+                  pending_metadata_ids={@pending_metadata_ids}
                 />
               </ul>
             </section>
@@ -134,6 +138,7 @@ defmodule LinksWeb.DashboardLive do
               collaborators={@collaborators}
               collaboration_email={@collaboration_email}
               collaboration_readonly={@collaboration_readonly}
+              pending_metadata_ids={@pending_metadata_ids}
             />
           <% else %>
             <div class="flex h-full items-center justify-center">
@@ -172,6 +177,7 @@ defmodule LinksWeb.DashboardLive do
   attr :bookmark, Bookmark, required: true
   attr :selected, :boolean, default: false
   attr :show_drag_handle, :boolean, default: false
+  attr :metadata_pending, :boolean, default: false
 
   def bookmark_menu_link(assigns) do
     ~H"""
@@ -190,11 +196,28 @@ defmodule LinksWeb.DashboardLive do
       >
         <.icon name="hero-ellipsis-vertical" class="size-4 cursor-grab" />
       </span>
-      <.bookmark_icon bookmark={@bookmark} />
+      <.bookmark_status_icon bookmark={@bookmark} metadata_pending={@metadata_pending} />
       <span class="min-w-0 flex-1 truncate text-left leading-normal">
         {bookmark_label(@bookmark)}
       </span>
     </a>
+    """
+  end
+
+  attr :bookmark, Bookmark, required: true
+  attr :metadata_pending, :boolean, default: false
+  attr :class, :string, default: "size-4"
+
+  def bookmark_status_icon(assigns) do
+    ~H"""
+    <%= if @metadata_pending do %>
+      <span
+        class={["loading loading-spinner loading-xs shrink-0 text-base-content/50", @class]}
+        aria-label="Fetching link metadata"
+      />
+    <% else %>
+      <.bookmark_icon bookmark={@bookmark} class={@class} />
+    <% end %>
     """
   end
 
@@ -245,6 +268,7 @@ defmodule LinksWeb.DashboardLive do
   attr :collapsed, MapSet, required: true
   attr :depth, :integer, required: true
   attr :current_scope, :map, required: true
+  attr :pending_metadata_ids, MapSet, required: true
 
   def tree_node(assigns) do
     assigns =
@@ -324,6 +348,7 @@ defmodule LinksWeb.DashboardLive do
               collapsed={@collapsed}
               depth={@depth + 1}
               current_scope={@current_scope}
+              pending_metadata_ids={@pending_metadata_ids}
             />
           </ul>
           <ul
@@ -343,6 +368,7 @@ defmodule LinksWeb.DashboardLive do
                 bookmark={bookmark}
                 selected={selected?(@selected, :bookmark, bookmark.id)}
                 show_drag_handle={!@node.readonly}
+                metadata_pending={MapSet.member?(@pending_metadata_ids, bookmark.id)}
               />
             </li>
           </ul>
@@ -366,7 +392,10 @@ defmodule LinksWeb.DashboardLive do
   end
 
   def handle_info({:bookmark_metadata_updated, bookmark_id}, socket) do
-    socket = refresh_dashboard(socket)
+    socket =
+      socket
+      |> clear_metadata_pending(bookmark_id)
+      |> refresh_dashboard()
 
     socket =
       case socket.assigns.selected do
@@ -380,6 +409,10 @@ defmodule LinksWeb.DashboardLive do
     {:noreply, socket}
   end
 
+  def handle_info({:bookmark_metadata_failed, bookmark_id}, socket) do
+    {:noreply, clear_metadata_pending(socket, bookmark_id)}
+  end
+
   attr :selected, :map, required: true
   attr :context, :map, required: true
   attr :collection_form, :any, required: true
@@ -389,16 +422,31 @@ defmodule LinksWeb.DashboardLive do
   attr :collaborators, :list, default: []
   attr :collaboration_email, :string, default: ""
   attr :collaboration_readonly, :boolean, default: false
+  attr :pending_metadata_ids, MapSet, default: MapSet.new()
 
   def detail_panel(%{selected: %{type: :bookmark}} = assigns) do
+    assigns =
+      assign(
+        assigns,
+        :metadata_pending,
+        MapSet.member?(assigns.pending_metadata_ids, assigns.context.bookmark.id)
+      )
+
     ~H"""
     <div class="mx-auto max-w-3xl space-y-4">
       <div class="rounded-box border border-base-300 bg-base-100 p-4">
         <div class="mb-4 flex items-start gap-3">
-          <.bookmark_icon bookmark={@context.bookmark} class="mt-1 size-8" />
+          <.bookmark_status_icon
+            bookmark={@context.bookmark}
+            metadata_pending={@metadata_pending}
+            class="mt-1 size-8"
+          />
           <div class="min-w-0">
             <h1 class="truncate text-lg font-semibold">{bookmark_label(@context.bookmark)}</h1>
             <p class="truncate text-sm text-base-content/60">{@context.bookmark.url}</p>
+            <p :if={@metadata_pending} class="mt-1 text-xs text-base-content/50">
+              Fetching page title and icon…
+            </p>
           </div>
         </div>
         <.form
@@ -616,13 +664,17 @@ defmodule LinksWeb.DashboardLive do
   end
 
   @impl true
-  def handle_event("create_link", %{"bookmark" => bookmark_params}, socket) do
+  def handle_event("create_link", %{"new_bookmark" => bookmark_params}, socket) do
     case Collections.create_inbox_bookmark(socket.assigns.current_scope, bookmark_params) do
-      {:ok, _bookmark} ->
-        {:noreply, refresh_dashboard(socket)}
+      {:ok, bookmark} ->
+        {:noreply,
+         socket
+         |> assign(:new_bookmark_form, new_bookmark_form())
+         |> mark_metadata_pending(bookmark.id)
+         |> refresh_dashboard()}
 
       {:error, changeset} ->
-        {:noreply, assign(socket, :new_bookmark_form, to_form(changeset))}
+        {:noreply, assign(socket, :new_bookmark_form, to_form(changeset, as: :new_bookmark))}
     end
   end
 
@@ -881,6 +933,22 @@ defmodule LinksWeb.DashboardLive do
     end
   end
 
+  defp mark_metadata_pending(socket, bookmark_id) do
+    assign(
+      socket,
+      :pending_metadata_ids,
+      MapSet.put(socket.assigns.pending_metadata_ids, bookmark_id)
+    )
+  end
+
+  defp clear_metadata_pending(socket, bookmark_id) do
+    assign(
+      socket,
+      :pending_metadata_ids,
+      MapSet.delete(socket.assigns.pending_metadata_ids, bookmark_id)
+    )
+  end
+
   defp refresh_dashboard(socket) do
     socket
     |> assign(:dashboard, Collections.list_dashboard(socket.assigns.current_scope))
@@ -955,10 +1023,15 @@ defmodule LinksWeb.DashboardLive do
 
   defp assign_forms(socket) do
     socket
-    |> assign(:new_bookmark_form, to_form(Bookmark.changeset(%Bookmark{}, %{})))
+    |> assign(:new_bookmark_form, new_bookmark_form())
     |> assign(:collection_form, to_form(Collection.changeset(%Collection{}, %{})))
     |> assign(:child_collection_form, child_collection_form())
     |> assign(:bookmark_form, to_form(Bookmark.changeset(%Bookmark{}, %{})))
+  end
+
+  defp new_bookmark_form do
+    Bookmark.changeset(%Bookmark{}, %{})
+    |> to_form(as: :new_bookmark)
   end
 
   defp child_collection_form do

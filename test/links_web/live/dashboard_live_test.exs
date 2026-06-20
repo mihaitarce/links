@@ -5,6 +5,7 @@ defmodule LinksWeb.DashboardLiveTest do
   import Links.AccountsFixtures
   import Links.CollectionsFixtures
 
+  alias Links.Bookmarks.Bookmark
   alias Links.Collections
   alias Links.Collections.Collection
   alias Links.Repo
@@ -34,10 +35,61 @@ defmodule LinksWeb.DashboardLiveTest do
 
       html =
         lv
-        |> form("#new-link-form", bookmark: %{url: "https://example.com/new"})
+        |> form("#new-link-form", new_bookmark: %{url: "https://example.com/new"})
         |> render_submit()
 
       assert html =~ "https://example.com/new"
+      assert html =~ ~s(aria-label="Fetching link metadata")
+      assert has_element?(lv, "#new-link-form input[type=\"url\"][value=\"\"]")
+    end
+
+    test "removes metadata spinner after background fetch completes", %{conn: conn} do
+      %{conn: conn} = register_and_log_in_user(%{conn: conn})
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv
+      |> form("#new-link-form", new_bookmark: %{url: "https://example.com/spinner"})
+      |> render_submit()
+
+      bookmark = Repo.get_by!(Bookmark, url: "https://example.com/spinner")
+
+      assert render(lv) =~ ~s(aria-label="Fetching link metadata")
+
+      send(lv.pid, {:bookmark_metadata_updated, bookmark.id})
+
+      html = render(lv)
+      refute html =~ ~s(aria-label="Fetching link metadata")
+    end
+
+    test "deletes an inbox bookmark from the detail panel", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      bookmark = bookmark_fixture(scope, %{title: "Inbox link", url: "https://example.com/inbox"})
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv
+      |> element("#bookmark-#{bookmark.id} a")
+      |> render_click()
+
+      lv
+      |> element("#bookmark-form button", "Delete")
+      |> render_click()
+
+      refute has_element?(lv, "#bookmark-#{bookmark.id}")
+      assert has_element?(lv, "#inbox-empty-state", "Your inbox is empty.")
+    end
+
+    test "keeps the new link input visible when a bookmark is selected", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      bookmark = bookmark_fixture(scope, %{title: "Inbox link", url: "https://example.com/inbox"})
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv
+      |> element("#bookmark-#{bookmark.id} a")
+      |> render_click()
+
+      assert has_element?(lv, "#new-link-form")
+      assert has_element?(lv, "#new_bookmark_url")
+      assert has_element?(lv, "#bookmark-form")
     end
 
     test "shows an empty label when the inbox has no bookmarks", %{conn: conn} do
