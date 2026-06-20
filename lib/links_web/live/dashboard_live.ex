@@ -40,8 +40,8 @@ defmodule LinksWeb.DashboardLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <div class="flex h-full min-h-0 w-full flex-col md:flex-row md:overflow-hidden bg-base-200 text-sm">
-        <aside class="flex w-full min-w-0 max-w-[65ch] shrink-0 flex-col border-r border-base-300 bg-base-100 md:w-1/2">
+      <div class="flex h-full min-h-0 w-full flex-col lg:flex-row lg:overflow-hidden bg-base-200 text-sm">
+        <aside class="flex w-full min-w-0 shrink-0 flex-col border-r border-base-300 bg-base-100 lg:w-[70ch] lg:max-w-[70ch] xl:w-[90ch] xl:max-w-[90ch]">
           <div class="border-b border-base-300 p-3">
             <.form for={@new_bookmark_form} id="new-link-form" phx-submit="create_link">
               <div class="join w-full">
@@ -128,19 +128,19 @@ defmodule LinksWeb.DashboardLive do
             id="detail-panel"
             class={[
               "fixed inset-0 z-[999] flex items-center justify-center bg-black/40 p-4",
-              "md:static md:z-auto md:flex md:min-w-0 md:flex-1 md:flex-col md:items-stretch md:justify-start md:overflow-auto md:border-l md:border-base-300 md:bg-transparent md:p-0"
+              "lg:static lg:z-auto lg:flex lg:min-w-0 lg:flex-1 lg:flex-col lg:items-stretch lg:justify-start lg:overflow-auto lg:border-l lg:border-base-300 lg:bg-transparent lg:p-0"
             ]}
             role="dialog"
             aria-modal="true"
           >
             <button
               type="button"
-              class="absolute inset-0 md:hidden"
+              class="absolute inset-0 lg:hidden"
               phx-click="close_detail"
               aria-label="Close"
             />
-            <div class="relative z-10 flex max-h-[90dvh] w-full max-w-3xl flex-col overflow-hidden rounded-box bg-base-100 shadow-xl md:h-full md:max-h-none md:max-w-none md:rounded-none md:shadow-none">
-              <div class="flex shrink-0 items-center justify-end border-b border-base-300 px-3 py-2 md:hidden">
+            <div class="relative z-10 flex max-h-[90dvh] w-full max-w-3xl flex-col overflow-hidden rounded-box bg-base-100 shadow-xl lg:h-full lg:max-h-none lg:max-w-none lg:rounded-none lg:shadow-none">
+              <div class="flex shrink-0 items-center justify-end border-b border-base-300 px-3 py-2 lg:hidden">
                 <button
                   type="button"
                   id="detail-modal-close"
@@ -167,7 +167,7 @@ defmodule LinksWeb.DashboardLive do
             </div>
           </div>
         <% else %>
-          <section class="hidden min-w-0 flex-1 overflow-auto p-4 md:block">
+          <section class="hidden min-w-0 flex-1 overflow-auto p-4 lg:block">
             <div class="flex h-full items-center justify-center">
               <div class="max-w-md rounded-box border border-dashed border-base-300 bg-base-100 p-8 text-center">
                 <h1 class="text-lg font-semibold">Select a collection or bookmark</h1>
