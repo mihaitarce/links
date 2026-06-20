@@ -882,6 +882,10 @@ defmodule Links.Collections do
     bookmark_count =
       length(bookmarks) + Enum.sum(Enum.map(children, & &1.bookmark_count))
 
+    completed_bookmark_count =
+      Enum.count(bookmarks, & &1.completed) +
+        Enum.sum(Enum.map(children, & &1.completed_bookmark_count))
+
     %{
       collection: collection,
       effective_collection: effective_collection,
@@ -892,8 +896,33 @@ defmodule Links.Collections do
       title: effective_collection.title,
       children: children,
       bookmarks: bookmarks,
-      bookmark_count: bookmark_count
+      bookmark_count: bookmark_count,
+      completed_bookmark_count: completed_bookmark_count
     }
+  end
+
+  @doc """
+  Formats a bookmark badge as completed/total.
+  """
+  def bookmark_badge(completed, total) when is_integer(completed) and is_integer(total) do
+    "#{completed} / #{total}"
+  end
+
+  @doc """
+  Formats a collection tree node's bookmark badge as completed/total.
+  """
+  def collection_bookmark_badge(%{
+        bookmark_count: total,
+        completed_bookmark_count: completed
+      }) do
+    bookmark_badge(completed, total)
+  end
+
+  @doc """
+  Formats an inbox bookmark badge as completed/total.
+  """
+  def inbox_bookmark_badge(bookmarks) when is_list(bookmarks) do
+    bookmark_badge(Enum.count(bookmarks, & &1.completed), length(bookmarks))
   end
 
   defp shared_collection_ids(user_id) do
@@ -1041,7 +1070,6 @@ defmodule Links.Collections do
       created_by_id: scope.user.id,
       collection_id: collection_id
     })
-    |> Ecto.Changeset.put_change(:page_title, source.page_title)
     |> Ecto.Changeset.put_change(:favicon_data, source.favicon_data)
     |> Ecto.Changeset.put_change(:favicon_content_type, source.favicon_content_type)
     |> Ecto.Changeset.put_change(:favicon_byte_size, source.favicon_byte_size)

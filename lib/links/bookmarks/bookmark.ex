@@ -10,7 +10,7 @@ defmodule Links.Bookmarks.Bookmark do
     field :url, :string
     field :description, :string
     field :position, :integer, default: 0
-    field :page_title, :string
+    field :completed, :boolean, default: false
     field :favicon_data, :binary
     field :favicon_content_type, :string
     field :favicon_byte_size, :integer
@@ -25,7 +25,7 @@ defmodule Links.Bookmarks.Bookmark do
 
   def changeset(bookmark, attrs) do
     bookmark
-    |> cast(attrs, [:title, :url, :description, :position, :collection_id, :created_by_id])
+    |> cast(attrs, [:title, :url, :description, :position, :completed, :collection_id, :created_by_id])
     |> normalize_title()
     |> validate_required([:title, :url, :created_by_id])
     |> validate_length(:title, min: 1, max: 240)
@@ -39,14 +39,14 @@ defmodule Links.Bookmarks.Bookmark do
   def metadata_changeset(bookmark, attrs) do
     bookmark
     |> cast(attrs, [
-      :page_title,
+      :title,
       :favicon_data,
       :favicon_content_type,
       :favicon_byte_size,
       :favicon_source_url,
       :metadata_fetched_at
     ])
-    |> validate_length(:page_title, max: 240)
+    |> validate_length(:title, max: 240)
     |> validate_length(:favicon_content_type, max: 120)
     |> validate_length(:favicon_source_url, max: 2_048)
     |> validate_number(:favicon_byte_size, greater_than_or_equal_to: 0)

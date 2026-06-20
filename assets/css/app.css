@@ -146,6 +146,11 @@ body.bookmark-dragging li[id^="bookmark-"].sortable-fallback {
   padding: 0;
 }
 
+#bookmarks-sidebar .bookmark-completed .bookmark-title {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
 #bookmarks-sidebar .bookmark-menu-row .sidebar-more-button {
   --size: 1rem;
   height: 1rem;
@@ -312,5 +317,5 @@ details > summary .sidebar-more-button {
 [data-bookmark-sortable]::before {
   top: 0;
   bottom: 0;
-  inset-inline-start: 0.2rem;
+  inset-inline-start: 1.2rem;
 }

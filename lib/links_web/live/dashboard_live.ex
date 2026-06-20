@@ -78,9 +78,9 @@ defmodule LinksWeb.DashboardLive do
                 </h2>
                 <span
                   id="inbox-bookmark-count"
-                  class="badge badge-ghost badge-xs shrink-0 tabular-nums"
+                  class="badge badge-ghost badge-sm shrink-0 tabular-nums"
                 >
-                  {length(@dashboard.inbox)}
+                  {Collections.inbox_bookmark_badge(@dashboard.inbox)}
                 </span>
               </div>
               <ul
@@ -98,6 +98,7 @@ defmodule LinksWeb.DashboardLive do
                     bookmark={bookmark}
                     selected={selected?(@selected, :bookmark, bookmark.id)}
                     metadata_pending={MapSet.member?(@pending_metadata_ids, bookmark.id)}
+                    editable={true}
                   />
                 </li>
                 <li id="inbox-empty-state" class="inbox-empty-state" aria-hidden="true">
@@ -374,12 +375,14 @@ defmodule LinksWeb.DashboardLive do
   attr :bookmark, Bookmark, required: true
   attr :selected, :boolean, default: false
   attr :metadata_pending, :boolean, default: false
+  attr :editable, :boolean, default: true
 
   def bookmark_menu_link(assigns) do
     ~H"""
     <div class={[
       "bookmark-menu-row flex min-w-0 w-full items-center gap-2",
-      @selected && "sidebar-item-active"
+      @selected && "sidebar-item-active",
+      @bookmark.completed && "bookmark-completed"
     ]}>
       <button
         type="button"
@@ -390,7 +393,7 @@ defmodule LinksWeb.DashboardLive do
       >
         <.bookmark_status_icon bookmark={@bookmark} metadata_pending={@metadata_pending} />
         <span class="flex min-w-0 flex-1 items-baseline gap-1 overflow-hidden leading-normal">
-          <span class="min-w-0 truncate">{bookmark_label(@bookmark)}</span>
+          <span class="bookmark-title min-w-0 truncate">{bookmark_label(@bookmark)}</span>
           <span
             :if={domain = Bookmark.display_host(@bookmark)}
             class="bookmark-domain shrink-0 truncate"
@@ -398,6 +401,25 @@ defmodule LinksWeb.DashboardLive do
             {domain}
           </span>
         </span>
+      </button>
+      <button
+        type="button"
+        id={"bookmark-completed-#{@bookmark.id}"}
+        phx-click="toggle_bookmark_completed"
+        phx-value-id={@bookmark.id}
+        phx-value-completed={to_string(!@bookmark.completed)}
+        disabled={not @editable}
+        class="bookmark-completed-toggle shrink-0"
+        aria-label={"Mark \"#{bookmark_label(@bookmark)}\" complete"}
+        aria-pressed={to_string(@bookmark.completed)}
+      >
+        <input
+          type="checkbox"
+          checked={@bookmark.completed}
+          tabindex="-1"
+          aria-hidden="true"
+          class="checkbox checkbox-sm pointer-events-none"
+        />
       </button>
       <a
         id={"bookmark-more-#{@bookmark.id}"}
@@ -525,8 +547,8 @@ defmodule LinksWeb.DashboardLive do
             <.folder_icon />
             <span class="flex min-w-0 flex-1 items-center gap-1.5 leading-none">
               <span class="min-w-0 truncate leading-normal">{@node.title}</span>
-              <span class="badge badge-ghost badge-xs shrink-0 tabular-nums">
-                {@node.bookmark_count}
+              <span class="badge badge-ghost badge-sm shrink-0 tabular-nums">
+                {Collections.collection_bookmark_badge(@node)}
               </span>
               <span
                 :if={@node.shared}
@@ -586,6 +608,7 @@ defmodule LinksWeb.DashboardLive do
                 bookmark={bookmark}
                 selected={selected?(@selected, :bookmark, bookmark.id)}
                 metadata_pending={MapSet.member?(@pending_metadata_ids, bookmark.id)}
+                editable={not @node.readonly}
               />
             </li>
           </ul>
@@ -1121,6 +1144,31 @@ defmodule LinksWeb.DashboardLive do
     bookmark = socket.assigns.selected_context.bookmark
     changeset = Bookmark.changeset(bookmark, params) |> Map.put(:action, :validate)
     {:noreply, assign(socket, :bookmark_form, to_form(changeset))}
+  end
+
+  def handle_event("toggle_bookmark_completed", %{"id" => id, "completed" => completed}, socket) do
+    bookmark = Collections.get_bookmark!(id)
+    completed = completed in ["true", "1"]
+
+    case Collections.update_bookmark(
+           socket.assigns.current_scope,
+           bookmark,
+           %{completed: completed}
+         ) do
+      {:ok, bookmark} ->
+        socket =
+          socket
+          |> refresh_dashboard()
+          |> maybe_refresh_selected_bookmark(bookmark)
+
+        {:noreply, socket}
+
+      {:error, :unauthorized} ->
+        {:noreply, put_flash(socket, :error, "You do not have permission to update this link")}
+
+      {:error, _changeset} ->
+        {:noreply, put_flash(socket, :error, "Could not update link")}
+    end
   end
 
   def handle_event("save_bookmark", %{"bookmark" => params}, socket) do
@@ -1727,13 +1775,23 @@ defmodule LinksWeb.DashboardLive do
     |> assign(:bookmark_form, to_form(Bookmark.changeset(bookmark, %{})))
   end
 
+  defp maybe_refresh_selected_bookmark(socket, %Bookmark{id: id}) do
+    if match?(%{type: :bookmark, id: ^id}, socket.assigns.selected) do
+      select_bookmark(socket, Collections.get_bookmark!(id))
+    else
+      socket
+    end
+  end
+
   def selected?(%{type: type, id: id}, type, id), do: true
   def selected?(_, _, _), do: false
 
-  def bookmark_label(%Bookmark{page_title: title}) when is_binary(title) and title != "",
+  def bookmark_label(%Bookmark{title: title}) when is_binary(title) and title != "",
     do: title
 
-  def bookmark_label(%Bookmark{title: title}), do: title
+  def bookmark_label(%Bookmark{url: url}) when is_binary(url), do: url
+
+  def bookmark_label(_), do: "Untitled"
 
   def collaborator_access_label(%Collection{collaboration_revoked_at: revoked_at} = collaborator) do
     access =

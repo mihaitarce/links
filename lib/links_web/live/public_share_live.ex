@@ -105,7 +105,7 @@ defmodule LinksWeb.PublicShareLive do
           <.folder_icon />
           <span class="flex min-w-0 flex-1 items-center gap-1.5 leading-none">
             <span class="min-w-0 truncate leading-normal">{@node.title}</span>
-            <span class="badge badge-ghost badge-xs shrink-0 tabular-nums">0</span>
+            <span class="badge badge-ghost badge-sm shrink-0 tabular-nums">0</span>
           </span>
         </span>
       <% else %>
@@ -114,7 +114,7 @@ defmodule LinksWeb.PublicShareLive do
             <.folder_icon />
             <span class="flex min-w-0 flex-1 items-center gap-1.5 leading-none">
               <span class="min-w-0 truncate leading-normal">{@node.title}</span>
-              <span class="badge badge-ghost badge-xs shrink-0 tabular-nums">
+              <span class="badge badge-ghost badge-sm shrink-0 tabular-nums">
                 {@node.bookmark_count}
               </span>
             </span>
@@ -311,8 +311,10 @@ defmodule LinksWeb.PublicShareLive do
 
   defp favicon_data_url(_), do: nil
 
-  def bookmark_label(%Bookmark{page_title: title}) when is_binary(title) and title != "",
+  def bookmark_label(%Bookmark{title: title}) when is_binary(title) and title != "",
     do: title
 
-  def bookmark_label(%Bookmark{title: title}), do: title
+  def bookmark_label(%Bookmark{url: url}) when is_binary(url), do: url
+
+  def bookmark_label(_), do: "Untitled"
 end

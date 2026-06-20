@@ -417,7 +417,7 @@ const CollectionBookmarkSort = {
       sort: !readonly,
       animation: 150,
       draggable: "li[id^='bookmark-']",
-      filter: "summary, .sidebar-more-button, input, textarea, select, #inbox-empty-state",
+      filter: "summary, .sidebar-more-button, .bookmark-completed-toggle, input, textarea, select, #inbox-empty-state",
       preventOnFilter: false,
       delay: 200,
       delayOnTouchOnly: false,

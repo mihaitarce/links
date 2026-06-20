@@ -208,8 +208,66 @@ defmodule Links.CollectionsTest do
       [parent_node] = dashboard.tree
 
       assert parent_node.bookmark_count == 2
+      assert parent_node.completed_bookmark_count == 0
       [child_node] = parent_node.children
       assert child_node.bookmark_count == 1
+      assert child_node.completed_bookmark_count == 0
+    end
+
+    test "counts completed bookmarks in collection tree badges" do
+      scope = user_scope_fixture()
+      parent = collection_fixture(scope, %{title: "Parent"})
+      child = collection_fixture(scope, %{title: "Child", parent_id: parent.id})
+
+      {:ok, parent_bookmark} =
+        Collections.create_bookmark(scope, %{
+          title: "Parent link",
+          url: "https://example.com/parent",
+          collection_id: parent.id
+        })
+
+      {:ok, child_bookmark} =
+        Collections.create_bookmark(scope, %{
+          title: "Child link",
+          url: "https://example.com/child",
+          collection_id: child.id
+        })
+
+      assert {:ok, _} =
+               Collections.update_bookmark(scope, parent_bookmark, %{completed: true})
+
+      dashboard = Collections.list_dashboard(scope)
+      [parent_node] = dashboard.tree
+
+      assert parent_node.bookmark_count == 2
+      assert parent_node.completed_bookmark_count == 1
+      assert Collections.collection_bookmark_badge(parent_node) == "1 / 2"
+
+      [child_node] = parent_node.children
+      assert child_node.completed_bookmark_count == 0
+      assert Collections.collection_bookmark_badge(child_node) == "0 / 1"
+
+      assert {:ok, _} =
+               Collections.update_bookmark(scope, child_bookmark, %{completed: true})
+
+      dashboard = Collections.list_dashboard(scope)
+      [parent_node] = dashboard.tree
+
+      assert parent_node.completed_bookmark_count == 2
+      assert Collections.collection_bookmark_badge(parent_node) == "2 / 2"
+    end
+
+    test "formats inbox bookmark badges" do
+      scope = user_scope_fixture()
+
+      assert Collections.inbox_bookmark_badge([]) == "0 / 0"
+
+      {:ok, first} = Collections.create_inbox_bookmark(scope, %{url: "https://example.com/1"})
+      {:ok, second} = Collections.create_inbox_bookmark(scope, %{url: "https://example.com/2"})
+      assert {:ok, _} = Collections.update_bookmark(scope, first, %{completed: true})
+
+      inbox = Collections.list_inbox_bookmarks(scope)
+      assert Collections.inbox_bookmark_badge(inbox) == "1 / 2"
     end
 
     test "broadcasts collection bookmark list changes" do

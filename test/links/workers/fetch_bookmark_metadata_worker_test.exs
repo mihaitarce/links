@@ -51,6 +51,6 @@ defmodule Links.Workers.FetchBookmarkMetadataWorkerTest do
 
     assert :ok = FetchBookmarkMetadataWorker.perform(job)
 
-    assert Collections.get_bookmark!(bookmark.id).page_title == "Tom & Jerry — Home"
+    assert Collections.get_bookmark!(bookmark.id).title == "Tom & Jerry — Home"
   end
 end

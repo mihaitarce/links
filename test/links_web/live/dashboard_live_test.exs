@@ -27,7 +27,7 @@ defmodule LinksWeb.DashboardLiveTest do
       assert html =~ "Collections"
       assert html =~ "Reading"
       assert html =~ "Inbox link"
-      assert has_element?(lv, "#inbox-bookmark-count", "1")
+      assert has_element?(lv, "#inbox-bookmark-count", "0 / 1")
     end
 
     test "creates new links in the inbox", %{conn: conn} do
@@ -42,6 +42,63 @@ defmodule LinksWeb.DashboardLiveTest do
       assert html =~ "https://example.com/new"
       assert html =~ ~s(aria-label="Fetching link metadata")
       assert has_element?(lv, "#new-link-form input[type=\"url\"][value=\"\"]")
+    end
+
+    test "toggles completed on inbox links", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      bookmark = bookmark_fixture(scope, %{title: "Read me", url: "https://example.com/read"})
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      refute Collections.get_bookmark!(bookmark.id).completed
+      assert has_element?(lv, "#bookmark-completed-#{bookmark.id} input:not([checked])")
+
+      render_click(lv, "toggle_bookmark_completed", %{
+        "id" => to_string(bookmark.id),
+        "completed" => "true"
+      })
+
+      assert Collections.get_bookmark!(bookmark.id).completed
+      assert has_element?(lv, "#bookmark-completed-#{bookmark.id} input[checked]")
+      assert has_element?(lv, "#bookmark-#{bookmark.id} .bookmark-completed")
+      assert has_element?(lv, "#inbox-bookmark-count", "1 / 1")
+
+      render_click(lv, "toggle_bookmark_completed", %{
+        "id" => to_string(bookmark.id),
+        "completed" => "false"
+      })
+
+      refute Collections.get_bookmark!(bookmark.id).completed
+      assert has_element?(lv, "#bookmark-completed-#{bookmark.id} input:not([checked])")
+      refute has_element?(lv, "#bookmark-#{bookmark.id} .bookmark-completed")
+      assert has_element?(lv, "#inbox-bookmark-count", "0 / 1")
+    end
+
+    test "disables completed checkbox on read-only collection links", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      {:ok, bookmark} =
+        Collections.create_bookmark(owner_scope, %{
+          title: "Shared link",
+          url: "https://example.com/shared",
+          collection_id: source.id
+        })
+
+      conn = log_in_user(conn, collaborator)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv
+      |> element("#collection-#{mount.id} > details > summary")
+      |> render_click()
+
+      assert has_element?(
+               lv,
+               "#bookmark-completed-#{bookmark.id}[disabled]"
+             )
     end
 
     test "adds an active public share URL as a read-only collection", %{conn: conn} do
@@ -170,7 +227,7 @@ defmodule LinksWeb.DashboardLiveTest do
       |> render_click()
 
       assert has_element?(lv, "#new-link-form")
-      assert has_element?(lv, "#new_bookmark_url")
+      assert has_element?(lv, "#new-link-form input[type=\"url\"]")
       assert has_element?(lv, "#bookmark-form")
     end
 
@@ -264,7 +321,7 @@ defmodule LinksWeb.DashboardLiveTest do
       assert html =~ ~s(data-bookmark-sortable)
       assert html =~ ~s(data-collection-id="#{collection.id}")
       assert html =~ ~s(data-readonly="false")
-      assert has_element?(lv, "#collection-#{collection.id} summary .badge.badge-ghost", "1")
+      assert has_element?(lv, "#collection-#{collection.id} summary .badge.badge-ghost", "0 / 1")
     end
 
     test "reorders collections from the dashboard", %{conn: conn} do
@@ -429,8 +486,8 @@ defmodule LinksWeb.DashboardLiveTest do
 
       {:ok, lv, _html} = live(conn, ~p"/")
 
-      assert has_element?(lv, "#collection-#{parent.id} summary .badge.badge-ghost", "2")
-      assert has_element?(lv, "#collection-#{child.id} summary .badge.badge-ghost", "1")
+      assert has_element?(lv, "#collection-#{parent.id} summary .badge.badge-ghost", "0 / 2")
+      assert has_element?(lv, "#collection-#{child.id} summary .badge.badge-ghost", "0 / 1")
     end
 
     test "keeps collection trees collapsed on initial load", %{conn: conn} do
@@ -1096,12 +1153,11 @@ defmodule LinksWeb.DashboardLiveTest do
     test "renders fetched page title after metadata is stored", %{conn: conn} do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
 
-      bookmark =
-        bookmark_fixture(scope, %{title: "https://example.com", url: "https://example.com"})
+      bookmark = bookmark_fixture(scope, %{url: "https://example.com"})
 
       {:ok, _bookmark} =
         Collections.update_bookmark_metadata(bookmark, %{
-          page_title: "Example Domain",
+          title: "Example Domain",
           favicon_data: <<0, 1, 2>>,
           favicon_content_type: "image/png",
           favicon_byte_size: 3,

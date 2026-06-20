@@ -37,7 +37,7 @@ defmodule Links.Workers.FetchBookmarkMetadataWorker do
           Collections.update_bookmark_metadata(
             bookmark,
             favicon_attrs
-            |> Map.put(:page_title, title)
+            |> maybe_put_title(title)
             |> Map.put(:metadata_fetched_at, DateTime.utc_now(:second))
           )
 
@@ -73,6 +73,12 @@ defmodule Links.Workers.FetchBookmarkMetadataWorker do
       {:bookmark_metadata_failed, bookmark_id}
     )
   end
+
+  defp maybe_put_title(attrs, title) when is_binary(title) and title != "" do
+    Map.put(attrs, :title, title)
+  end
+
+  defp maybe_put_title(attrs, _title), do: attrs
 
   defp fetch(url) do
     fetch(url, 3)
