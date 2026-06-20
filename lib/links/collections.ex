@@ -479,6 +479,37 @@ defmodule Links.Collections do
     end
   end
 
+  def restore_public_share(%Scope{} = scope, %PublicShare{} = public_share) do
+    public_share = Repo.preload(public_share, :collection)
+    collection = public_share.collection
+
+    cond do
+      collection.owner_id != scope.user.id ->
+        {:error, :unauthorized}
+
+      is_nil(public_share.revoked_at) ->
+        {:error, :unauthorized}
+
+      active_public_share_exists?(collection.id) ->
+        {:error, :active_share_exists}
+
+      true ->
+        public_share
+        |> PublicShare.changeset(%{revoked_at: nil})
+        |> Repo.update()
+        |> tap(fn
+          {:ok, share} -> broadcast_public_share_changed(share.token)
+          _ -> :ok
+        end)
+    end
+  end
+
+  defp active_public_share_exists?(collection_id) do
+    PublicShare
+    |> where([s], s.collection_id == ^collection_id and is_nil(s.revoked_at))
+    |> Repo.exists?()
+  end
+
   def create_collaboration(%Scope{} = scope, %Collection{} = source, collaborator_email, readonly) do
     with true <- can_manage_collection?(scope, source),
          %Accounts.User{} = collaborator <- Accounts.get_user_by_email(collaborator_email),

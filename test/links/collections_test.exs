@@ -413,6 +413,48 @@ defmodule Links.CollectionsTest do
       assert {:error, :unauthorized} = Collections.create_public_share(collaborator_scope, source)
       assert Collections.list_public_shares(collaborator_scope, source) == []
     end
+
+    test "owner can restore revoked public shares" do
+      owner_scope = user_scope_fixture()
+      collection = collection_fixture(owner_scope)
+
+      assert {:ok, share} = Collections.create_public_share(owner_scope, collection)
+      assert {:ok, revoked} = Collections.revoke_public_share(owner_scope, share)
+      refute Collections.get_public_share_by_token(share.token)
+
+      assert {:ok, restored} = Collections.restore_public_share(owner_scope, revoked)
+      refute restored.revoked_at
+      assert Collections.get_public_share_by_token(share.token)
+    end
+
+    test "editable collaborators cannot restore revoked public shares" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, false)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:ok, share} = Collections.create_public_share(collaborator_scope, source)
+      assert {:ok, revoked} = Collections.revoke_public_share(collaborator_scope, share)
+
+      assert {:error, :unauthorized} =
+               Collections.restore_public_share(collaborator_scope, revoked)
+    end
+
+    test "cannot restore a public share while another link is active" do
+      owner_scope = user_scope_fixture()
+      collection = collection_fixture(owner_scope)
+
+      assert {:ok, first_share} = Collections.create_public_share(owner_scope, collection)
+      assert {:ok, revoked} = Collections.revoke_public_share(owner_scope, first_share)
+      assert {:ok, _active_share} = Collections.create_public_share(owner_scope, collection)
+
+      assert {:error, :active_share_exists} =
+               Collections.restore_public_share(owner_scope, revoked)
+    end
   end
 
   describe "collaboration mounts" do

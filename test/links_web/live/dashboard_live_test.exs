@@ -514,6 +514,30 @@ defmodule LinksWeb.DashboardLiveTest do
       assert has_element?(lv, "#copy-public-share-#{share.id}", "Copy link")
     end
 
+    test "owner can restore a revoked public share from the detail panel", %{conn: conn} do
+      scope = user_scope_fixture()
+      collection = collection_fixture(scope, %{title: "Shared Publicly"})
+
+      assert {:ok, share} = Collections.create_public_share(scope, collection)
+      assert {:ok, _revoked} = Collections.revoke_public_share(scope, share)
+
+      conn = log_in_user(conn, scope.user)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv = open_collection_details(lv, collection.id)
+
+      refute has_element?(lv, "#copy-public-share-#{share.id}")
+      assert has_element?(lv, "#restore-public-share-#{share.id}", "Restore")
+
+      lv
+      |> element("#restore-public-share-#{share.id}")
+      |> render_click()
+
+      assert has_element?(lv, "#copy-public-share-#{share.id}", "Copy link")
+      refute has_element?(lv, "#restore-public-share-#{share.id}")
+      assert Collections.get_public_share_by_token(share.token)
+    end
+
     test "editable collaborator can create a public share from the detail panel", %{conn: conn} do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()

@@ -730,6 +730,16 @@ defmodule LinksWeb.DashboardLive do
                 Revoke
               </button>
             </div>
+            <button
+              :if={share.revoked_at && @context.can_restore_collaborators}
+              id={"restore-public-share-#{share.id}"}
+              type="button"
+              class="btn btn-ghost shrink-0"
+              phx-click="restore_public_share"
+              phx-value-id={share.id}
+            >
+              Restore
+            </button>
           </li>
           <li :if={@public_shares == []} class="text-sm text-base-content/60">
             No public shares yet.
@@ -947,6 +957,26 @@ defmodule LinksWeb.DashboardLive do
 
       {:error, _reason} ->
         {:noreply, put_flash(socket, :error, "Could not revoke public share")}
+    end
+  end
+
+  def handle_event("restore_public_share", %{"id" => id}, socket) do
+    share = Collections.get_public_share!(id)
+    collection = socket.assigns.selected_context.effective_collection
+
+    case Collections.restore_public_share(socket.assigns.current_scope, share) do
+      {:ok, _share} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "Public link restored")
+         |> refresh_dashboard()
+         |> select_collection(collection.id)}
+
+      {:error, :active_share_exists} ->
+        {:noreply, put_flash(socket, :error, "Another public link is already active")}
+
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, "Could not restore public share")}
     end
   end
 
