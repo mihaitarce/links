@@ -29,6 +29,10 @@ defmodule LinksWeb.DashboardLive do
      |> assign(:subscribed_collection_ids, MapSet.new())
      |> assign(:selected, nil)
      |> assign(:selected_context, nil)
+     |> assign(:confirm_delete_collection?, false)
+     |> assign(:confirm_delete_bookmark?, false)
+     |> assign(:confirm_revoke_collaboration_id, nil)
+     |> assign(:confirm_revoke_public_share_id, nil)
      |> assign(:public_shares, [])
      |> assign(:collaborators, [])
      |> assign(:pending_metadata_ids, MapSet.new())
@@ -70,7 +74,10 @@ defmodule LinksWeb.DashboardLive do
                 <h2 class="text-xs font-semibold uppercase tracking-wide text-base-content/60">
                   Inbox
                 </h2>
-                <span id="inbox-bookmark-count" class="badge badge-ghost badge-xs shrink-0 tabular-nums">
+                <span
+                  id="inbox-bookmark-count"
+                  class="badge badge-ghost badge-xs shrink-0 tabular-nums"
+                >
                   {length(@dashboard.inbox)}
                 </span>
               </div>
@@ -170,6 +177,178 @@ defmodule LinksWeb.DashboardLive do
         <% end %>
       </div>
     </Layouts.app>
+
+    <div
+      :if={@confirm_delete_collection? && @selected_context}
+      id="delete-collection-confirm-modal"
+      class="modal modal-open"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="delete-collection-confirm-title"
+    >
+      <div class="modal-box">
+        <h3 id="delete-collection-confirm-title" class="text-lg font-bold">
+          {if @selected_context.mount, do: "Remove collection?", else: "Delete collection?"}
+        </h3>
+        <p class="py-4 text-base-content/70">
+          <%= if @selected_context.mount do %>
+            Remove "{@selected_context.effective_collection.title}" from your sidebar? The shared collection will remain for other collaborators.
+          <% else %>
+            Delete "{@selected_context.effective_collection.title}" permanently? This will remove all bookmarks and subcollections inside it.
+          <% end %>
+        </p>
+        <div class="modal-action">
+          <button
+            type="button"
+            id="delete-collection-cancel-button"
+            class="btn"
+            phx-click="cancel_delete_collection"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            id="delete-collection-confirm-button"
+            class="btn btn-error"
+            phx-click="delete_collection"
+            phx-value-id={@selected_context.collection.id}
+          >
+            {if @selected_context.mount, do: "Remove", else: "Delete"}
+          </button>
+        </div>
+      </div>
+      <button
+        type="button"
+        class="modal-backdrop"
+        phx-click="cancel_delete_collection"
+        aria-label="Close"
+      />
+    </div>
+
+    <div
+      :if={
+        @confirm_delete_bookmark? && @selected_context && Map.has_key?(@selected_context, :bookmark)
+      }
+      id="delete-bookmark-confirm-modal"
+      class="modal modal-open"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="delete-bookmark-confirm-title"
+    >
+      <div class="modal-box">
+        <h3 id="delete-bookmark-confirm-title" class="text-lg font-bold">Delete link?</h3>
+        <p class="py-4 text-base-content/70">
+          Delete "{bookmark_label(@selected_context.bookmark)}" permanently? This cannot be undone.
+        </p>
+        <div class="modal-action">
+          <button
+            type="button"
+            id="delete-bookmark-cancel-button"
+            class="btn"
+            phx-click="cancel_delete_bookmark"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            id="delete-bookmark-confirm-button"
+            class="btn btn-error"
+            phx-click="delete_bookmark"
+            phx-value-id={@selected_context.bookmark.id}
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+      <button
+        type="button"
+        class="modal-backdrop"
+        phx-click="cancel_delete_bookmark"
+        aria-label="Close"
+      />
+    </div>
+
+    <div
+      :if={@confirm_revoke_collaboration_id}
+      id="revoke-collaboration-confirm-modal"
+      class="modal modal-open"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="revoke-collaboration-confirm-title"
+    >
+      <div class="modal-box">
+        <h3 id="revoke-collaboration-confirm-title" class="text-lg font-bold">Revoke access?</h3>
+        <p class="py-4 text-base-content/70">
+          Revoke access for "{collaborator_email(@collaborators, @confirm_revoke_collaboration_id)}"? They will no longer be able to edit this collection.
+        </p>
+        <div class="modal-action">
+          <button
+            type="button"
+            id="revoke-collaboration-cancel-button"
+            class="btn"
+            phx-click="cancel_revoke_collaboration"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            id="revoke-collaboration-confirm-button"
+            class="btn btn-error"
+            phx-click="revoke_collaboration"
+            phx-value-id={@confirm_revoke_collaboration_id}
+          >
+            Revoke
+          </button>
+        </div>
+      </div>
+      <button
+        type="button"
+        class="modal-backdrop"
+        phx-click="cancel_revoke_collaboration"
+        aria-label="Close"
+      />
+    </div>
+
+    <div
+      :if={@confirm_revoke_public_share_id}
+      id="revoke-public-share-confirm-modal"
+      class="modal modal-open"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="revoke-public-share-confirm-title"
+    >
+      <div class="modal-box">
+        <h3 id="revoke-public-share-confirm-title" class="text-lg font-bold">Revoke public link?</h3>
+        <p class="py-4 text-base-content/70">
+          Revoke public link "{public_share_token(@public_shares, @confirm_revoke_public_share_id)}"? The shared URL will stop working.
+        </p>
+        <div class="modal-action">
+          <button
+            type="button"
+            id="revoke-public-share-cancel-button"
+            class="btn"
+            phx-click="cancel_revoke_public_share"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            id="revoke-public-share-confirm-button"
+            class="btn btn-error"
+            phx-click="revoke_public_share"
+            phx-value-id={@confirm_revoke_public_share_id}
+          >
+            Revoke
+          </button>
+        </div>
+      </div>
+      <button
+        type="button"
+        class="modal-backdrop"
+        phx-click="cancel_revoke_public_share"
+        aria-label="Close"
+      />
+    </div>
     """
   end
 
@@ -504,9 +683,9 @@ defmodule LinksWeb.DashboardLive do
             <button class="btn btn-primary">Save</button>
             <button
               type="button"
+              id="delete-bookmark-button"
               class="btn btn-error btn-soft"
-              phx-click="delete_bookmark"
-              phx-value-id={@context.bookmark.id}
+              phx-click="confirm_delete_bookmark"
             >
               Delete
             </button>
@@ -534,9 +713,9 @@ defmodule LinksWeb.DashboardLive do
           <button
             :if={@context.mount || !@readonly}
             type="button"
+            id="delete-collection-button"
             class="btn btn-error btn-soft"
-            phx-click="delete_collection"
-            phx-value-id={@context.collection.id}
+            phx-click="confirm_delete_collection"
           >
             {if @context.mount, do: "Remove", else: "Delete"}
           </button>
@@ -722,7 +901,7 @@ defmodule LinksWeb.DashboardLive do
                 :if={is_nil(collaborator.collaboration_revoked_at)}
                 id={"revoke-collaborator-#{collaborator.id}"}
                 class="btn btn-ghost"
-                phx-click="revoke_collaboration"
+                phx-click="confirm_revoke_collaboration"
                 phx-value-id={collaborator.id}
               >
                 Revoke
@@ -775,8 +954,9 @@ defmodule LinksWeb.DashboardLive do
                 Copy link
               </button>
               <button
+                id={"revoke-public-share-#{share.id}"}
                 class="btn btn-ghost"
-                phx-click="revoke_public_share"
+                phx-click="confirm_revoke_public_share"
                 phx-value-id={share.id}
               >
                 Revoke
@@ -890,16 +1070,31 @@ defmodule LinksWeb.DashboardLive do
     end
   end
 
+  def handle_event("confirm_delete_collection", _params, socket) do
+    {:noreply, assign(socket, :confirm_delete_collection?, true)}
+  end
+
+  def handle_event("cancel_delete_collection", _params, socket) do
+    {:noreply, assign(socket, :confirm_delete_collection?, false)}
+  end
+
   def handle_event("delete_collection", %{"id" => id}, socket) do
     collection = Collections.get_collection!(id)
 
     case Collections.delete_collection(socket.assigns.current_scope, collection) do
       {:ok, _collection} ->
         {:noreply,
-         socket |> assign(:selected, nil) |> assign(:selected_context, nil) |> refresh_dashboard()}
+         socket
+         |> assign(:confirm_delete_collection?, false)
+         |> assign(:selected, nil)
+         |> assign(:selected_context, nil)
+         |> refresh_dashboard()}
 
       {:error, _reason} ->
-        {:noreply, put_flash(socket, :error, "Could not delete collection")}
+        {:noreply,
+         socket
+         |> assign(:confirm_delete_collection?, false)
+         |> put_flash(:error, "Could not delete collection")}
     end
   end
 
@@ -940,16 +1135,31 @@ defmodule LinksWeb.DashboardLive do
     end
   end
 
+  def handle_event("confirm_delete_bookmark", _params, socket) do
+    {:noreply, assign(socket, :confirm_delete_bookmark?, true)}
+  end
+
+  def handle_event("cancel_delete_bookmark", _params, socket) do
+    {:noreply, assign(socket, :confirm_delete_bookmark?, false)}
+  end
+
   def handle_event("delete_bookmark", %{"id" => id}, socket) do
     bookmark = Collections.get_bookmark!(id)
 
     case Collections.delete_bookmark(socket.assigns.current_scope, bookmark) do
       {:ok, _bookmark} ->
         {:noreply,
-         socket |> assign(:selected, nil) |> assign(:selected_context, nil) |> refresh_dashboard()}
+         socket
+         |> assign(:confirm_delete_bookmark?, false)
+         |> assign(:selected, nil)
+         |> assign(:selected_context, nil)
+         |> refresh_dashboard()}
 
       {:error, _reason} ->
-        {:noreply, put_flash(socket, :error, "Could not delete bookmark")}
+        {:noreply,
+         socket
+         |> assign(:confirm_delete_bookmark?, false)
+         |> put_flash(:error, "Could not delete bookmark")}
     end
   end
 
@@ -998,16 +1208,31 @@ defmodule LinksWeb.DashboardLive do
     end
   end
 
+  def handle_event("confirm_revoke_public_share", %{"id" => id}, socket) do
+    {:noreply, assign(socket, :confirm_revoke_public_share_id, String.to_integer(id))}
+  end
+
+  def handle_event("cancel_revoke_public_share", _params, socket) do
+    {:noreply, assign(socket, :confirm_revoke_public_share_id, nil)}
+  end
+
   def handle_event("revoke_public_share", %{"id" => id}, socket) do
     share = Collections.get_public_share!(id)
     collection = socket.assigns.selected_context.effective_collection
 
     case Collections.revoke_public_share(socket.assigns.current_scope, share) do
       {:ok, _share} ->
-        {:noreply, select_collection(refresh_dashboard(socket), collection.id)}
+        {:noreply,
+         socket
+         |> assign(:confirm_revoke_public_share_id, nil)
+         |> refresh_dashboard()
+         |> select_collection(collection.id)}
 
       {:error, _reason} ->
-        {:noreply, put_flash(socket, :error, "Could not revoke public share")}
+        {:noreply,
+         socket
+         |> assign(:confirm_revoke_public_share_id, nil)
+         |> put_flash(:error, "Could not revoke public share")}
     end
   end
 
@@ -1093,16 +1318,31 @@ defmodule LinksWeb.DashboardLive do
     end
   end
 
+  def handle_event("confirm_revoke_collaboration", %{"id" => id}, socket) do
+    {:noreply, assign(socket, :confirm_revoke_collaboration_id, String.to_integer(id))}
+  end
+
+  def handle_event("cancel_revoke_collaboration", _params, socket) do
+    {:noreply, assign(socket, :confirm_revoke_collaboration_id, nil)}
+  end
+
   def handle_event("revoke_collaboration", %{"id" => id}, socket) do
     mount = Collections.get_collection!(id)
     collection = socket.assigns.selected_context.effective_collection
 
     case Collections.revoke_collaboration(socket.assigns.current_scope, mount) do
       {:ok, _mount} ->
-        {:noreply, select_collection(refresh_dashboard(socket), collection.id)}
+        {:noreply,
+         socket
+         |> assign(:confirm_revoke_collaboration_id, nil)
+         |> refresh_dashboard()
+         |> select_collection(collection.id)}
 
       {:error, _reason} ->
-        {:noreply, put_flash(socket, :error, "Could not revoke collaborator")}
+        {:noreply,
+         socket
+         |> assign(:confirm_revoke_collaboration_id, nil)
+         |> put_flash(:error, "Could not revoke collaborator")}
     end
   end
 
@@ -1396,6 +1636,8 @@ defmodule LinksWeb.DashboardLive do
         |> assign(:selected_context, context)
         |> assign(:public_shares, shares)
         |> assign(:collaborators, collaborators)
+        |> assign(:confirm_revoke_collaboration_id, nil)
+        |> assign(:confirm_revoke_public_share_id, nil)
         |> reset_collaboration_form()
         |> assign(
           :collection_form,
@@ -1434,6 +1676,20 @@ defmodule LinksWeb.DashboardLive do
 
     status = if revoked_at, do: "Revoked", else: "Active"
     "#{access} · #{status}"
+  end
+
+  defp collaborator_email(collaborators, id) do
+    case Enum.find(collaborators, &(&1.id == id)) do
+      %{owner: %{email: email}} -> email
+      _ -> "this collaborator"
+    end
+  end
+
+  defp public_share_token(shares, id) do
+    case Enum.find(shares, &(&1.id == id)) do
+      %{token: token} -> token
+      _ -> "this link"
+    end
   end
 
   defp public_share_url(%{token: token}) do

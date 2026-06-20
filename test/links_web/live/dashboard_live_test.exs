@@ -72,11 +72,40 @@ defmodule LinksWeb.DashboardLiveTest do
       |> render_click()
 
       lv
-      |> element("#bookmark-form button", "Delete")
+      |> element("#delete-bookmark-button")
+      |> render_click()
+
+      assert has_element?(lv, "#delete-bookmark-confirm-modal")
+
+      lv
+      |> element("#delete-bookmark-confirm-button")
       |> render_click()
 
       refute has_element?(lv, "#bookmark-#{bookmark.id}")
       assert has_element?(lv, "#inbox-empty-state", "Your inbox is empty")
+    end
+
+    test "canceling bookmark delete confirmation keeps the link", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      bookmark = bookmark_fixture(scope, %{title: "Inbox link", url: "https://example.com/inbox"})
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv
+      |> element("#bookmark-select-#{bookmark.id}")
+      |> render_click()
+
+      lv
+      |> element("#delete-bookmark-button")
+      |> render_click()
+
+      assert has_element?(lv, "#delete-bookmark-confirm-modal")
+
+      lv
+      |> element("#delete-bookmark-cancel-button")
+      |> render_click()
+
+      refute has_element?(lv, "#delete-bookmark-confirm-modal")
+      assert has_element?(lv, "#bookmark-#{bookmark.id}")
     end
 
     test "keeps the new link input visible when a bookmark is selected", %{conn: conn} do
@@ -603,6 +632,12 @@ defmodule LinksWeb.DashboardLiveTest do
       |> element("#revoke-collaborator-#{mount.id}")
       |> render_click()
 
+      assert has_element?(lv, "#revoke-collaboration-confirm-modal")
+
+      lv
+      |> element("#revoke-collaboration-confirm-button")
+      |> render_click()
+
       assert has_element?(lv, "#collaborator-#{mount.id}", "Revoked")
       refute has_element?(lv, "#revoke-collaborator-#{mount.id}")
 
@@ -616,6 +651,92 @@ defmodule LinksWeb.DashboardLiveTest do
 
       collaborator_scope = user_scope_fixture(collaborator)
       assert Collections.can_edit_collection?(collaborator_scope, collection.id)
+    end
+
+    test "canceling collaborator revoke confirmation keeps access active", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      collection = collection_fixture(owner_scope, %{title: "Team Project"})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(
+                 owner_scope,
+                 collection,
+                 collaborator.email,
+                 false
+               )
+
+      conn = log_in_user(conn, owner_scope.user)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv = open_collection_details(lv, collection.id)
+
+      lv
+      |> element("#revoke-collaborator-#{mount.id}")
+      |> render_click()
+
+      assert has_element?(lv, "#revoke-collaboration-confirm-modal")
+
+      lv
+      |> element("#revoke-collaboration-cancel-button")
+      |> render_click()
+
+      refute has_element?(lv, "#revoke-collaboration-confirm-modal")
+      assert has_element?(lv, "#collaborator-#{mount.id}", "Can edit · Active")
+      assert has_element?(lv, "#revoke-collaborator-#{mount.id}")
+    end
+
+    test "revokes a public share from the detail panel", %{conn: conn} do
+      scope = user_scope_fixture()
+      collection = collection_fixture(scope, %{title: "Shared Publicly"})
+
+      assert {:ok, share} = Collections.create_public_share(scope, collection)
+
+      conn = log_in_user(conn, scope.user)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv = open_collection_details(lv, collection.id)
+
+      assert has_element?(lv, "#revoke-public-share-#{share.id}")
+
+      lv
+      |> element("#revoke-public-share-#{share.id}")
+      |> render_click()
+
+      assert has_element?(lv, "#revoke-public-share-confirm-modal")
+
+      lv
+      |> element("#revoke-public-share-confirm-button")
+      |> render_click()
+
+      refute has_element?(lv, "#revoke-public-share-#{share.id}")
+      assert has_element?(lv, "#restore-public-share-#{share.id}", "Restore")
+    end
+
+    test "canceling public share revoke confirmation keeps the link active", %{conn: conn} do
+      scope = user_scope_fixture()
+      collection = collection_fixture(scope, %{title: "Shared Publicly"})
+
+      assert {:ok, share} = Collections.create_public_share(scope, collection)
+
+      conn = log_in_user(conn, scope.user)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv = open_collection_details(lv, collection.id)
+
+      lv
+      |> element("#revoke-public-share-#{share.id}")
+      |> render_click()
+
+      assert has_element?(lv, "#revoke-public-share-confirm-modal")
+
+      lv
+      |> element("#revoke-public-share-cancel-button")
+      |> render_click()
+
+      refute has_element?(lv, "#revoke-public-share-confirm-modal")
+      assert has_element?(lv, "#revoke-public-share-#{share.id}")
+      assert has_element?(lv, "#copy-public-share-#{share.id}", "Copy link")
     end
 
     test "updates collaborator tree when a collection is shared or revoked", %{conn: conn} do
@@ -707,16 +828,45 @@ defmodule LinksWeb.DashboardLiveTest do
 
       lv = open_collection_details(lv, mount.id)
 
-      assert has_element?(lv, "button", "Remove")
+      assert has_element?(lv, "#delete-collection-button", "Remove")
 
       lv
-      |> element("button", "Remove")
+      |> element("#delete-collection-button")
+      |> render_click()
+
+      assert has_element?(lv, "#delete-collection-confirm-modal")
+
+      lv
+      |> element("#delete-collection-confirm-button")
       |> render_click()
 
       html = render(lv)
       refute html =~ "Shared To Remove"
       assert Collections.get_collection!(source.id).title == "Shared To Remove"
       refute Repo.get(Collection, mount.id)
+    end
+
+    test "canceling collection delete confirmation keeps the collection", %{conn: conn} do
+      scope = user_scope_fixture()
+      collection = collection_fixture(scope, %{title: "Keep Me"})
+      conn = log_in_user(conn, scope.user)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv = open_collection_details(lv, collection.id)
+
+      lv
+      |> element("#delete-collection-button")
+      |> render_click()
+
+      assert has_element?(lv, "#delete-collection-confirm-modal")
+
+      lv
+      |> element("#delete-collection-cancel-button")
+      |> render_click()
+
+      refute has_element?(lv, "#delete-collection-confirm-modal")
+      assert has_element?(lv, "#collection-#{collection.id}")
+      assert Collections.get_collection!(collection.id).title == "Keep Me"
     end
 
     test "shows a copy link button for active public shares", %{conn: conn} do
