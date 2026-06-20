@@ -434,6 +434,17 @@ defmodule LinksWeb.DashboardLiveTest do
                lv,
                "#collection-#{collection.id} summary [aria-label='Shared with others']"
              )
+
+      lv
+      |> element("#collection-#{collection.id} > details > summary")
+      |> render_click()
+
+      assert has_element?(lv, "#collection-#{collection.id} summary.sidebar-item-active")
+
+      assert has_element?(
+               lv,
+               "#collection-#{collection.id} summary.sidebar-item-active [aria-label='Shared with others']"
+             )
     end
 
     test "suggests existing account emails while typing collaborator email", %{conn: conn} do
