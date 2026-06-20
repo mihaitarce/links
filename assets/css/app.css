@@ -65,8 +65,13 @@ summary.bookmark-drop-highlight,
   padding: 0;
 }
 
-.bookmark-drag-handle {
-  align-self: center;
+[data-bookmark-sortable] > li[id^="bookmark-"] > a {
+  cursor: grab;
+}
+
+[data-bookmark-sortable] > li[id^="bookmark-"].sortable-chosen > a,
+[data-bookmark-sortable] > li[id^="bookmark-"].sortable-chosen > a:active {
+  cursor: grabbing;
 }
 
 [data-collection-sortable] > li[id^="collection-"][data-reorderable="true"] > details > summary {

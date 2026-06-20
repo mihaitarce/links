@@ -87,7 +87,6 @@ defmodule LinksWeb.DashboardLive do
                   <.bookmark_menu_link
                     bookmark={bookmark}
                     selected={selected?(@selected, :bookmark, bookmark.id)}
-                    show_drag_handle
                     metadata_pending={MapSet.member?(@pending_metadata_ids, bookmark.id)}
                   />
                 </li>
@@ -176,7 +175,6 @@ defmodule LinksWeb.DashboardLive do
 
   attr :bookmark, Bookmark, required: true
   attr :selected, :boolean, default: false
-  attr :show_drag_handle, :boolean, default: false
   attr :metadata_pending, :boolean, default: false
 
   def bookmark_menu_link(assigns) do
@@ -189,13 +187,6 @@ defmodule LinksWeb.DashboardLive do
         @selected && "menu-active"
       ]}
     >
-      <span
-        :if={@show_drag_handle}
-        class="bookmark-drag-handle inline-flex shrink-0 items-center leading-none text-base-content/40"
-        aria-hidden="true"
-      >
-        <.icon name="hero-ellipsis-vertical" class="size-4 cursor-grab" />
-      </span>
       <.bookmark_status_icon bookmark={@bookmark} metadata_pending={@metadata_pending} />
       <span class="min-w-0 flex-1 truncate text-left leading-normal">
         {bookmark_label(@bookmark)}
@@ -367,7 +358,6 @@ defmodule LinksWeb.DashboardLive do
               <.bookmark_menu_link
                 bookmark={bookmark}
                 selected={selected?(@selected, :bookmark, bookmark.id)}
-                show_drag_handle={!@node.readonly}
                 metadata_pending={MapSet.member?(@pending_metadata_ids, bookmark.id)}
               />
             </li>

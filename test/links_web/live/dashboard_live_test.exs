@@ -118,7 +118,6 @@ defmodule LinksWeb.DashboardLiveTest do
       assert html =~ ~s(id="bookmarks-zone-inbox")
       assert html =~ ~s(phx-hook="CollectionBookmarkSort")
       assert html =~ ~s(data-collection-id="inbox")
-      assert html =~ "bookmark-drag-handle"
     end
 
     test "moves bookmarks between inbox and collections from the dashboard", %{conn: conn} do
@@ -175,7 +174,6 @@ defmodule LinksWeb.DashboardLiveTest do
       assert html =~ ~s(data-bookmark-sortable)
       assert html =~ ~s(data-collection-id="#{collection.id}")
       assert html =~ ~s(data-readonly="false")
-      assert html =~ "bookmark-drag-handle"
       assert has_element?(lv, "#collection-#{collection.id} summary .badge.badge-ghost", "1")
     end
 

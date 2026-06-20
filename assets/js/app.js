@@ -381,10 +381,11 @@ const CollectionBookmarkSort = {
     return new Sortable(el, {
       group: "bookmarks",
       animation: 150,
-      handle: ".bookmark-drag-handle",
       draggable: "li[id^='bookmark-']",
       filter: "summary, button, input, textarea, select, #inbox-empty-state",
       preventOnFilter: false,
+      delay: 200,
+      delayOnTouchOnly: false,
       fallbackOnBody: true,
       swapThreshold: 0.65,
       emptyInsertThreshold: 8,
