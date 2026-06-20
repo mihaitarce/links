@@ -233,7 +233,7 @@ details > summary .sidebar-more-button {
   overflow: hidden;
   grid-auto-flow: column;
   grid-auto-columns: unset;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
 #bookmarks-sidebar .menu :where(li > details > summary:not(.menu-title))::after {
@@ -262,6 +262,10 @@ details > summary .sidebar-more-button {
   box-sizing: border-box;
   white-space: normal;
   overflow-x: hidden;
+}
+
+#public-share-sidebar .menu :where(li ul)::before {
+  inset-inline-start: 1.2rem;
 }
 
 #public-share-sidebar .menu :where(li > details) {

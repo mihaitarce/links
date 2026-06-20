@@ -572,33 +572,38 @@ defmodule LinksWeb.DashboardLive do
             phx-value-id={@collection.id}
           >
             <.folder_icon />
-            <span class="flex min-w-0 flex-1 items-center gap-1.5 leading-none">
+            <span class="flex min-w-0 flex-1 items-center leading-none">
               <span class="min-w-0 truncate leading-normal">{@node.title}</span>
-              <span class="badge badge-ghost badge-sm shrink-0 tabular-nums">
-                {Collections.collection_bookmark_badge(@node)}
-              </span>
               <span
-                :if={@node.shared}
-                class="inline-flex shrink-0 items-center justify-center self-center opacity-60"
-                aria-label="Shared with others"
+                :if={@node.shared || @collaboration_mount?}
+                class="ms-3 flex shrink-0 items-center gap-1.5"
               >
-                <.icon name="hero-user-group" class="size-4 block leading-none" />
+                <span
+                  :if={@node.shared}
+                  class="inline-flex shrink-0 items-center justify-center self-center opacity-60"
+                  aria-label="Shared with others"
+                >
+                  <.icon name="hero-user-group" class="size-4 block leading-none" />
+                </span>
+                <span
+                  :if={@collaboration_mount?}
+                  class="inline-flex shrink-0 items-center justify-center self-center opacity-60"
+                  aria-label={
+                    if(@node.readonly,
+                      do: "Read-only collaboration",
+                      else: "Editable collaboration"
+                    )
+                  }
+                >
+                  <.icon
+                    name={if @node.readonly, do: "hero-eye", else: "hero-pencil-square"}
+                    class="size-4 block leading-none"
+                  />
+                </span>
               </span>
-              <span
-                :if={@collaboration_mount?}
-                class="inline-flex shrink-0 items-center justify-center self-center opacity-60"
-                aria-label={
-                  if(@node.readonly,
-                    do: "Read-only collaboration",
-                    else: "Editable collaboration"
-                  )
-                }
-              >
-                <.icon
-                  name={if @node.readonly, do: "hero-eye", else: "hero-pencil-square"}
-                  class="size-4 block leading-none"
-                />
-              </span>
+            </span>
+            <span class="badge badge-ghost badge-sm shrink-0 tabular-nums">
+              {Collections.collection_bookmark_badge(@node)}
             </span>
           </summary>
           <ul
