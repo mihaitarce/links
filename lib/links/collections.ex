@@ -608,6 +608,21 @@ defmodule Links.Collections do
     user_id = scope.user.id
 
     case Repo.get(Collection, collection_id) do
+      %Collection{owner_id: ^user_id} = collection ->
+        not revoked_collaboration_mount?(collection)
+
+      %Collection{} ->
+        collection_id in editable_collaboration_ids(scope)
+
+      nil ->
+        false
+    end
+  end
+
+  def can_reorder_collection?(%Scope{} = scope, collection_id) do
+    user_id = scope.user.id
+
+    case Repo.get(Collection, collection_id) do
       %Collection{owner_id: ^user_id} ->
         true
 
@@ -869,7 +884,7 @@ defmodule Links.Collections do
     actual = MapSet.new(ordered_ids)
 
     with true <- MapSet.equal?(expected, actual),
-         true <- Enum.all?(ordered_ids, &can_edit_collection?(scope, &1)) do
+         true <- Enum.all?(ordered_ids, &can_reorder_collection?(scope, &1)) do
       :ok
     else
       _ -> {:error, :invalid_order}

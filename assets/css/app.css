@@ -149,8 +149,26 @@ details > summary .sidebar-more-button {
   cursor: grab;
 }
 
+[data-collection-sortable]
+  > li[id^="collection-"][data-reorderable="true"][data-revoked="true"]
+  > .revoked-collection
+  > summary {
+  cursor: grab;
+}
+
 [data-collection-sortable] > li[id^="collection-"].sortable-chosen > details > summary {
   cursor: grabbing;
+}
+
+[data-collection-sortable]
+  > li[id^="collection-"].sortable-chosen[data-revoked="true"]
+  > .revoked-collection
+  > summary {
+  cursor: grabbing;
+}
+
+.revoked-collection > summary::after {
+  display: none;
 }
 
 [data-collection-sortable]::before,

@@ -345,7 +345,10 @@ defmodule LinksWeb.DashboardLive do
       )
       |> assign(
         :reorderable?,
-        Collections.can_edit_collection?(assigns.current_scope, assigns.node.collection.id)
+        Collections.can_reorder_collection?(
+          assigns.current_scope,
+          assigns.node.collection.id
+        )
       )
 
     ~H"""
@@ -353,16 +356,16 @@ defmodule LinksWeb.DashboardLive do
       id={"collection-#{@collection.id}"}
       data-readonly={to_string(@node.readonly || false)}
       data-reorderable={to_string(@reorderable?)}
-      class={[
-        "min-w-0 max-w-full",
-        @node.revoked && "menu-disabled line-through opacity-50"
-      ]}
+      data-revoked={to_string(@node.revoked || false)}
+      class="min-w-0 max-w-full"
     >
       <%= if @node.revoked do %>
-        <a>
-          <.folder_icon />
-          {@node.title}
-        </a>
+        <details class="revoked-collection min-w-0 max-w-full">
+          <summary class="min-w-0 max-w-full line-through opacity-50">
+            <.folder_icon />
+            <span class="min-w-0 truncate leading-normal">{@node.title}</span>
+          </summary>
+        </details>
       <% else %>
         <details class="min-w-0 max-w-full" open={@expanded}>
           <summary

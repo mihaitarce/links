@@ -94,6 +94,29 @@ defmodule Links.CollectionsTest do
       assert Collections.get_collection!(first.id).position == 1
     end
 
+    test "collaborators can reorder revoked shared collection mounts among root siblings" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Revoked Shared"})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      assert {:ok, _mount} = Collections.revoke_collaboration(owner_scope, mount)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+      {:ok, own} = Collections.create_collection(collaborator_scope, %{title: "Mine"})
+
+      refute Collections.can_edit_collection?(collaborator_scope, mount.id)
+      assert Collections.can_reorder_collection?(collaborator_scope, mount.id)
+
+      assert {:ok, :reordered} =
+               Collections.reorder_collections(collaborator_scope, "root", [mount.id, own.id])
+
+      assert Collections.get_collection!(mount.id).position == 0
+      assert Collections.get_collection!(own.id).position == 1
+    end
+
     test "collaborators can reorder read-only shared collection mounts among root siblings" do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()
@@ -678,6 +701,8 @@ defmodule Links.CollectionsTest do
       assert [%{title: "Revoked", revoked: true}] = dashboard.tree
       refute Collections.can_view_collection?(collaborator_scope, source.id)
       refute Collections.can_edit_collection?(collaborator_scope, source.id)
+      refute Collections.can_edit_collection?(collaborator_scope, mount.id)
+      assert Collections.can_reorder_collection?(collaborator_scope, mount.id)
     end
 
     test "lists collaborators for a collection" do

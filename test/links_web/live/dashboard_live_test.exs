@@ -497,7 +497,36 @@ defmodule LinksWeb.DashboardLiveTest do
       assert {:ok, _mount} = Collections.revoke_collaboration(owner_scope, mount)
 
       render(lv)
-      assert has_element?(lv, "#collection-#{mount.id}.menu-disabled")
+      assert has_element?(lv, ~s(#collection-#{mount.id}[data-revoked="true"]))
+      assert has_element?(lv, ~s(#collection-#{mount.id}[data-reorderable="true"]))
+    end
+
+    test "reorders revoked shared collection mounts from the dashboard", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Revoked Shared"})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      assert {:ok, _mount} = Collections.revoke_collaboration(owner_scope, mount)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+      {:ok, own} = Collections.create_collection(collaborator_scope, %{title: "Mine"})
+
+      conn = log_in_user(conn, collaborator)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      assert has_element?(lv, ~s(#collection-#{mount.id}[data-revoked="true"]))
+      assert has_element?(lv, ~s(#collection-#{mount.id}[data-reorderable="true"]))
+
+      assert render_reorder_collections(lv, %{
+               "parent_id" => "root",
+               "ordered_ids" => [to_string(mount.id), to_string(own.id)]
+             })
+
+      assert Collections.get_collection!(mount.id).position == 0
+      assert Collections.get_collection!(own.id).position == 1
     end
 
     test "collaborator removing a shared collection deletes only their mount", %{conn: conn} do
