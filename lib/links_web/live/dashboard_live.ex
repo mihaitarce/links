@@ -5,6 +5,7 @@ defmodule LinksWeb.DashboardLive do
   alias Links.Bookmarks.Bookmark
   alias Links.Collections
   alias Links.Collections.Collection
+  alias Links.Sharing.PublicShare
 
   @impl true
   def mount(_params, _session, socket) do
@@ -984,16 +985,14 @@ defmodule LinksWeb.DashboardLive do
 
   @impl true
   def handle_event("create_link", %{"new_bookmark" => bookmark_params}, socket) do
-    case Collections.create_inbox_bookmark(socket.assigns.current_scope, bookmark_params) do
-      {:ok, bookmark} ->
-        {:noreply,
-         socket
-         |> assign(:new_bookmark_form, new_bookmark_form())
-         |> mark_metadata_pending(bookmark.id)
-         |> refresh_dashboard()}
+    url = Map.get(bookmark_params, "url")
 
-      {:error, changeset} ->
-        {:noreply, assign(socket, :new_bookmark_form, to_form(changeset, as: :new_bookmark))}
+    case url && LinksWeb.PublicShareUrl.parse(url) do
+      {:ok, token} ->
+        handle_public_share_url(socket, token, bookmark_params)
+
+      _ ->
+        create_inbox_bookmark(socket, bookmark_params)
     end
   end
 
@@ -1360,6 +1359,48 @@ defmodule LinksWeb.DashboardLive do
 
       {:error, _reason} ->
         {:noreply, put_flash(socket, :error, "Could not restore collaborator access")}
+    end
+  end
+
+  defp handle_public_share_url(socket, token, bookmark_params) do
+    case Collections.join_public_share(socket.assigns.current_scope, token) do
+      {:ok, mount} ->
+        {:noreply,
+         socket
+         |> assign(:new_bookmark_form, new_bookmark_form())
+         |> put_flash(:info, "Added \"#{mount.title}\" to your collections")
+         |> refresh_dashboard()
+         |> select_collection(mount.id)}
+
+      {:error, :already_owned} ->
+        case Collections.get_public_share_by_token(token) do
+          %PublicShare{collection: %{id: id}} ->
+            {:noreply,
+             socket
+             |> assign(:new_bookmark_form, new_bookmark_form())
+             |> refresh_dashboard()
+             |> select_collection(id)}
+
+          _ ->
+            create_inbox_bookmark(socket, bookmark_params)
+        end
+
+      {:error, :not_found} ->
+        create_inbox_bookmark(socket, bookmark_params)
+    end
+  end
+
+  defp create_inbox_bookmark(socket, bookmark_params) do
+    case Collections.create_inbox_bookmark(socket.assigns.current_scope, bookmark_params) do
+      {:ok, bookmark} ->
+        {:noreply,
+         socket
+         |> assign(:new_bookmark_form, new_bookmark_form())
+         |> mark_metadata_pending(bookmark.id)
+         |> refresh_dashboard()}
+
+      {:error, changeset} ->
+        {:noreply, assign(socket, :new_bookmark_form, to_form(changeset, as: :new_bookmark))}
     end
   end
 

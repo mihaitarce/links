@@ -44,6 +44,58 @@ defmodule LinksWeb.DashboardLiveTest do
       assert has_element?(lv, "#new-link-form input[type=\"url\"][value=\"\"]")
     end
 
+    test "adds an active public share URL as a read-only collection", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      subscriber_scope = user_scope_fixture()
+      collection = collection_fixture(owner_scope, %{title: "Shared Reading List"})
+
+      assert {:ok, share} = Collections.create_public_share(owner_scope, collection)
+
+      conn = log_in_user(conn, subscriber_scope.user)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      share_url = "http://localhost:4000/share/#{share.token}"
+
+      html =
+        lv
+        |> form("#new-link-form", new_bookmark: %{url: share_url})
+        |> render_submit()
+
+      assert html =~ "Shared Reading List"
+      refute html =~ share_url
+
+      mount =
+        Repo.get_by!(Collection,
+          owner_id: subscriber_scope.user.id,
+          collaboration_id: collection.id
+        )
+
+      assert mount.collaboration_readonly
+      assert has_element?(lv, "#collection-#{mount.id}", "Shared Reading List")
+    end
+
+    test "falls back to inbox bookmark for revoked public share URLs", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      subscriber_scope = user_scope_fixture()
+      collection = collection_fixture(owner_scope, %{title: "Shared Reading List"})
+
+      assert {:ok, share} = Collections.create_public_share(owner_scope, collection)
+      assert {:ok, _revoked} = Collections.revoke_public_share(owner_scope, share)
+
+      conn = log_in_user(conn, subscriber_scope.user)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      share_url = "http://localhost:4000/share/#{share.token}"
+
+      html =
+        lv
+        |> form("#new-link-form", new_bookmark: %{url: share_url})
+        |> render_submit()
+
+      assert html =~ share_url
+      refute html =~ "Shared Reading List"
+    end
+
     test "removes metadata spinner after background fetch completes", %{conn: conn} do
       %{conn: conn} = register_and_log_in_user(%{conn: conn})
       {:ok, lv, _html} = live(conn, ~p"/")

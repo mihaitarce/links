@@ -404,6 +404,59 @@ defmodule Links.CollectionsTest do
       assert hd(hd(root_node.children).bookmarks).id == bookmark.id
     end
 
+    test "join_public_share creates a read-only collaboration mount" do
+      owner_scope = user_scope_fixture()
+      subscriber_scope = user_scope_fixture()
+      collection = collection_fixture(owner_scope, %{title: "Shared Publicly"})
+
+      assert {:ok, share} = Collections.create_public_share(owner_scope, collection)
+
+      assert {:ok, mount} = Collections.join_public_share(subscriber_scope, share.token)
+      assert mount.collaboration_id == collection.id
+      assert mount.collaboration_readonly
+      assert mount.owner_id == subscriber_scope.user.id
+      assert Collections.can_view_collection?(subscriber_scope, collection.id)
+      refute Collections.can_edit_collection?(subscriber_scope, collection.id)
+    end
+
+    test "join_public_share returns already_owned for the collection owner" do
+      owner_scope = user_scope_fixture()
+      collection = collection_fixture(owner_scope, %{title: "Mine"})
+
+      assert {:ok, share} = Collections.create_public_share(owner_scope, collection)
+      assert {:error, :already_owned} = Collections.join_public_share(owner_scope, share.token)
+    end
+
+    test "join_public_share restores a revoked read-only mount" do
+      owner_scope = user_scope_fixture()
+      subscriber = user_fixture()
+      collection = collection_fixture(owner_scope, %{title: "Shared Publicly"})
+
+      assert {:ok, share} = Collections.create_public_share(owner_scope, collection)
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, collection, subscriber.email, true)
+
+      assert {:ok, revoked} = Collections.revoke_collaboration(owner_scope, mount)
+
+      subscriber_scope = user_scope_fixture(subscriber)
+
+      assert {:ok, restored} = Collections.join_public_share(subscriber_scope, share.token)
+      assert restored.id == revoked.id
+      refute restored.collaboration_revoked_at
+      assert restored.collaboration_readonly
+    end
+
+    test "join_public_share returns not_found for revoked shares" do
+      owner_scope = user_scope_fixture()
+      subscriber_scope = user_scope_fixture()
+      collection = collection_fixture(owner_scope)
+
+      assert {:ok, share} = Collections.create_public_share(owner_scope, collection)
+      assert {:ok, _revoked} = Collections.revoke_public_share(owner_scope, share)
+      assert {:error, :not_found} = Collections.join_public_share(subscriber_scope, share.token)
+    end
+
     test "broadcasts public share changes when a link is revoked" do
       scope = user_scope_fixture()
       collection = collection_fixture(scope)

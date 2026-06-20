@@ -415,6 +415,68 @@ defmodule Links.Collections do
     |> Repo.one()
   end
 
+  def join_public_share(%Scope{} = scope, token) when is_binary(token) do
+    case get_public_share_by_token(token) do
+      %PublicShare{collection: %Collection{} = source} ->
+        join_public_share_collection(scope, source)
+
+      nil ->
+        {:error, :not_found}
+    end
+  end
+
+  defp join_public_share_collection(%Scope{} = scope, %Collection{} = source) do
+    user_id = scope.user.id
+
+    cond do
+      source.owner_id == user_id ->
+        {:error, :already_owned}
+
+      active_collaborator?(source, user_id) ->
+        case collaboration_mount_for_user_and_source(user_id, source.id) do
+          %Collection{} = mount -> {:ok, mount}
+          nil -> {:error, :already_collaborator}
+        end
+
+      true ->
+        case collaboration_mount_for_user_and_source(user_id, source.id) do
+          %Collection{collaboration_revoked_at: revoked_at} = mount when not is_nil(revoked_at) ->
+            mount
+            |> Collection.changeset(%{
+              collaboration_revoked_at: nil,
+              collaboration_readonly: true
+            })
+            |> Repo.update()
+            |> tap_join_public_share(user_id)
+
+          nil ->
+            %Collection{}
+            |> Collection.changeset(%{
+              owner_id: user_id,
+              title: source.title,
+              collaboration_id: source.id,
+              collaboration_readonly: true,
+              position: next_collection_position(nil, user_id)
+            })
+            |> Repo.insert()
+            |> tap_join_public_share(user_id)
+        end
+    end
+  end
+
+  defp collaboration_mount_for_user_and_source(user_id, source_id) do
+    Collection
+    |> where([c], c.owner_id == ^user_id and c.collaboration_id == ^source_id)
+    |> Repo.one()
+  end
+
+  defp tap_join_public_share({:ok, _mount} = result, user_id) do
+    broadcast_user_collections_changed(user_id)
+    result
+  end
+
+  defp tap_join_public_share(result, _user_id), do: result
+
   def fetch_public_share_dashboard(token) when is_binary(token) do
     case get_public_share_by_token(token) do
       %PublicShare{collection: %Collection{} = root} = share ->
