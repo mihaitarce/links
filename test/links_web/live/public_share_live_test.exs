@@ -32,6 +32,7 @@ defmodule LinksWeb.PublicShareLiveTest do
 
       assert html =~ "Public Reading"
       assert html =~ "Public Docs"
+      assert html =~ "example.com"
       assert html =~ ~s(href="https://example.com/docs")
       assert html =~ "data:image/png;base64,#{Base.encode64(<<1, 2, 3>>)}"
       refute html =~ ~s(/bookmarks/#{bookmark.id}/favicon)

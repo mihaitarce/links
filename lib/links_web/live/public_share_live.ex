@@ -149,8 +149,14 @@ defmodule LinksWeb.PublicShareLive do
         class="flex min-w-0 flex-1 items-center gap-2"
       >
         <.bookmark_icon bookmark={@bookmark} />
-        <span class="min-w-0 flex-1 truncate text-left leading-normal">
-          {bookmark_label(@bookmark)}
+        <span class="flex min-w-0 flex-1 items-baseline gap-1 overflow-hidden text-left leading-normal">
+          <span class="min-w-0 truncate">{bookmark_label(@bookmark)}</span>
+          <span
+            :if={domain = Bookmark.display_host(@bookmark)}
+            class="shrink-0 truncate text-base-content/50"
+          >
+            {domain}
+          </span>
         </span>
       </a>
     </div>

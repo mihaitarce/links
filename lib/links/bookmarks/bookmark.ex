@@ -76,4 +76,26 @@ defmodule Links.Bookmarks.Bookmark do
       end
     end)
   end
+
+  def display_host(%__MODULE__{url: url}), do: display_host(url)
+
+  def display_host(url) when is_binary(url) do
+    case URI.parse(url) do
+      %URI{host: host} when is_binary(host) and host != "" ->
+        strip_www_prefix(host)
+
+      _ ->
+        nil
+    end
+  end
+
+  def display_host(_), do: nil
+
+  defp strip_www_prefix(host) do
+    case host do
+      "www." <> rest -> rest
+      "WWW." <> rest -> rest
+      _ -> host
+    end
+  end
 end
