@@ -59,6 +59,7 @@ defmodule LinksWeb.DashboardLive do
                   placeholder="Paste a new link..."
                   class="input join-item w-full"
                   required
+                  autocomplete="off"
                 />
                 <button class="btn btn-primary join-item">Add</button>
               </div>
@@ -1383,7 +1384,7 @@ defmodule LinksWeb.DashboardLive do
       {:ok, mount} ->
         {:noreply,
          socket
-         |> assign(:new_bookmark_form, new_bookmark_form())
+         |> reset_new_bookmark_form()
          |> put_flash(:info, "Added \"#{mount.title}\" to your collections")
          |> refresh_dashboard()
          |> select_collection(mount.id)}
@@ -1393,7 +1394,7 @@ defmodule LinksWeb.DashboardLive do
           %PublicShare{collection: %{id: id}} ->
             {:noreply,
              socket
-             |> assign(:new_bookmark_form, new_bookmark_form())
+             |> reset_new_bookmark_form()
              |> refresh_dashboard()
              |> select_collection(id)}
 
@@ -1411,12 +1412,12 @@ defmodule LinksWeb.DashboardLive do
       {:ok, bookmark} ->
         {:noreply,
          socket
-         |> assign(:new_bookmark_form, new_bookmark_form())
+         |> reset_new_bookmark_form()
          |> mark_metadata_pending(bookmark.id)
          |> refresh_dashboard()}
 
       {:error, changeset} ->
-        {:noreply, assign(socket, :new_bookmark_form, to_form(changeset, as: :new_bookmark))}
+        {:noreply, assign_new_bookmark_form(socket, changeset)}
     end
   end
 
@@ -1649,9 +1650,18 @@ defmodule LinksWeb.DashboardLive do
     Phoenix.HTML.Form.normalize_value("checkbox", form[:readonly].value)
   end
 
+  defp reset_new_bookmark_form(socket) do
+    assign(socket, :new_bookmark_form, new_bookmark_form())
+  end
+
+  defp assign_new_bookmark_form(socket, changeset) do
+    form_id = socket.assigns.new_bookmark_form.id
+
+    assign(socket, :new_bookmark_form, to_form(changeset, as: :new_bookmark, id: form_id))
+  end
+
   defp new_bookmark_form do
-    Bookmark.changeset(%Bookmark{}, %{})
-    |> to_form(as: :new_bookmark)
+    to_form(%{"url" => ""}, as: :new_bookmark, id: "new-bookmark-#{System.unique_integer([:positive])}")
   end
 
   defp child_collection_form do
