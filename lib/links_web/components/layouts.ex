@@ -40,7 +40,7 @@ defmodule LinksWeb.Layouts do
     <div class="flex h-dvh flex-col overflow-hidden">
       <header class="navbar min-h-12 shrink-0 border-b border-base-300 bg-base-100 px-3">
         <div class="flex-1">
-          <a href="/" class="flex w-fit items-center gap-2">
+          <a href={~p"/"} class="flex w-fit items-center gap-2">
             <img src={~p"/images/logo.svg"} width="28" />
             <span class="text-sm font-semibold tracking-tight">Links</span>
           </a>

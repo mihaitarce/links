@@ -1,0 +1,53 @@
+# Version control
+.git
+.gitignore
+
+# Documentation
+README.md
+AGENTS.md
+
+# Elixir build artifacts (rebuilt in the image)
+/_build
+/deps
+/.fetch
+*.ez
+erl_crash.dump
+
+# Tests
+/test
+/cover
+
+# Static assets (rebuilt by mix assets.deploy and mix phx.digest)
+/priv/static/assets
+/priv/static/cache_manifest.json
+
+# Frontend dependencies (installed during the image build)
+/assets/node_modules
+npm-debug.log
+
+# Local configuration, secrets, and data
+.env
+.env.*
+/data
+Caddyfile
+
+# Runtime uploads and logs
+/log
+/priv/static/uploads
+
+# Editor and OS files
+.elixir_ls
+.vscode
+.idea
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Release tarballs
+links-*.tar
+
+# Temporary files
+/tmp
+
+*.env

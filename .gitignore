@@ -51,3 +51,5 @@ npm-debug.log
 /priv/static/uploads/
 
 /data/
+
+*.env
