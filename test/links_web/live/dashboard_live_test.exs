@@ -40,6 +40,23 @@ defmodule LinksWeb.DashboardLiveTest do
       assert html =~ "https://example.com/new"
     end
 
+    test "shows an empty label when the inbox has no bookmarks", %{conn: conn} do
+      %{conn: conn} = register_and_log_in_user(%{conn: conn})
+      {:ok, lv, html} = live(conn, ~p"/")
+
+      assert html =~ ~s(id="inbox-empty-state")
+      assert has_element?(lv, "#inbox-empty-state", "Your inbox is empty.")
+    end
+
+    test "keeps the inbox empty label in the list when bookmarks are present", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      bookmark = bookmark_fixture(scope, %{title: "Inbox link", url: "https://example.com/inbox"})
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      assert has_element?(lv, "#bookmark-#{bookmark.id}")
+      assert has_element?(lv, "#inbox-empty-state")
+    end
+
     test "inbox bookmark lists are sortable", %{conn: conn} do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
       bookmark_fixture(scope, %{title: "Inbox link", url: "https://example.com/inbox"})

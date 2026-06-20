@@ -60,6 +60,9 @@ const sortContainerForSummary = (summary) => {
 const isWritableSortContainer = (container) =>
   container != null && container.dataset.readonly !== "true"
 
+const isInboxContainer = (container) =>
+  container != null && container.dataset.collectionId === "inbox"
+
 const isEmptyBookmarkContainer = (container) =>
   container != null &&
   container.dataset.collectionId !== "inbox" &&
@@ -71,6 +74,7 @@ const AUTO_EXPAND_DELAY_MS = 2000
 const CollectionBookmarkSort = {
   mounted() {
     this.highlightedSummary = null
+    this.highlightedInbox = null
     this.sourceSummary = null
     this.expandTimer = null
     this.expandTargetId = null
@@ -109,6 +113,22 @@ const CollectionBookmarkSort = {
       this.highlightedSummary.classList.remove(DROP_HIGHLIGHT_CLASS)
       this.highlightedSummary = null
     }
+
+    if (this.highlightedInbox) {
+      this.highlightedInbox.classList.remove(DROP_HIGHLIGHT_CLASS)
+      this.highlightedInbox = null
+    }
+  },
+  setInboxDropHighlight(container) {
+    if (this.highlightedInbox === container) return
+
+    this.clearDropHighlight()
+    this.clearExpandTimer()
+
+    if (!container) return
+
+    container.classList.add(DROP_HIGHLIGHT_CLASS)
+    this.highlightedInbox = container
   },
   setDropHighlight(summary) {
     if (this.highlightedSummary === summary) {
@@ -174,6 +194,11 @@ const CollectionBookmarkSort = {
     const container = target.closest("[data-bookmark-sortable]")
 
     if (container) {
+      if (isInboxContainer(container)) {
+        this.setInboxDropHighlight(container)
+        return
+      }
+
       this.setDropHighlight(this.summaryForSortContainer(container) || this.sourceSummary)
       return
     }
@@ -358,7 +383,7 @@ const CollectionBookmarkSort = {
       animation: 150,
       handle: ".bookmark-drag-handle",
       draggable: "li[id^='bookmark-']",
-      filter: "summary, button, input, textarea, select",
+      filter: "summary, button, input, textarea, select, #inbox-empty-state",
       preventOnFilter: false,
       fallbackOnBody: true,
       swapThreshold: 0.65,
@@ -370,8 +395,14 @@ const CollectionBookmarkSort = {
       onStart(event) {
         hook.spilled = false
         hook.bindDragOver()
-        hook.sourceSummary = hook.summaryForSortContainer(event.from)
-        hook.setDropHighlight(hook.sourceSummary)
+
+        if (isInboxContainer(event.from)) {
+          hook.sourceSummary = null
+          hook.setInboxDropHighlight(event.from)
+        } else {
+          hook.sourceSummary = hook.summaryForSortContainer(event.from)
+          hook.setDropHighlight(hook.sourceSummary)
+        }
       },
       onMove(event) {
         const pointerTarget = hook.elementUnderPointer(event)
