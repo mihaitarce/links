@@ -440,4 +440,25 @@ defmodule Links.AccountsTest do
       refute inspect(%User{password: "123456"}) =~ "password: \"123456\""
     end
   end
+
+  describe "get_or_register_forward_auth_user/1" do
+    test "creates a confirmed user without a password from a username" do
+      assert {:ok, user} = Accounts.get_or_register_forward_auth_user("alice")
+      assert user.email == "alice@forward-auth.local"
+      assert user.confirmed_at
+      refute user.hashed_password
+    end
+
+    test "uses the header value as email when it contains @" do
+      assert {:ok, user} = Accounts.get_or_register_forward_auth_user("bob@example.com")
+      assert user.email == "bob@example.com"
+    end
+
+    test "returns an existing user" do
+      existing = user_fixture(%{email: "carol@forward-auth.local"})
+
+      assert {:ok, user} = Accounts.get_or_register_forward_auth_user("carol")
+      assert user.id == existing.id
+    end
+  end
 end

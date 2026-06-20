@@ -387,4 +387,46 @@ defmodule LinksWeb.UserAuthTest do
       }
     end
   end
+
+  describe "forward auth" do
+    setup do
+      previous = Application.get_env(:links, :forward_auth)
+      Application.put_env(:links, :forward_auth, true)
+
+      on_exit(fn -> Application.put_env(:links, :forward_auth, previous) end)
+
+      :ok
+    end
+
+    test "fetch_current_scope_for_user authenticates from header and creates user", %{conn: conn} do
+      conn =
+        conn
+        |> put_req_header("x-authenticated-user", "alice")
+        |> UserAuth.fetch_current_scope_for_user([])
+
+      assert conn.assigns.current_scope.user.email == "alice@forward-auth.local"
+      assert get_session(conn, :user_token)
+    end
+
+    test "fetch_current_scope_for_user returns nil user when header is missing", %{conn: conn} do
+      conn = UserAuth.fetch_current_scope_for_user(conn, [])
+      refute conn.assigns.current_scope
+    end
+
+    test "reject_when_forward_auth_enabled returns 404", %{conn: conn} do
+      conn = UserAuth.reject_when_forward_auth_enabled(conn, [])
+      assert conn.status == 404
+      assert conn.halted
+    end
+
+    test "require_authenticated_user returns unauthorized when header is missing", %{conn: conn} do
+      conn =
+        conn
+        |> UserAuth.fetch_current_scope_for_user([])
+        |> UserAuth.require_authenticated_user([])
+
+      assert conn.status == 401
+      assert conn.halted
+    end
+  end
 end

@@ -29,6 +29,8 @@ if config_env() != :prod do
   config :links, LinksWeb.Endpoint, url: [host: "localhost", path: path]
 end
 
+config :links, :forward_auth, System.get_env("PHOENIX_FORWARD_AUTH") in ~w(true 1 yes TRUE)
+
 if config_env() == :prod do
   database_path =
     System.get_env("DATABASE_PATH") ||

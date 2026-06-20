@@ -106,4 +106,27 @@ defmodule LinksWeb.UserLive.LoginTest do
                ~s(<input type="email" name="user[email]" id="login_form_magic_email" value="#{user.email}")
     end
   end
+
+  describe "forward auth" do
+    setup do
+      previous = Application.get_env(:links, :forward_auth)
+      Application.put_env(:links, :forward_auth, true)
+
+      on_exit(fn -> Application.put_env(:links, :forward_auth, previous) end)
+
+      :ok
+    end
+
+    test "login page is not available", %{conn: conn} do
+      assert conn |> get(~p"/users/log-in") |> response(404)
+    end
+
+    test "register page is not available", %{conn: conn} do
+      assert conn |> get(~p"/users/register") |> response(404)
+    end
+
+    test "settings page is not available", %{conn: conn} do
+      assert conn |> get(~p"/users/settings") |> response(404)
+    end
+  end
 end

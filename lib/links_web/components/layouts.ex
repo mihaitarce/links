@@ -34,6 +34,8 @@ defmodule LinksWeb.Layouts do
   slot :inner_block, required: true
 
   def app(assigns) do
+    assigns = assign(assigns, :forward_auth, LinksWeb.UserAuth.forward_auth_enabled?())
+
     ~H"""
     <div class="flex h-dvh flex-col overflow-hidden">
       <header class="navbar min-h-12 shrink-0 border-b border-base-300 bg-base-100 px-3">
@@ -52,14 +54,14 @@ defmodule LinksWeb.Layouts do
               {@current_scope.user.email}
             </span>
             <.link
-              :if={@current_scope && @current_scope.user}
+              :if={@current_scope && @current_scope.user && !@forward_auth}
               href={~p"/users/settings"}
               class="btn btn-ghost btn-xs"
             >
               Settings
             </.link>
             <.link
-              :if={@current_scope && @current_scope.user}
+              :if={@current_scope && @current_scope.user && !@forward_auth}
               href={~p"/users/log-out"}
               method="delete"
               class="btn btn-ghost btn-xs"
@@ -67,14 +69,14 @@ defmodule LinksWeb.Layouts do
               Log out
             </.link>
             <.link
-              :if={!(@current_scope && @current_scope.user)}
+              :if={!(@current_scope && @current_scope.user) && !@forward_auth}
               href={~p"/users/register"}
               class="btn btn-ghost btn-xs"
             >
               Register
             </.link>
             <.link
-              :if={!(@current_scope && @current_scope.user)}
+              :if={!(@current_scope && @current_scope.user) && !@forward_auth}
               href={~p"/users/log-in"}
               class="btn btn-primary btn-xs"
             >

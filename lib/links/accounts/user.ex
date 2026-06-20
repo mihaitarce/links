@@ -115,6 +115,23 @@ defmodule Links.Accounts.User do
   end
 
   @doc """
+  Registers a user authenticated by a reverse proxy without a password.
+  """
+  def forward_auth_changeset(user, attrs) do
+    now = DateTime.utc_now(:second)
+
+    user
+    |> cast(attrs, [:email])
+    |> validate_required([:email])
+    |> validate_format(:email, ~r/^[^@,;\s]+@[^@,;\s]+$/,
+      message: "must have the @ sign and no spaces"
+    )
+    |> validate_length(:email, max: 160)
+    |> unique_constraint(:email)
+    |> put_change(:confirmed_at, now)
+  end
+
+  @doc """
   Verifies the password.
 
   If there is no user or the user doesn't have a password, we call

@@ -25,6 +25,11 @@ defmodule LinksWeb.UserAuth do
   # token. This can be set to a value greater than `@max_cookie_age_in_days` to disable
   # the reissuing of tokens completely.
   @session_reissue_age_in_days 7
+  @forward_auth_header "x-authenticated-user"
+
+  def forward_auth_enabled? do
+    Application.get_env(:links, :forward_auth, false)
+  end
 
   @doc """
   Logs the user in.
@@ -65,6 +70,14 @@ defmodule LinksWeb.UserAuth do
   Will reissue the session token if it is older than the configured age.
   """
   def fetch_current_scope_for_user(conn, _opts) do
+    if forward_auth_enabled?() do
+      fetch_forward_auth_scope(conn)
+    else
+      fetch_session_scope(conn)
+    end
+  end
+
+  defp fetch_session_scope(conn) do
     with {token, conn} <- ensure_user_token(conn),
          {user, token_inserted_at} <- Accounts.get_user_by_session_token(token) do
       conn
@@ -72,6 +85,47 @@ defmodule LinksWeb.UserAuth do
       |> maybe_reissue_user_session_token(user, token_inserted_at)
     else
       nil -> assign(conn, :current_scope, Scope.for_user(nil))
+    end
+  end
+
+  defp fetch_forward_auth_scope(conn) do
+    with [username | _] <- get_req_header(conn, @forward_auth_header),
+         username when username != "" <- String.trim(username),
+         {:ok, user} <- Accounts.get_or_register_forward_auth_user(username) do
+      conn
+      |> assign(:current_scope, Scope.for_user(user))
+      |> sync_forward_auth_session(user)
+    else
+      _ -> assign(conn, :current_scope, Scope.for_user(nil))
+    end
+  end
+
+  defp sync_forward_auth_session(conn, user) do
+    case get_session(conn, :user_token) do
+      token when is_binary(token) ->
+        case Accounts.get_user_by_session_token(token) do
+          {%Accounts.User{id: id}, _} when id == user.id ->
+            conn
+
+          _ ->
+            create_or_extend_session(conn, user, %{})
+        end
+
+      _ ->
+        create_or_extend_session(conn, user, %{})
+    end
+  end
+
+  @doc """
+  Blocks local authentication routes when forward auth is enabled.
+  """
+  def reject_when_forward_auth_enabled(conn, _opts) do
+    if forward_auth_enabled?() do
+      conn
+      |> send_resp(:not_found, "Not Found")
+      |> halt()
+    else
+      conn
     end
   end
 
@@ -222,9 +276,15 @@ defmodule LinksWeb.UserAuth do
       {:cont, socket}
     else
       socket =
-        socket
-        |> Phoenix.LiveView.put_flash(:error, "You must log in to access this page.")
-        |> Phoenix.LiveView.redirect(to: ~p"/users/log-in")
+        if forward_auth_enabled?() do
+          socket
+          |> Phoenix.LiveView.put_flash(:error, "Authentication required.")
+          |> Phoenix.LiveView.redirect(to: ~p"/")
+        else
+          socket
+          |> Phoenix.LiveView.put_flash(:error, "You must log in to access this page.")
+          |> Phoenix.LiveView.redirect(to: ~p"/users/log-in")
+        end
 
       {:halt, socket}
     end
@@ -271,11 +331,18 @@ defmodule LinksWeb.UserAuth do
     if conn.assigns.current_scope && conn.assigns.current_scope.user do
       conn
     else
-      conn
-      |> put_flash(:error, "You must log in to access this page.")
-      |> maybe_store_return_to()
-      |> redirect(to: ~p"/users/log-in")
-      |> halt()
+      if forward_auth_enabled?() do
+        conn
+        |> put_status(:unauthorized)
+        |> Phoenix.Controller.text("Unauthorized")
+        |> halt()
+      else
+        conn
+        |> put_flash(:error, "You must log in to access this page.")
+        |> maybe_store_return_to()
+        |> redirect(to: ~p"/users/log-in")
+        |> halt()
+      end
     end
   end
 

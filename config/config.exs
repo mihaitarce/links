@@ -22,7 +22,9 @@ config :links, :scopes,
 
 config :links,
   ecto_repos: [Links.Repo],
-  generators: [timestamp_type: :utc_datetime]
+  generators: [timestamp_type: :utc_datetime],
+  forward_auth: false,
+  forward_auth_email_domain: "forward-auth.local"
 
 config :links, Oban,
   engine: Oban.Engines.Lite,
