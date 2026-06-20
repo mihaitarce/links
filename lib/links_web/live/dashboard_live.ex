@@ -43,7 +43,7 @@ defmodule LinksWeb.DashboardLive do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
       <div class="flex h-full min-h-0 w-full flex-col md:flex-row md:overflow-hidden bg-base-200 text-sm">
-        <aside class="flex w-full min-w-0 shrink-0 flex-col border-r border-base-300 bg-base-100 md:w-1/2">
+        <aside class="flex w-full min-w-0 max-w-[65ch] shrink-0 flex-col border-r border-base-300 bg-base-100 md:w-1/2">
           <div class="border-b border-base-300 p-3">
             <.form for={@new_bookmark_form} id="new-link-form" phx-submit="create_link">
               <div class="join w-full">
