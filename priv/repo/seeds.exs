@@ -2,16 +2,19 @@
 #
 #     mix run priv/repo/seeds.exs
 #
-# Seeds the first (single) user account with nested collections and demo links.
+# Creates a demo account and seeds nested collections with demo links.
 
 import Ecto.Query
 
 alias Links.Accounts
-alias Links.Accounts.Scope
+alias Links.Accounts.{Scope, User}
 alias Links.Bookmarks.Bookmark
 alias Links.Collections
 alias Links.Collections.Collection
 alias Links.Repo
+
+demo_email = "demouser@example.com"
+demo_password = "demouserpass12"
 
 demo_links = [
   # inbox
@@ -101,83 +104,111 @@ demo_links = [
   %{title: "ShopTalk Show", url: "https://shoptalkshow.com", collection: "Podcasts"}
 ]
 
-case Repo.one(from u in Accounts.User, order_by: [asc: u.id], limit: 1) do
-  nil ->
-    IO.puts("No users found. Register an account first, then re-run seeds.")
+user =
+  case Accounts.get_user_by_email(demo_email) do
+    %User{} = user ->
+      user
 
-  user ->
-    scope = Scope.for_user(user)
+    nil ->
+      {:ok, user} = Accounts.register_user(%{email: demo_email})
+      user
+  end
 
-    Repo.delete_all(from b in Bookmark, where: b.created_by_id == ^user.id)
-    Repo.delete_all(from c in Collection, where: c.owner_id == ^user.id)
+user =
+  if user.confirmed_at do
+    user
+  else
+    user |> User.confirm_changeset() |> Repo.update!()
+  end
 
-    {:ok, reading} = Collections.create_collection(scope, %{title: "Reading List"})
-    {:ok, work} = Collections.create_collection(scope, %{title: "Work"})
-    {:ok, inspiration} = Collections.create_collection(scope, %{title: "Inspiration"})
+user =
+  if user.hashed_password do
+    user
+  else
+    {:ok, {user, _tokens}} =
+      Accounts.update_user_password(user, %{
+        password: demo_password,
+        password_confirmation: demo_password
+      })
 
-    {:ok, phoenix} =
-      Collections.create_collection(scope, %{title: "Phoenix", parent_id: work.id})
+    user
+  end
 
-    {:ok, tools} =
-      Collections.create_collection(scope, %{title: "Tools", parent_id: work.id})
+scope = Scope.for_user(user)
 
-    {:ok, archive} = Collections.create_collection(scope, %{title: "Archive"})
-    {:ok, podcasts} = Collections.create_collection(scope, %{title: "Podcasts"})
+Repo.delete_all(from b in Bookmark, where: b.created_by_id == ^user.id)
+Repo.delete_all(from c in Collection, where: c.owner_id == ^user.id)
 
-    {:ok, old_projects} =
-      Collections.create_collection(scope, %{title: "Old Projects", parent_id: archive.id})
+{:ok, reading} = Collections.create_collection(scope, %{title: "Reading List"})
+{:ok, work} = Collections.create_collection(scope, %{title: "Work"})
+{:ok, inspiration} = Collections.create_collection(scope, %{title: "Inspiration"})
 
-    collection_ids = %{
-      "Reading List" => reading.id,
-      "Work" => work.id,
-      "Inspiration" => inspiration.id,
-      "Archive" => archive.id,
-      "Podcasts" => podcasts.id,
-      "Work/Phoenix" => phoenix.id,
-      "Work/Tools" => tools.id,
-      "Archive/Old Projects" => old_projects.id
-    }
+{:ok, phoenix} =
+  Collections.create_collection(scope, %{title: "Phoenix", parent_id: work.id})
 
-    resolve_collection_id = fn link ->
-      cond do
-        link[:inbox] ->
-          nil
+{:ok, tools} =
+  Collections.create_collection(scope, %{title: "Tools", parent_id: work.id})
 
-        link[:subcollection] ->
-          Map.fetch!(collection_ids, "#{link.collection}/#{link.subcollection}")
+{:ok, archive} = Collections.create_collection(scope, %{title: "Archive"})
+{:ok, podcasts} = Collections.create_collection(scope, %{title: "Podcasts"})
 
-        true ->
-          Map.fetch!(collection_ids, link.collection)
-      end
-    end
+{:ok, old_projects} =
+  Collections.create_collection(scope, %{title: "Old Projects", parent_id: archive.id})
 
-    Enum.each(demo_links, fn link ->
-      attrs = %{
-        title: link.title,
-        url: link.url,
-        description: "Demo bookmark seeded for #{user.email}."
-      }
+collection_ids = %{
+  "Reading List" => reading.id,
+  "Work" => work.id,
+  "Inspiration" => inspiration.id,
+  "Archive" => archive.id,
+  "Podcasts" => podcasts.id,
+  "Work/Phoenix" => phoenix.id,
+  "Work/Tools" => tools.id,
+  "Archive/Old Projects" => old_projects.id
+}
 
-      if link[:inbox] do
-        {:ok, _} = Collections.create_inbox_bookmark(scope, attrs)
-      else
-        {:ok, _} =
-          Collections.create_bookmark(
-            scope,
-            Map.put(attrs, :collection_id, resolve_collection_id.(link))
-          )
-      end
-    end)
+resolve_collection_id = fn link ->
+  cond do
+    link[:inbox] ->
+      nil
 
-    inbox_count = length(Enum.filter(demo_links, & &1[:inbox]))
-    collection_count = length(demo_links) - inbox_count
-    collection_total = map_size(collection_ids)
+    link[:subcollection] ->
+      Map.fetch!(collection_ids, "#{link.collection}/#{link.subcollection}")
 
-    IO.puts("""
-    Seeded demo data for #{user.email}:
-      - #{collection_total} collections (including nested folders)
-      - #{inbox_count} inbox links
-      - #{collection_count} collection links
-      - #{length(demo_links)} links total
-    """)
+    true ->
+      Map.fetch!(collection_ids, link.collection)
+  end
 end
+
+Enum.each(demo_links, fn link ->
+  attrs = %{
+    title: link.title,
+    url: link.url,
+    description: "Demo bookmark seeded for #{user.email}."
+  }
+
+  if link[:inbox] do
+    {:ok, _} = Collections.create_inbox_bookmark(scope, attrs)
+  else
+    {:ok, _} =
+      Collections.create_bookmark(
+        scope,
+        Map.put(attrs, :collection_id, resolve_collection_id.(link))
+      )
+  end
+end)
+
+inbox_count = length(Enum.filter(demo_links, & &1[:inbox]))
+collection_count = length(demo_links) - inbox_count
+collection_total = map_size(collection_ids)
+
+IO.puts("""
+Seeded demo data for #{user.email}:
+  - #{collection_total} collections (including nested folders)
+  - #{inbox_count} inbox links
+  - #{collection_count} collection links
+  - #{length(demo_links)} links total
+
+Log in with:
+  email: #{demo_email}
+  password: #{demo_password}
+""")

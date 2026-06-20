@@ -41,9 +41,6 @@ links-*.tar
 npm-debug.log
 /assets/node_modules/
 
-# Local SQLite database files.
-*.db
-*.db-*
 
 # Local environment files.
 .env
@@ -53,4 +50,4 @@ npm-debug.log
 /log/
 /priv/static/uploads/
 
-
+/data/

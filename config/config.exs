@@ -27,7 +27,6 @@ config :links,
   forward_auth_email_domain: "forward-auth.local"
 
 config :links, Oban,
-  engine: Oban.Engines.Lite,
   repo: Links.Repo,
   queues: [metadata: 5]
 
