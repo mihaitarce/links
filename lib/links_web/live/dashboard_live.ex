@@ -129,46 +129,22 @@ defmodule LinksWeb.DashboardLive do
         <%= if @selected_context do %>
           <div
             id="detail-panel"
-            class={[
-              "fixed inset-0 z-[999] flex items-center justify-center bg-black/40 p-4",
-              "lg:static lg:z-auto lg:flex lg:min-w-0 lg:flex-1 lg:flex-col lg:items-stretch lg:justify-start lg:overflow-auto lg:border-l lg:border-base-300 lg:bg-transparent lg:p-0"
-            ]}
-            role="dialog"
-            aria-modal="true"
+            class="hidden min-w-0 flex-1 flex-col overflow-auto border-l border-base-300 lg:flex"
           >
-            <button
-              type="button"
-              class="absolute inset-0 lg:hidden"
-              phx-click="close_detail"
-              aria-label="Close"
-            />
-            <div class="relative z-10 flex max-h-[90dvh] w-full max-w-3xl flex-col overflow-hidden rounded-box bg-base-100 shadow-xl lg:h-full lg:max-h-none lg:max-w-none lg:rounded-none lg:shadow-none">
-              <div class="flex shrink-0 items-center justify-end border-b border-base-300 px-3 py-2 lg:hidden">
-                <button
-                  type="button"
-                  id="detail-modal-close"
-                  class="btn btn-ghost btn-sm btn-circle"
-                  phx-click="close_detail"
-                  aria-label="Close"
-                >
-                  <.icon name="hero-x-mark" class="size-5" />
-                </button>
-              </div>
-              <div class="min-h-0 flex-1 overflow-y-auto p-4">
-                <.detail_panel
-                  selected={@selected}
-                  context={@selected_context}
-                  collection_form={@collection_form}
-                  child_collection_form={@child_collection_form}
-                  bookmark_form={@bookmark_form}
-                  public_shares={@public_shares}
-                  collaborators={@collaborators}
-                  collaboration_form={@collaboration_form}
-                  collaborator_email_suggestions={@collaborator_email_suggestions}
-                  collaborator_email_suggestions_open?={@collaborator_email_suggestions_open?}
-                  pending_metadata_ids={@pending_metadata_ids}
-                />
-              </div>
+            <div class="min-h-0 flex-1 overflow-y-auto p-4">
+              <.detail_panel
+                selected={@selected}
+                context={@selected_context}
+                collection_form={@collection_form}
+                child_collection_form={@child_collection_form}
+                bookmark_form={@bookmark_form}
+                public_shares={@public_shares}
+                collaborators={@collaborators}
+                collaboration_form={@collaboration_form}
+                collaborator_email_suggestions={@collaborator_email_suggestions}
+                collaborator_email_suggestions_open?={@collaborator_email_suggestions_open?}
+                pending_metadata_ids={@pending_metadata_ids}
+              />
             </div>
           </div>
         <% else %>
@@ -849,10 +825,6 @@ defmodule LinksWeb.DashboardLive do
     {:noreply, select_collection(socket, id)}
   end
 
-  def handle_event("close_detail", _params, socket) do
-    {:noreply, clear_detail_selection(socket)}
-  end
-
   def handle_event("select_bookmark", %{"id" => id}, socket) do
     bookmark = Collections.get_bookmark!(id)
 
@@ -1191,12 +1163,6 @@ defmodule LinksWeb.DashboardLive do
       |> Enum.map(& &1.id)
       |> MapSet.new()
     )
-  end
-
-  defp clear_detail_selection(socket) do
-    socket
-    |> assign(:selected, nil)
-    |> assign(:selected_context, nil)
   end
 
   defp refresh_selected_bookmark(socket, bookmark_id) do

@@ -380,25 +380,6 @@ defmodule LinksWeb.DashboardLiveTest do
       assert has_element?(lv, "#collection-#{parent.id} > details[open]")
     end
 
-    test "closes detail panel from modal close button", %{conn: conn} do
-      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
-      parent = collection_fixture(scope, %{title: "Parent"})
-
-      {:ok, lv, _html} = live(conn, ~p"/")
-
-      open_collection_details(lv, parent.id)
-
-      assert has_element?(lv, "#collection-form")
-      assert has_element?(lv, "#detail-panel")
-
-      lv
-      |> element("#detail-modal-close")
-      |> render_click()
-
-      refute has_element?(lv, "#collection-form")
-      refute has_element?(lv, "#detail-panel")
-    end
-
     test "opens bookmark links in a new tab from the more button", %{conn: conn} do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
 
