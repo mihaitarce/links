@@ -5,6 +5,10 @@ defmodule Links.Bookmarks.Bookmark do
   alias Links.Accounts.User
   alias Links.Collections.Collection
 
+  @url_max_length 2_048
+
+  def url_max_length, do: @url_max_length
+
   schema "bookmarks" do
     field :title, :string
     field :url, :string
@@ -37,7 +41,7 @@ defmodule Links.Bookmarks.Bookmark do
     |> normalize_title()
     |> validate_required([:title, :url, :created_by_id])
     |> validate_length(:title, min: 1, max: 240)
-    |> validate_length(:url, min: 3, max: 2_048)
+    |> validate_length(:url, min: 3, max: @url_max_length)
     |> validate_url()
     |> validate_number(:position, greater_than_or_equal_to: 0)
     |> foreign_key_constraint(:collection_id)
@@ -56,7 +60,7 @@ defmodule Links.Bookmarks.Bookmark do
     ])
     |> validate_length(:title, max: 240)
     |> validate_length(:favicon_content_type, max: 120)
-    |> validate_length(:favicon_source_url, max: 2_048)
+    |> validate_length(:favicon_source_url, max: @url_max_length)
     |> validate_number(:favicon_byte_size, greater_than_or_equal_to: 0)
   end
 
@@ -66,11 +70,21 @@ defmodule Links.Bookmarks.Bookmark do
         changeset
 
       {_title, url} when is_binary(url) ->
-        put_change(changeset, :title, url)
+        put_change(changeset, :title, default_title(url))
 
       _ ->
         changeset
     end
+  end
+
+  defp default_title(url) do
+    url
+    |> display_host()
+    |> case do
+      host when is_binary(host) -> host
+      _ -> url
+    end
+    |> String.slice(0, 240)
   end
 
   defp validate_url(changeset) do

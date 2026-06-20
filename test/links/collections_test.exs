@@ -18,7 +18,7 @@ defmodule Links.CollectionsTest do
 
       assert child.parent_id == root.id
       assert bookmark.collection_id == nil
-      assert bookmark.title == "https://example.com"
+      assert bookmark.title == "example.com"
     end
 
     test "deletes inbox bookmarks without error" do
