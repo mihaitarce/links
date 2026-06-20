@@ -359,7 +359,7 @@ defmodule Links.Collections do
   end
 
   def create_public_share(%Scope{} = scope, %Collection{} = collection) do
-    if owns_effective_collection?(scope, collection) do
+    if can_manage_collection?(scope, collection) do
       %PublicShare{}
       |> PublicShare.changeset(%{
         collection_id: collection.id,
@@ -373,7 +373,7 @@ defmodule Links.Collections do
   end
 
   def list_public_shares(%Scope{} = scope, %Collection{} = collection) do
-    if owns_effective_collection?(scope, collection) do
+    if can_manage_collection?(scope, collection) do
       PublicShare
       |> where([s], s.collection_id == ^collection.id)
       |> order_by([s], desc: s.inserted_at, desc: s.id)
@@ -450,7 +450,7 @@ defmodule Links.Collections do
   def revoke_public_share(%Scope{} = scope, %PublicShare{} = public_share) do
     public_share = Repo.preload(public_share, :collection)
 
-    if owns_effective_collection?(scope, public_share.collection) do
+    if can_manage_collection?(scope, public_share.collection) do
       public_share
       |> PublicShare.changeset(%{revoked_at: DateTime.utc_now(:second)})
       |> Repo.update()
@@ -464,7 +464,7 @@ defmodule Links.Collections do
   end
 
   def create_collaboration(%Scope{} = scope, %Collection{} = source, collaborator_email, readonly) do
-    with true <- source.owner_id == scope.user.id,
+    with true <- can_manage_collection?(scope, source),
          %Accounts.User{} = collaborator <- Accounts.get_user_by_email(collaborator_email),
          false <- collaborator.id == scope.user.id do
       attrs = %{
@@ -492,7 +492,7 @@ defmodule Links.Collections do
   end
 
   def list_collaborators(%Scope{} = scope, %Collection{} = collection) do
-    if collection.owner_id == scope.user.id do
+    if can_manage_collection?(scope, collection) do
       Collection
       |> where([c], c.collaboration_id == ^collection.id)
       |> order_by([c], asc: c.collaboration_revoked_at, desc: c.inserted_at)
@@ -507,10 +507,32 @@ defmodule Links.Collections do
     source = Repo.get(Collection, collaboration_mount.collaboration_id)
 
     if source &&
-         source.owner_id == scope.user.id &&
+         can_manage_collection?(scope, source) &&
          active_collaboration_mount?(collaboration_mount) do
       collaboration_mount
       |> Collection.changeset(%{collaboration_revoked_at: DateTime.utc_now(:second)})
+      |> Repo.update()
+      |> tap(fn
+        {:ok, _mount} ->
+          broadcast_user_collections_changed(collaboration_mount.owner_id)
+          broadcast_user_collections_changed(scope.user.id)
+
+        _ ->
+          :ok
+      end)
+    else
+      {:error, :unauthorized}
+    end
+  end
+
+  def restore_collaboration(%Scope{} = scope, %Collection{} = collaboration_mount) do
+    source = Repo.get(Collection, collaboration_mount.collaboration_id)
+
+    if source &&
+         source.owner_id == scope.user.id &&
+         revoked_collaboration_mount?(collaboration_mount) do
+      collaboration_mount
+      |> Collection.changeset(%{collaboration_revoked_at: nil})
       |> Repo.update()
       |> tap(fn
         {:ok, _mount} ->
@@ -537,6 +559,11 @@ defmodule Links.Collections do
         collaboration_revoked_at: revoked_at
       }) do
     not is_nil(collaboration_id) and not is_nil(revoked_at)
+  end
+
+  def can_manage_collection?(%Scope{} = scope, %Collection{} = collection) do
+    effective = effective_collection(collection)
+    effective && effective.id in editable_collaboration_ids(scope)
   end
 
   def can_edit_collection?(%Scope{} = scope, collection_id) do
@@ -990,15 +1017,12 @@ defmodule Links.Collections do
     |> Repo.one()
   end
 
-  defp owns_effective_collection?(%Scope{} = scope, %Collection{} = collection) do
-    effective =
-      if active_collaboration_mount?(collection) do
-        Repo.get(Collection, collection.collaboration_id)
-      else
-        collection
-      end
-
-    effective && effective.owner_id == scope.user.id
+  defp effective_collection(%Collection{} = collection) do
+    if active_collaboration_mount?(collection) do
+      Repo.get(Collection, collection.collaboration_id)
+    else
+      collection
+    end
   end
 
   defp normalize_attrs(attrs) do

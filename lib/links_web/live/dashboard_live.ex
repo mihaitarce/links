@@ -550,6 +550,15 @@ defmodule LinksWeb.DashboardLive do
               >
                 Revoke
               </button>
+              <button
+                :if={collaborator.collaboration_revoked_at && @context.can_restore_collaborators}
+                id={"restore-collaborator-#{collaborator.id}"}
+                class="btn btn-ghost"
+                phx-click="restore_collaboration"
+                phx-value-id={collaborator.id}
+              >
+                Restore
+              </button>
             </li>
             <li :if={@collaborators == []} class="text-sm text-base-content/60">
               No collaborators yet.
@@ -855,6 +864,23 @@ defmodule LinksWeb.DashboardLive do
     end
   end
 
+  def handle_event("restore_collaboration", %{"id" => id}, socket) do
+    mount = Collections.get_collection!(id)
+    collection = socket.assigns.selected_context.effective_collection
+
+    case Collections.restore_collaboration(socket.assigns.current_scope, mount) do
+      {:ok, _mount} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "Collaborator access restored")
+         |> refresh_dashboard()
+         |> select_collection(collection.id)}
+
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, "Could not restore collaborator access")}
+    end
+  end
+
   defp refresh_dashboard(socket) do
     socket
     |> assign(:dashboard, Collections.list_dashboard(socket.assigns.current_scope))
@@ -943,8 +969,19 @@ defmodule LinksWeb.DashboardLive do
   defp select_collection(socket, id) do
     case Collections.resolve_collection(socket.assigns.current_scope, id) do
       {:ok, context} ->
-        can_manage = context.effective_collection.owner_id == socket.assigns.current_scope.user.id
-        context = Map.put(context, :can_manage, can_manage)
+        can_manage =
+          Collections.can_manage_collection?(
+            socket.assigns.current_scope,
+            context.effective_collection
+          )
+
+        can_restore_collaborators =
+          context.effective_collection.owner_id == socket.assigns.current_scope.user.id
+
+        context =
+          context
+          |> Map.put(:can_manage, can_manage)
+          |> Map.put(:can_restore_collaborators, can_restore_collaborators)
 
         shares =
           Collections.list_public_shares(

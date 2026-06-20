@@ -326,6 +326,17 @@ defmodule LinksWeb.DashboardLiveTest do
 
       assert has_element?(lv, "#collaborator-#{mount.id}", "Revoked")
       refute has_element?(lv, "#revoke-collaborator-#{mount.id}")
+
+      lv
+      |> element("#restore-collaborator-#{mount.id}")
+      |> render_click()
+
+      assert has_element?(lv, "#collaborator-#{mount.id}", "Can edit · Active")
+      assert has_element?(lv, "#revoke-collaborator-#{mount.id}")
+      refute has_element?(lv, "#restore-collaborator-#{mount.id}")
+
+      collaborator_scope = user_scope_fixture(collaborator)
+      assert Collections.can_edit_collection?(collaborator_scope, collection.id)
     end
 
     test "updates collaborator tree when a collection is shared or revoked", %{conn: conn} do
@@ -392,6 +403,52 @@ defmodule LinksWeb.DashboardLiveTest do
       |> render_click()
 
       assert has_element?(lv, "#copy-public-share-#{share.id}", "Copy link")
+    end
+
+    test "editable collaborator can create a public share from the detail panel", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared Publicly"})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, false)
+
+      conn = log_in_user(conn, collaborator)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv
+      |> element("#collection-#{mount.id} > details > summary")
+      |> render_click()
+
+      assert has_element?(lv, "#collaboration-form")
+      assert has_element?(lv, "button", "Create public link")
+
+      lv
+      |> element("button", "Create public link")
+      |> render_click()
+
+      html = render(lv)
+      assert html =~ "Copy link"
+    end
+
+    test "read-only collaborator cannot manage sharing from the detail panel", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared Read Only"})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      conn = log_in_user(conn, collaborator)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv
+      |> element("#collection-#{mount.id} > details > summary")
+      |> render_click()
+
+      html = render(lv)
+      refute html =~ ~s(id="collaboration-form")
+      refute html =~ "Create public link"
     end
 
     test "shows collaboration icons only on shared root collections", %{conn: conn} do

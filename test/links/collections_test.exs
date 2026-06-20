@@ -369,6 +369,42 @@ defmodule Links.CollectionsTest do
       assert_receive {:public_share_changed, token} when token == share.token
       refute Collections.get_public_share_by_token(share.token)
     end
+
+    test "editable collaborators can create and revoke public shares" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, false)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:ok, share} = Collections.create_public_share(collaborator_scope, source)
+      assert share.collection_id == source.id
+      assert share.created_by_id == collaborator.id
+
+      assert [listed] = Collections.list_public_shares(collaborator_scope, source)
+      assert listed.id == share.id
+
+      assert {:ok, revoked} = Collections.revoke_public_share(collaborator_scope, share)
+      assert revoked.revoked_at
+      refute Collections.get_public_share_by_token(share.token)
+    end
+
+    test "read-only collaborators cannot manage public shares" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:error, :unauthorized} = Collections.create_public_share(collaborator_scope, source)
+      assert Collections.list_public_shares(collaborator_scope, source) == []
+    end
   end
 
   describe "collaboration mounts" do
@@ -604,6 +640,56 @@ defmodule Links.CollectionsTest do
       assert {:error, :unauthorized} = Collections.revoke_collaboration(owner_scope, revoked)
     end
 
+    test "owner can restore revoked collaborator access" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, false)
+
+      assert {:ok, revoked} = Collections.revoke_collaboration(owner_scope, mount)
+      assert revoked.collaboration_revoked_at
+
+      collaborator_scope = user_scope_fixture(collaborator)
+      refute Collections.can_view_collection?(collaborator_scope, source.id)
+
+      assert {:ok, restored} = Collections.restore_collaboration(owner_scope, revoked)
+      refute restored.collaboration_revoked_at
+      assert Collections.can_edit_collection?(collaborator_scope, source.id)
+    end
+
+    test "editable collaborators cannot restore revoked access" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      invitee = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, false)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:ok, invitee_mount} =
+               Collections.create_collaboration(collaborator_scope, source, invitee.email, true)
+
+      assert {:ok, revoked} = Collections.revoke_collaboration(owner_scope, invitee_mount)
+
+      assert {:error, :unauthorized} =
+               Collections.restore_collaboration(collaborator_scope, revoked)
+    end
+
+    test "cannot restore an active collaboration" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      assert {:error, :unauthorized} = Collections.restore_collaboration(owner_scope, mount)
+    end
+
     test "broadcasts user collection list changes when sharing and revoking" do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()
@@ -669,6 +755,72 @@ defmodule Links.CollectionsTest do
       assert {:ok, _deleted_mount} = Collections.delete_collection(collaborator_scope, mount)
       assert Collections.get_collection!(source.id).id == source.id
       refute Repo.get(Collection, mount.id)
+    end
+
+    test "editable collaborators can invite and list collaborators" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      invitee = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, false)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:ok, invitee_mount} =
+               Collections.create_collaboration(
+                 collaborator_scope,
+                 source,
+                 invitee.email,
+                 true
+               )
+
+      assert invitee_mount.collaboration_id == source.id
+      assert invitee_mount.owner_id == invitee.id
+
+      listed = Collections.list_collaborators(collaborator_scope, source)
+      assert Enum.any?(listed, &(&1.id == invitee_mount.id))
+    end
+
+    test "editable collaborators can revoke collaborations" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      invitee = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, false)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:ok, invitee_mount} =
+               Collections.create_collaboration(collaborator_scope, source, invitee.email, true)
+
+      assert {:ok, revoked} = Collections.revoke_collaboration(collaborator_scope, invitee_mount)
+      assert revoked.collaboration_revoked_at
+    end
+
+    test "read-only collaborators cannot manage collaborators" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      invitee = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:error, :unauthorized} =
+               Collections.create_collaboration(
+                 collaborator_scope,
+                 source,
+                 invitee.email,
+                 false
+               )
+
+      assert Collections.list_collaborators(collaborator_scope, source) == []
     end
   end
 end
