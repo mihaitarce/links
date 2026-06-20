@@ -70,12 +70,19 @@ summary.bookmark-drop-highlight,
 }
 
 [data-bookmark-sortable] > li[id^="bookmark-"].sortable-chosen > .bookmark-menu-row,
-[data-bookmark-sortable] > li[id^="bookmark-"].sortable-chosen > .bookmark-menu-row:active {
-  cursor: grabbing;
+[data-bookmark-sortable] > li[id^="bookmark-"].sortable-chosen > .bookmark-menu-row > a,
+.sortable-drag,
+.sortable-fallback {
+  cursor: grabbing !important;
 }
 
 [data-bookmark-sortable] > li[id^="bookmark-"] > .bookmark-menu-row > a {
   cursor: pointer;
+}
+
+body.bookmark-dragging,
+body.bookmark-dragging * {
+  cursor: grabbing !important;
 }
 
 .sidebar-more-button {
@@ -85,7 +92,7 @@ summary.bookmark-drop-highlight,
 }
 
 details > summary .sidebar-more-button {
-  margin-inline-end: 0.375rem;
+  margin-inline-end: 0;
 }
 
 #bookmarks-sidebar {
@@ -131,7 +138,11 @@ details > summary .sidebar-more-button {
   overflow: hidden;
   grid-auto-flow: column;
   grid-auto-columns: unset;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+#bookmarks-sidebar .menu :where(li > details > summary:not(.menu-title))::after {
+  display: none;
 }
 
 [data-collection-sortable] > li[id^="collection-"][data-reorderable="true"] > details > summary {

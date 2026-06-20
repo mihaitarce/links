@@ -69,7 +69,8 @@ const isEmptyBookmarkContainer = (container) =>
   container.dataset.emptyBookmarks === "true"
 
 const DROP_HIGHLIGHT_CLASS = "bookmark-drop-highlight"
-const AUTO_EXPAND_DELAY_MS = 2000
+const BOOKMARK_DRAGGING_CLASS = "bookmark-dragging"
+const AUTO_EXPAND_DELAY_MS = 1000
 
 const CollectionBookmarkSort = {
   mounted() {
@@ -96,8 +97,15 @@ const CollectionBookmarkSort = {
     this.destroySortables()
     this.clearDropHighlight()
     this.clearExpandTimer()
+    this.endBookmarkDrag()
     this.unbindDragOver()
     this.sourceSummary = null
+  },
+  beginBookmarkDrag() {
+    document.body.classList.add(BOOKMARK_DRAGGING_CLASS)
+  },
+  endBookmarkDrag() {
+    document.body.classList.remove(BOOKMARK_DRAGGING_CLASS)
   },
   clearExpandTimer() {
     if (this.expandTimer) {
@@ -395,6 +403,7 @@ const CollectionBookmarkSort = {
       },
       onStart(event) {
         hook.spilled = false
+        hook.beginBookmarkDrag()
         hook.bindDragOver()
 
         if (isInboxContainer(event.from)) {
@@ -413,44 +422,48 @@ const CollectionBookmarkSort = {
         return !hook.shouldRejectMoveInContainer(event, pointerTarget)
       },
       onEnd(event) {
-        hook.unbindDragOver()
+        try {
+          hook.unbindDragOver()
 
-        const validDrop = hook.isValidDropTarget(event)
-        const targetContainer = hook.resolveDropContainer(event)
-        const sourceContainer = event.from
+          const validDrop = hook.isValidDropTarget(event)
+          const targetContainer = hook.resolveDropContainer(event)
+          const sourceContainer = event.from
 
-        hook.clearDropHighlight()
-        hook.clearExpandTimer()
-        hook.sourceSummary = null
+          hook.clearDropHighlight()
+          hook.clearExpandTimer()
+          hook.sourceSummary = null
 
-        if (!validDrop) {
-          if (!hook.spilled) {
-            hook.revertDraggedItem(event)
+          if (!validDrop) {
+            if (!hook.spilled) {
+              hook.revertDraggedItem(event)
+            }
+
+            hook.spilled = false
+            hook.autoExpandedIds.clear()
+            return
           }
 
           hook.spilled = false
-          hook.autoExpandedIds.clear()
-          return
+
+          const moved =
+            !(targetContainer === sourceContainer && event.oldIndex === event.newIndex)
+
+          if (moved) {
+            hook.ensureDropTargetExpanded(targetContainer, event)
+          }
+
+          hook.syncAutoExpandedCollections()
+
+          if (!moved) return
+
+          hook.pushEvent("move_bookmark", {
+            id: event.item.dataset.id,
+            collection_id: targetCollectionId(targetContainer),
+            ordered_ids: hook.orderedBookmarkIds(targetContainer, event.item),
+          })
+        } finally {
+          hook.endBookmarkDrag()
         }
-
-        hook.spilled = false
-
-        const moved =
-          !(targetContainer === sourceContainer && event.oldIndex === event.newIndex)
-
-        if (moved) {
-          hook.ensureDropTargetExpanded(targetContainer, event)
-        }
-
-        hook.syncAutoExpandedCollections()
-
-        if (!moved) return
-
-        hook.pushEvent("move_bookmark", {
-          id: event.item.dataset.id,
-          collection_id: targetCollectionId(targetContainer),
-          ordered_ids: hook.orderedBookmarkIds(targetContainer, event.item),
-        })
       },
     })
   },
