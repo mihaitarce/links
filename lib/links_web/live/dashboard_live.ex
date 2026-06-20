@@ -66,11 +66,13 @@ defmodule LinksWeb.DashboardLive do
             class="flex min-h-0 flex-1 flex-col"
           >
             <section class="shrink-0 border-b border-base-300 p-3">
-              <div class="mb-2 flex items-center justify-between">
+              <div class="mb-2 flex items-center gap-1.5">
                 <h2 class="text-xs font-semibold uppercase tracking-wide text-base-content/60">
                   Inbox
                 </h2>
-                <span class="badge badge-ghost badge-sm">{length(@dashboard.inbox)}</span>
+                <span id="inbox-bookmark-count" class="badge badge-ghost badge-xs shrink-0 tabular-nums">
+                  {length(@dashboard.inbox)}
+                </span>
               </div>
               <ul
                 id="bookmarks-zone-inbox"

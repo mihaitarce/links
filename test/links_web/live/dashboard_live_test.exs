@@ -20,13 +20,14 @@ defmodule LinksWeb.DashboardLiveTest do
       collection_fixture(scope, %{title: "Reading"})
       bookmark_fixture(scope, %{title: "Inbox link", url: "https://example.com/inbox"})
 
-      {:ok, _lv, html} = live(conn, ~p"/")
+      {:ok, lv, html} = live(conn, ~p"/")
 
       assert html =~ "Paste a new link"
       assert html =~ "Inbox"
       assert html =~ "Collections"
       assert html =~ "Reading"
       assert html =~ "Inbox link"
+      assert has_element?(lv, "#inbox-bookmark-count", "1")
     end
 
     test "creates new links in the inbox", %{conn: conn} do
