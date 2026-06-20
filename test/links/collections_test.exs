@@ -521,6 +521,37 @@ defmodule Links.CollectionsTest do
       assert Collections.can_view_collection?(collaborator_scope, source.id)
     end
 
+    test "rejects inviting an active collaborator again" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      assert {:error, :already_collaborator} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, false)
+
+      assert length(Collections.list_collaborators(owner_scope, source)) == 1
+    end
+
+    test "allows inviting a collaborator again after access was revoked" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      assert {:ok, _revoked} = Collections.revoke_collaboration(owner_scope, mount)
+
+      assert {:ok, new_mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, false)
+
+      assert new_mount.id != mount.id
+      assert is_nil(new_mount.collaboration_revoked_at)
+    end
+
     test "marks owned collections as shared when collaborators are invited" do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()

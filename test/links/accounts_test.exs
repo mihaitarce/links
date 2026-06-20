@@ -62,6 +62,16 @@ defmodule Links.AccountsTest do
              ]
     end
 
+    test "excludes multiple user ids" do
+      owner = user_fixture(%{email: "owner@example.com"})
+      excluded = user_fixture(%{email: "excluded@example.com"})
+      user_fixture(%{email: "included@example.com"})
+
+      assert Accounts.search_users_by_email("example.com",
+               exclude_user_ids: [owner.id, excluded.id]
+             ) == ["included@example.com"]
+    end
+
     test "respects the result limit" do
       for index <- 1..10 do
         user_fixture(%{email: "match#{index}@example.com"})

@@ -509,31 +509,66 @@ defmodule Links.Collections do
   end
 
   def create_collaboration(%Scope{} = scope, %Collection{} = source, collaborator_email, readonly) do
-    with true <- can_manage_collection?(scope, source),
-         %Accounts.User{} = collaborator <- Accounts.get_user_by_email(collaborator_email),
-         false <- collaborator.id == scope.user.id do
-      attrs = %{
-        owner_id: collaborator.id,
-        title: source.title,
-        collaboration_id: source.id,
-        collaboration_readonly: readonly,
-        position: next_collection_position(nil, collaborator.id)
-      }
+    collaborator = Accounts.get_user_by_email(collaborator_email)
 
-      %Collection{}
-      |> Collection.changeset(attrs)
-      |> Repo.insert()
-      |> tap(fn
-        {:ok, _mount} ->
-          broadcast_user_collections_changed(collaborator.id)
-          broadcast_user_collections_changed(scope.user.id)
+    cond do
+      not can_manage_collection?(scope, source) ->
+        {:error, :unauthorized}
 
-        _ ->
-          :ok
-      end)
-    else
-      _ -> {:error, :unauthorized}
+      is_nil(collaborator) ->
+        {:error, :unauthorized}
+
+      collaborator.id == scope.user.id ->
+        {:error, :unauthorized}
+
+      active_collaborator?(source, collaborator) ->
+        {:error, :already_collaborator}
+
+      true ->
+        attrs = %{
+          owner_id: collaborator.id,
+          title: source.title,
+          collaboration_id: source.id,
+          collaboration_readonly: readonly,
+          position: next_collection_position(nil, collaborator.id)
+        }
+
+        %Collection{}
+        |> Collection.changeset(attrs)
+        |> Repo.insert()
+        |> tap(fn
+          {:ok, _mount} ->
+            broadcast_user_collections_changed(collaborator.id)
+            broadcast_user_collections_changed(scope.user.id)
+
+          _ ->
+            :ok
+        end)
     end
+  end
+
+  def active_collaborator?(%Collection{} = source, %Accounts.User{} = collaborator) do
+    active_collaborator?(source, collaborator.id)
+  end
+
+  def active_collaborator?(%Collection{} = source, user_id) when is_integer(user_id) do
+    Collection
+    |> where(
+      [c],
+      c.collaboration_id == ^source.id and c.owner_id == ^user_id and
+        is_nil(c.collaboration_revoked_at)
+    )
+    |> Repo.exists?()
+  end
+
+  def active_collaborator_user_ids(%Collection{} = source) do
+    Collection
+    |> where(
+      [c],
+      c.collaboration_id == ^source.id and is_nil(c.collaboration_revoked_at)
+    )
+    |> select([c], c.owner_id)
+    |> Repo.all()
   end
 
   def list_collaborators(%Scope{} = scope, %Collection{} = collection) do

@@ -439,6 +439,94 @@ defmodule LinksWeb.DashboardLiveTest do
       refute has_element?(lv, "#collaboration-email-suggestions")
     end
 
+    test "shows validation when inviting an active collaborator again", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      collection = collection_fixture(owner_scope, %{title: "Team Project"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(
+                 owner_scope,
+                 collection,
+                 collaborator.email,
+                 true
+               )
+
+      conn = log_in_user(conn, owner_scope.user)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv = open_collection_details(lv, collection.id)
+
+      lv
+      |> form("#collaboration-form form", collaboration: %{email: collaborator.email})
+      |> render_change()
+
+      assert has_element?(lv, "#collaboration-form", "This user is already a collaborator")
+
+      lv
+      |> form("#collaboration-form form", collaboration: %{email: collaborator.email})
+      |> render_submit()
+
+      assert has_element?(lv, "#collaboration-form", "This user is already a collaborator")
+      assert length(Collections.list_collaborators(owner_scope, collection)) == 1
+    end
+
+    test "omits active collaborators from email suggestions", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture(%{email: "active-collaborator@example.com"})
+      _other = user_fixture(%{email: "other-collaborator@example.com"})
+      collection = collection_fixture(owner_scope, %{title: "Team Project"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(
+                 owner_scope,
+                 collection,
+                 collaborator.email,
+                 true
+               )
+
+      conn = log_in_user(conn, owner_scope.user)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv = open_collection_details(lv, collection.id)
+
+      lv
+      |> form("#collaboration-form form", collaboration: %{email: "active-collaborator"})
+      |> render_change()
+
+      refute has_element?(lv, "#collaboration-email-suggestions", collaborator.email)
+      assert has_element?(lv, "#collaboration-email-no-matches", "No matches found")
+
+      lv
+      |> form("#collaboration-form form", collaboration: %{email: "other-collaborator"})
+      |> render_change()
+
+      assert has_element?(
+               lv,
+               "#collaboration-email-suggestions",
+               "other-collaborator@example.com"
+             )
+
+      refute has_element?(lv, "#collaboration-email-no-matches")
+    end
+
+    test "shows no matches found when email search has no results", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      collection = collection_fixture(owner_scope, %{title: "Team Project"})
+
+      conn = log_in_user(conn, owner_scope.user)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv = open_collection_details(lv, collection.id)
+
+      lv
+      |> form("#collaboration-form form", collaboration: %{email: "nobody-here"})
+      |> render_change()
+
+      assert has_element?(lv, "#collaboration-email-no-matches", "No matches found")
+      refute has_element?(lv, "[id^='collaboration-email-option-']")
+    end
+
     test "clears the collaborator form after sharing", %{conn: conn} do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()
