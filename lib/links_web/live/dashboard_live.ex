@@ -51,10 +51,10 @@ defmodule LinksWeb.DashboardLive do
                   name="bookmark[url]"
                   value=""
                   placeholder="Paste a new link..."
-                  class="input join-item input-sm w-full"
+                  class="input join-item w-full"
                   required
                 />
-                <button class="btn btn-primary join-item btn-sm">Add</button>
+                <button class="btn btn-primary join-item">Add</button>
               </div>
             </.form>
           </div>
@@ -94,9 +94,11 @@ defmodule LinksWeb.DashboardLive do
             <section class="flex min-h-0 flex-1 flex-col overflow-hidden p-3">
               <div class="mb-2 flex shrink-0 items-center justify-between">
                 <h2 class="text-xs font-semibold uppercase tracking-wide text-base-content/60">
-                  Projects
+                  Collections
                 </h2>
-                <button class="btn btn-ghost btn-xs" phx-click="new_collection">New</button>
+                <button class="btn btn-primary btn-soft" phx-click="new_collection">
+                  New
+                </button>
               </div>
               <ul
                 id="collections-zone-root"
@@ -411,10 +413,10 @@ defmodule LinksWeb.DashboardLive do
             disabled={@context.readonly}
           />
           <div :if={!@context.readonly} class="mt-4 flex gap-2">
-            <button class="btn btn-primary btn-sm">Save</button>
+            <button class="btn btn-primary">Save</button>
             <button
               type="button"
-              class="btn btn-error btn-soft btn-sm"
+              class="btn btn-error btn-soft"
               phx-click="delete_bookmark"
               phx-value-id={@context.bookmark.id}
             >
@@ -444,7 +446,7 @@ defmodule LinksWeb.DashboardLive do
           <button
             :if={@context.mount || !@readonly}
             type="button"
-            class="btn btn-error btn-soft btn-sm"
+            class="btn btn-error btn-soft"
             phx-click="delete_collection"
             phx-value-id={@context.collection.id}
           >
@@ -466,9 +468,9 @@ defmodule LinksWeb.DashboardLive do
               name={@collection_form[:title].name}
               id={@collection_form[:title].id}
               value={@collection_form[:title].value}
-              class="input input-sm join-item w-full"
+              class="input join-item w-full"
             />
-            <button class="btn btn-primary btn-sm join-item">Save collection</button>
+            <button class="btn btn-primary join-item">Save collection</button>
           </div>
         </.form>
       </div>
@@ -488,9 +490,9 @@ defmodule LinksWeb.DashboardLive do
                 name={@child_collection_form[:title].name}
                 id={@child_collection_form[:title].id}
                 value={@child_collection_form[:title].value}
-                class="input input-sm join-item w-full"
+                class="input join-item w-full"
               />
-              <button class="btn btn-primary btn-sm join-item">Create</button>
+              <button class="btn btn-primary join-item">Create</button>
             </div>
           </.form>
         </div>
@@ -505,7 +507,7 @@ defmodule LinksWeb.DashboardLive do
                 type="email"
                 name="collaboration[email]"
                 value={@collaboration_email}
-                class="input input-sm min-w-0 flex-1"
+                class="input min-w-0 flex-1"
               />
               <label class="label shrink-0 cursor-pointer gap-2 whitespace-nowrap">
                 <input
@@ -516,7 +518,7 @@ defmodule LinksWeb.DashboardLive do
                   class="checkbox checkbox-sm"
                 /> Read-only
               </label>
-              <button class="btn btn-primary btn-sm shrink-0">Add collaborator</button>
+              <button class="btn btn-primary shrink-0">Add collaborator</button>
             </div>
           </.form>
           <ul id="collaborators-list" class="mt-4 space-y-2">
@@ -539,7 +541,7 @@ defmodule LinksWeb.DashboardLive do
               <button
                 :if={is_nil(collaborator.collaboration_revoked_at)}
                 id={"revoke-collaborator-#{collaborator.id}"}
-                class="btn btn-ghost btn-xs"
+                class="btn btn-ghost"
                 phx-click="revoke_collaboration"
                 phx-value-id={collaborator.id}
               >
@@ -559,7 +561,7 @@ defmodule LinksWeb.DashboardLive do
       >
         <div class="mb-3 flex items-center justify-between">
           <h2 class="font-semibold">Public Sharing</h2>
-          <button class="btn btn-primary btn-sm" phx-click="create_public_share">Create public link</button>
+          <button class="btn btn-primary" phx-click="create_public_share">Create public link</button>
         </div>
         <ul class="space-y-2">
           <li
@@ -578,13 +580,13 @@ defmodule LinksWeb.DashboardLive do
               <button
                 id={"copy-public-share-#{share.id}"}
                 type="button"
-                class="btn btn-ghost btn-xs"
+                class="btn btn-ghost"
                 phx-click={JS.dispatch("phx:copy", detail: %{text: public_share_url(share)})}
               >
                 Copy link
               </button>
               <button
-                class="btn btn-ghost btn-xs"
+                class="btn btn-ghost"
                 phx-click="revoke_public_share"
                 phx-value-id={share.id}
               >

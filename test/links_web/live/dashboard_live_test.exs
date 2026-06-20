@@ -23,7 +23,7 @@ defmodule LinksWeb.DashboardLiveTest do
 
       assert html =~ "Paste a new link"
       assert html =~ "Inbox"
-      assert html =~ "Projects"
+      assert html =~ "Collections"
       assert html =~ "Reading"
       assert html =~ "Inbox link"
     end
