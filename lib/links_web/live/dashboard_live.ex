@@ -42,8 +42,8 @@ defmodule LinksWeb.DashboardLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <div class="flex h-full min-h-0 w-full overflow-hidden bg-base-200 text-sm">
-        <aside class="flex w-1/2 min-w-0 shrink-0 flex-col border-r border-base-300 bg-base-100">
+      <div class="flex h-full min-h-0 w-full flex-col md:flex-row md:overflow-hidden bg-base-200 text-sm">
+        <aside class="flex w-full min-w-0 shrink-0 flex-col border-r border-base-300 bg-base-100 md:w-1/2">
           <div class="border-b border-base-300 p-3">
             <.form for={@new_bookmark_form} id="new-link-form" phx-submit="create_link">
               <div class="join w-full">
@@ -125,21 +125,52 @@ defmodule LinksWeb.DashboardLive do
           </div>
         </aside>
 
-        <section class="min-w-0 flex-1 overflow-auto p-4">
-          <%= if @selected_context do %>
-            <.detail_panel
-              selected={@selected}
-              context={@selected_context}
-              collection_form={@collection_form}
-              child_collection_form={@child_collection_form}
-              bookmark_form={@bookmark_form}
-              public_shares={@public_shares}
-              collaborators={@collaborators}
-              collaboration_email={@collaboration_email}
-              collaboration_readonly={@collaboration_readonly}
-              pending_metadata_ids={@pending_metadata_ids}
+        <%= if @selected_context do %>
+          <div
+            id="detail-panel"
+            class={[
+              "fixed inset-0 z-[999] flex items-center justify-center bg-black/40 p-4",
+              "md:static md:z-auto md:flex md:min-w-0 md:flex-1 md:flex-col md:items-stretch md:justify-start md:overflow-auto md:border-l md:border-base-300 md:bg-transparent md:p-0"
+            ]}
+            role="dialog"
+            aria-modal="true"
+          >
+            <button
+              type="button"
+              class="absolute inset-0 md:hidden"
+              phx-click="close_detail"
+              aria-label="Close"
             />
-          <% else %>
+            <div class="relative z-10 flex max-h-[90dvh] w-full max-w-3xl flex-col overflow-hidden rounded-box bg-base-100 shadow-xl md:h-full md:max-h-none md:max-w-none md:rounded-none md:shadow-none">
+              <div class="flex shrink-0 items-center justify-end border-b border-base-300 px-3 py-2 md:hidden">
+                <button
+                  type="button"
+                  id="detail-modal-close"
+                  class="btn btn-ghost btn-sm btn-circle"
+                  phx-click="close_detail"
+                  aria-label="Close"
+                >
+                  <.icon name="hero-x-mark" class="size-5" />
+                </button>
+              </div>
+              <div class="min-h-0 flex-1 overflow-y-auto p-4">
+                <.detail_panel
+                  selected={@selected}
+                  context={@selected_context}
+                  collection_form={@collection_form}
+                  child_collection_form={@child_collection_form}
+                  bookmark_form={@bookmark_form}
+                  public_shares={@public_shares}
+                  collaborators={@collaborators}
+                  collaboration_email={@collaboration_email}
+                  collaboration_readonly={@collaboration_readonly}
+                  pending_metadata_ids={@pending_metadata_ids}
+                />
+              </div>
+            </div>
+          </div>
+        <% else %>
+          <section class="hidden min-w-0 flex-1 overflow-auto p-4 md:block">
             <div class="flex h-full items-center justify-center">
               <div class="max-w-md rounded-box border border-dashed border-base-300 bg-base-100 p-8 text-center">
                 <h1 class="text-lg font-semibold">Select a collection or bookmark</h1>
@@ -148,8 +179,8 @@ defmodule LinksWeb.DashboardLive do
                 </p>
               </div>
             </div>
-          <% end %>
-        </section>
+          </section>
+        <% end %>
       </div>
     </Layouts.app>
     """
@@ -735,6 +766,10 @@ defmodule LinksWeb.DashboardLive do
     {:noreply, select_collection(socket, id)}
   end
 
+  def handle_event("close_detail", _params, socket) do
+    {:noreply, clear_detail_selection(socket)}
+  end
+
   def handle_event("select_bookmark", %{"id" => id}, socket) do
     bookmark = Collections.get_bookmark!(id)
 
@@ -1011,6 +1046,12 @@ defmodule LinksWeb.DashboardLive do
       |> Enum.map(& &1.id)
       |> MapSet.new()
     )
+  end
+
+  defp clear_detail_selection(socket) do
+    socket
+    |> assign(:selected, nil)
+    |> assign(:selected_context, nil)
   end
 
   defp refresh_selected_bookmark(socket, bookmark_id) do
