@@ -601,7 +601,7 @@ defmodule Links.Collections do
   end
 
   def create_collaboration(%Scope{} = scope, %Collection{} = source, collaborator_email, readonly) do
-    collaborator = Accounts.get_user_by_email(collaborator_email)
+    collaborator = collaborator_email |> String.trim() |> Accounts.get_user_by_email()
 
     cond do
       not can_manage_collection?(scope, source) ->

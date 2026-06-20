@@ -685,7 +685,7 @@ defmodule LinksWeb.DashboardLiveTest do
              )
     end
 
-    test "suggests existing account emails while typing collaborator email", %{conn: conn} do
+    test "suggests existing users while typing collaborator query", %{conn: conn} do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture(%{email: "collaborator-search@example.com"})
       collection = collection_fixture(owner_scope, %{title: "Team Project"})
@@ -700,17 +700,6 @@ defmodule LinksWeb.DashboardLiveTest do
       |> render_change()
 
       assert has_element?(lv, "#collaboration-email-suggestions", collaborator.email)
-
-      lv
-      |> element("#collaboration-email-option-collaborator-search-example-com")
-      |> render_click()
-
-      assert has_element?(
-               lv,
-               "#collaboration-form input[type='email'][value='#{collaborator.email}']"
-             )
-
-      refute has_element?(lv, "#collaboration-email-suggestions")
     end
 
     test "shows validation when inviting an active collaborator again", %{conn: conn} do
@@ -784,7 +773,7 @@ defmodule LinksWeb.DashboardLiveTest do
       refute has_element?(lv, "#collaboration-email-no-matches")
     end
 
-    test "shows no matches found when email search has no results", %{conn: conn} do
+    test "shows no matches found when user search has no results", %{conn: conn} do
       owner_scope = user_scope_fixture()
       collection = collection_fixture(owner_scope, %{title: "Team Project"})
 
@@ -799,6 +788,39 @@ defmodule LinksWeb.DashboardLiveTest do
 
       assert has_element?(lv, "#collaboration-email-no-matches", "No matches found")
       refute has_element?(lv, "[id^='collaboration-email-option-']")
+    end
+
+    test "shows validation when user does not exist", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      collection = collection_fixture(owner_scope, %{title: "Team Project"})
+
+      conn = log_in_user(conn, owner_scope.user)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv = open_collection_details(lv, collection.id)
+
+      lv
+      |> form("#collaboration-form form", collaboration: %{email: "nobody-here"})
+      |> render_submit()
+
+      assert has_element?(lv, "#collaboration-form", "User not found")
+    end
+
+    test "allows inviting a user without an email address", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      {:ok, collaborator} = Links.Accounts.get_or_register_forward_auth_user("proxy-user")
+      collection = collection_fixture(owner_scope, %{title: "Team Project"})
+
+      conn = log_in_user(conn, owner_scope.user)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv = open_collection_details(lv, collection.id)
+
+      lv
+      |> form("#collaboration-form form", collaboration: %{email: collaborator.email})
+      |> render_submit()
+
+      assert has_element?(lv, "#collaborators-list", collaborator.email)
     end
 
     test "clears the collaborator form after sharing", %{conn: conn} do
@@ -818,7 +840,7 @@ defmodule LinksWeb.DashboardLiveTest do
       |> render_submit()
 
       assert has_element?(lv, "#collaborators-list", collaborator.email)
-      assert has_element?(lv, "#collaboration-form input[type='email'][value='']")
+      assert has_element?(lv, "#collaboration-form input[type='text'][value='']")
 
       refute has_element?(
                lv,
