@@ -71,8 +71,8 @@ defmodule LinksWeb.DashboardLive do
             phx-hook="CollectionBookmarkSort"
             class="flex min-h-0 flex-1 flex-col"
           >
-            <section class="shrink-0 border-b border-base-300 p-3">
-              <div class="mb-2 flex items-center gap-1.5">
+            <section class="flex min-h-0 max-h-[50dvh] shrink-0 flex-col overflow-hidden border-b border-base-300 p-3">
+              <div class="mb-2 flex shrink-0 items-center gap-1.5">
                 <h2 class="text-xs font-semibold uppercase tracking-wide text-base-content/60">
                   Inbox
                 </h2>
@@ -87,7 +87,7 @@ defmodule LinksWeb.DashboardLive do
                 id="bookmarks-zone-inbox"
                 data-bookmark-sortable
                 data-collection-id="inbox"
-                class={sidebar_menu_class()}
+                class={sidebar_menu_class(["min-h-0 flex-1 overflow-y-auto overflow-x-hidden"])}
               >
                 <li
                   :for={bookmark <- @dashboard.inbox}
@@ -1977,7 +1977,7 @@ defmodule LinksWeb.DashboardLive do
     url(~p"/share/#{token}")
   end
 
-  defp sidebar_menu_class(extra \\ []) do
+  defp sidebar_menu_class(extra) do
     [
       "menu flex-col flex-nowrap bg-base-200 rounded-box w-full min-w-0 max-w-full",
       "[&_li]:min-w-0 [&_li]:max-w-full [&_a]:min-w-0 [&_details]:min-w-0 [&_details]:max-w-full"
