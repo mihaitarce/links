@@ -81,11 +81,15 @@ defmodule Links.Workers.FetchBookmarkMetadataWorker do
   defp fetch(url, redirects_left) do
     with :ok <- validate_url(url),
          {:ok, response} <-
-           Req.get(url,
-             redirect: false,
-             receive_timeout: 5_000,
-             connect_options: [timeout: 5_000],
-             headers: [{"user-agent", "LinksBot/0.1"}]
+           Req.get(
+             url,
+             [
+               redirect: false,
+               receive_timeout: 5_000,
+               connect_options: [timeout: 5_000],
+               headers: [{"user-agent", "LinksBot/0.1"}]
+             ]
+             |> Keyword.merge(metadata_req_options())
            ) do
       maybe_follow_redirect(response, url, redirects_left)
     end
@@ -151,12 +155,21 @@ defmodule Links.Workers.FetchBookmarkMetadataWorker do
     |> Floki.find("title")
     |> Floki.text()
     |> String.trim()
+    |> decode_page_title()
     |> case do
+      nil -> nil
       "" -> nil
       title -> String.slice(title, 0, 240)
     end
   rescue
     _ -> nil
+  end
+
+  defp decode_page_title(title) when is_binary(title), do: HtmlEntities.decode(title)
+  defp decode_page_title(_), do: nil
+
+  defp metadata_req_options do
+    Application.get_env(:links, :metadata_req_options, [])
   end
 
   defp favicon_url(html, page_url) do

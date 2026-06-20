@@ -50,6 +50,7 @@ defmodule Links.MixProject do
       {:phoenix_live_view, "~> 1.2"},
       {:oban, "~> 2.23"},
       {:floki, "~> 0.38"},
+      {:html_entities, "~> 0.5"},
       {:lazy_html, ">= 0.1.0", only: :test},
       {:phoenix_live_dashboard, "~> 0.8.3"},
       {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
