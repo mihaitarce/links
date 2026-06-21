@@ -42,11 +42,13 @@
 }
 
 #bookmarks-sidebar li[id^="collection-"]:not([data-readonly="true"]) > details > summary,
-#bookmarks-sidebar li[id^="collection-"][data-collaboration-mount="true"] > details > summary {
+#bookmarks-sidebar li[id^="collection-"][data-collaboration-mount="true"] > details > summary,
+#bookmarks-sidebar li[id^="collection-"][data-revoked="true"] > .collection-tree-row {
   cursor: grab;
 }
 
-#bookmarks-sidebar li[id^="collection-"].sortable-chosen > details > summary {
+#bookmarks-sidebar li[id^="collection-"].sortable-chosen > details > summary,
+#bookmarks-sidebar li[id^="collection-"][data-revoked="true"].sortable-chosen > .collection-tree-row {
   cursor: grabbing;
 }
 

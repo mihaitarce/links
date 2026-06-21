@@ -1248,6 +1248,33 @@ defmodule LinksWeb.DashboardLiveTest do
       assert has_element?(lv, ~s(#collection-#{mount.id}[data-revoked="true"]))
     end
 
+    test "revoked shared collections are not interactive in the sidebar", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Revoked Shared"})
+
+      {:ok, child} =
+        Collections.create_collection(owner_scope, %{title: "Nested", parent_id: source.id})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      assert {:ok, _mount} = Collections.revoke_collaboration(owner_scope, mount)
+
+      conn = log_in_user(conn, collaborator)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      refute has_element?(lv, "#collection-#{mount.id} details")
+      refute has_element?(lv, "#collection-#{mount.id} [phx-click=\"toggle_collection\"]")
+      refute has_element?(lv, "#collection-#{source.id}")
+      refute has_element?(lv, "#collection-#{child.id}")
+      refute has_element?(lv, "#collection-form")
+
+      assert render_click(lv, "toggle_collection", %{"id" => to_string(mount.id)})
+
+      refute has_element?(lv, "#collection-form")
+    end
+
     test "hides revoked shared collections after one hour", %{conn: conn} do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()

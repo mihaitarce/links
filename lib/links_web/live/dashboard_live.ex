@@ -558,17 +558,26 @@ defmodule LinksWeb.DashboardLive do
     ~H"""
     <li
       id={"collection-#{@collection.id}"}
-      data-nest-parent-id={@effective.id}
-      data-bookmark-collection-id={@effective.id}
       data-readonly={to_string(@node.readonly || false)}
       data-revoked={to_string(@node.revoked || false)}
       data-collaboration-mount={to_string(@root_only_mount? || false)}
+      data-nest-parent-id={(!@node.revoked && @effective.id) || nil}
+      data-bookmark-collection-id={(!@node.revoked && @effective.id) || nil}
     >
-      <details open={@expanded}>
+      <div
+        :if={@node.revoked}
+        class="collection-tree-row line-through opacity-50"
+      >
+        <span class="flex min-w-0 items-center gap-2">
+          <.folder_icon />
+          <span class="truncate">{@node.title}</span>
+        </span>
+        <span class="badge badge-sm shrink-0 tabular-nums">
+          {Collections.collection_bookmark_badge(@node)}
+        </span>
+      </div>
+      <details :if={not @node.revoked} open={@expanded}>
         <summary
-          class={[
-            @node.revoked && "line-through opacity-50"
-          ]}
           phx-click="toggle_collection"
           phx-value-id={@collection.id}
         >
@@ -1151,23 +1160,36 @@ defmodule LinksWeb.DashboardLive do
 
   def handle_event("toggle_collection", %{"id" => id}, socket) do
     id = String.to_integer(id)
-    collapsed = socket.assigns.collapsed
+    collection = Collections.get_collection!(id)
 
-    collapsed =
-      if MapSet.member?(collapsed, id) do
-        MapSet.delete(collapsed, id)
-      else
-        MapSet.put(collapsed, id)
-      end
+    if Collections.revoked_collaboration_mount?(collection) do
+      {:noreply, socket}
+    else
+      collapsed = socket.assigns.collapsed
 
-    {:noreply,
-     socket
-     |> assign(:collapsed, collapsed)
-     |> select_collection(id)}
+      collapsed =
+        if MapSet.member?(collapsed, id) do
+          MapSet.delete(collapsed, id)
+        else
+          MapSet.put(collapsed, id)
+        end
+
+      {:noreply,
+       socket
+       |> assign(:collapsed, collapsed)
+       |> select_collection(id)}
+    end
   end
 
   def handle_event("expand_collection", %{"id" => id}, socket) do
-    {:noreply, expand_collection(socket, String.to_integer(id))}
+    id = String.to_integer(id)
+    collection = Collections.get_collection!(id)
+
+    if Collections.revoked_collaboration_mount?(collection) do
+      {:noreply, socket}
+    else
+      {:noreply, expand_collection(socket, id)}
+    end
   end
 
   def handle_event(

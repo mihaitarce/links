@@ -302,7 +302,7 @@ const CollectionSort = {
       group: COLLECTIONS_GROUP,
       animation: 150,
       draggable: "> li[id^='collection-']",
-      handle: "li[id^='collection-'] > details > summary",
+      handle: "li[id^='collection-'] > details > summary, li[id^='collection-'][data-revoked='true'] > .collection-tree-row",
       filter: "button, input, textarea, select, a, #collections-empty-state",
       preventOnFilter: true,
       fallbackOnBody: true,

@@ -34,6 +34,7 @@ defmodule Links.Collections do
       scope
       |> accessible_tree_root_ids()
       |> descendant_ids()
+      |> reject_revoked_collaboration_sources(own_collections)
 
     target_collections =
       Collection
@@ -1040,6 +1041,16 @@ defmodule Links.Collections do
 
     (own_source_ids ++ collaboration_target_ids)
     |> descendant_ids()
+  end
+
+  defp reject_revoked_collaboration_sources(visible_ids, own_collections) do
+    revoked_source_ids =
+      own_collections
+      |> Enum.filter(&revoked_collaboration_mount?/1)
+      |> Enum.map(& &1.collaboration_id)
+      |> MapSet.new()
+
+    Enum.reject(visible_ids, &MapSet.member?(revoked_source_ids, &1))
   end
 
   defp accessible_tree_root_ids(%Scope{} = scope) do
