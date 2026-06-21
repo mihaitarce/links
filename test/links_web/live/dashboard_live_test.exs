@@ -295,78 +295,16 @@ defmodule LinksWeb.DashboardLiveTest do
       assert has_element?(lv, "#inbox-empty-state")
     end
 
-    test "inbox bookmark lists are sortable", %{conn: conn} do
+    test "renders inbox bookmark list", %{conn: conn} do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
       bookmark_fixture(scope, %{title: "Inbox link", url: "https://example.com/inbox"})
       {:ok, _lv, html} = live(conn, ~p"/")
 
       assert html =~ ~s(id="bookmarks-sidebar")
       assert html =~ ~s(id="bookmarks-zone-inbox")
-      assert html =~ ~s(phx-hook="CollectionBookmarkSort")
-      assert html =~ ~s(data-collection-id="inbox")
     end
 
-    test "moves bookmarks between inbox and collections from the dashboard", %{conn: conn} do
-      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
-      collection = collection_fixture(scope, %{title: "Reading"})
-
-      inbox_bookmark =
-        bookmark_fixture(scope, %{title: "Inbox link", url: "https://example.com/inbox"})
-
-      {:ok, lv, _html} = live(conn, ~p"/")
-
-      assert render_click_move_bookmark(lv, %{
-               "id" => to_string(inbox_bookmark.id),
-               "collection_id" => to_string(collection.id),
-               "ordered_ids" => [to_string(inbox_bookmark.id)]
-             })
-
-      assert Collections.get_bookmark!(inbox_bookmark.id).collection_id == collection.id
-
-      {:ok, collection_bookmark} =
-        Collections.create_bookmark(scope, %{
-          title: "Collection link",
-          url: "https://example.com/collection",
-          collection_id: collection.id
-        })
-
-      assert render_click_move_bookmark(lv, %{
-               "id" => to_string(collection_bookmark.id),
-               "collection_id" => nil,
-               "ordered_ids" => [to_string(collection_bookmark.id)]
-             })
-
-      assert Collections.get_bookmark!(collection_bookmark.id).collection_id == nil
-      refute Collections.get_bookmark!(collection_bookmark.id).completed
-    end
-
-    test "clears completed when moving a completed link back to the inbox", %{conn: conn} do
-      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
-      collection = collection_fixture(scope, %{title: "Reading"})
-
-      {:ok, bookmark} =
-        Collections.create_bookmark(scope, %{
-          title: "Done link",
-          url: "https://example.com/done",
-          collection_id: collection.id,
-          completed: true
-        })
-
-      {:ok, lv, _html} = live(conn, ~p"/")
-
-      assert render_click_move_bookmark(lv, %{
-               "id" => to_string(bookmark.id),
-               "collection_id" => nil,
-               "ordered_ids" => [to_string(bookmark.id)]
-             })
-
-      moved = Collections.get_bookmark!(bookmark.id)
-      assert moved.collection_id == nil
-      refute moved.completed
-      refute has_element?(lv, "#bookmark-completed-#{bookmark.id}")
-    end
-
-    test "collection bookmark lists are sortable", %{conn: conn} do
+    test "renders collection bookmark lists", %{conn: conn} do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
       collection = collection_fixture(scope, %{title: "Reading"})
 
@@ -380,113 +318,12 @@ defmodule LinksWeb.DashboardLiveTest do
       {:ok, lv, html} = live(conn, ~p"/")
 
       assert html =~ ~s(id="collections-zone-root")
-      assert html =~ ~s(data-collection-sortable)
-      assert html =~ ~s(data-parent-id="root")
       assert html =~ ~s(id="bookmarks-sidebar")
-      assert html =~ ~s(phx-hook="CollectionBookmarkSort")
-      assert html =~ ~s(data-bookmark-sortable)
-      assert html =~ ~s(data-collection-id="#{collection.id}")
-      assert html =~ ~s(data-readonly="false")
+      assert html =~ ~s(id="nested-zone-#{collection.id}")
       assert has_element?(lv, "#collection-#{collection.id} summary .badge.badge-ghost", "0 / 1")
     end
 
-    test "reorders collections from the dashboard", %{conn: conn} do
-      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
-
-      {:ok, first} = Collections.create_collection(scope, %{title: "Alpha"})
-      {:ok, second} = Collections.create_collection(scope, %{title: "Beta"})
-
-      {:ok, lv, _html} = live(conn, ~p"/")
-
-      assert render_reorder_collections(lv, %{
-               "parent_id" => "root",
-               "ordered_ids" => [to_string(second.id), to_string(first.id)]
-             })
-
-      assert Collections.get_collection!(second.id).position == 0
-      assert Collections.get_collection!(first.id).position == 1
-    end
-
-    test "reorders deeply nested collections from the dashboard", %{conn: conn} do
-      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
-      parent = collection_fixture(scope, %{title: "Parent"})
-      child = collection_fixture(scope, %{title: "Child", parent_id: parent.id})
-
-      {:ok, first} =
-        Collections.create_collection(scope, %{title: "Grand A", parent_id: child.id})
-
-      {:ok, second} =
-        Collections.create_collection(scope, %{title: "Grand B", parent_id: child.id})
-
-      {:ok, lv, _html} = live(conn, ~p"/")
-
-      assert has_element?(lv, ~s(#collection-#{first.id}[data-reorderable="true"]))
-      assert has_element?(lv, ~s(#collection-#{second.id}[data-reorderable="true"]))
-
-      assert render_reorder_collections(lv, %{
-               "parent_id" => to_string(child.id),
-               "ordered_ids" => [to_string(second.id), to_string(first.id)]
-             })
-
-      assert Collections.get_collection!(second.id).position == 0
-      assert Collections.get_collection!(first.id).position == 1
-    end
-
-    test "marks nested collections as reorderable for editable collaborators", %{conn: conn} do
-      owner_scope = user_scope_fixture()
-      collaborator = user_fixture()
-      parent = collection_fixture(owner_scope, %{title: "Shared Parent"})
-
-      {:ok, first} =
-        Collections.create_collection(owner_scope, %{title: "Child A", parent_id: parent.id})
-
-      {:ok, second} =
-        Collections.create_collection(owner_scope, %{title: "Child B", parent_id: parent.id})
-
-      assert {:ok, _mount} =
-               Collections.create_collaboration(owner_scope, parent, collaborator.email, false)
-
-      conn = log_in_user(conn, collaborator)
-      {:ok, lv, _html} = live(conn, ~p"/")
-
-      assert has_element?(lv, ~s(#collection-#{first.id}[data-reorderable="true"]))
-      assert has_element?(lv, ~s(#collection-#{second.id}[data-reorderable="true"]))
-
-      assert render_reorder_collections(lv, %{
-               "parent_id" => to_string(parent.id),
-               "ordered_ids" => [to_string(second.id), to_string(first.id)]
-             })
-
-      assert Collections.get_collection!(second.id).position == 0
-      assert Collections.get_collection!(first.id).position == 1
-    end
-
-    test "reorders read-only shared collection mounts from the dashboard", %{conn: conn} do
-      owner_scope = user_scope_fixture()
-      collaborator = user_fixture()
-      source = collection_fixture(owner_scope, %{title: "Shared"})
-
-      assert {:ok, mount} =
-               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
-
-      collaborator_scope = user_scope_fixture(collaborator)
-      {:ok, own} = Collections.create_collection(collaborator_scope, %{title: "Mine"})
-
-      conn = log_in_user(conn, collaborator)
-      {:ok, lv, html} = live(conn, ~p"/")
-
-      assert html =~ ~s(id="collection-#{mount.id}" data-readonly="true" data-reorderable="true")
-
-      assert render_reorder_collections(lv, %{
-               "parent_id" => "root",
-               "ordered_ids" => [to_string(mount.id), to_string(own.id)]
-             })
-
-      assert Collections.get_collection!(mount.id).position == 0
-      assert Collections.get_collection!(own.id).position == 1
-    end
-
-    test "copies bookmarks from read-only collections via drag hook", %{conn: conn} do
+    test "shows nested bookmarks in read-only shared collections", %{conn: conn} do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()
       source = collection_fixture(owner_scope, %{title: "Shared Reading"})
@@ -501,9 +338,6 @@ defmodule LinksWeb.DashboardLiveTest do
           collection_id: source.id
         })
 
-      collaborator_scope = user_scope_fixture(collaborator)
-      target = collection_fixture(collaborator_scope, %{title: "Saved"})
-
       conn = log_in_user(conn, collaborator)
       {:ok, lv, _html} = live(conn, ~p"/")
 
@@ -511,24 +345,8 @@ defmodule LinksWeb.DashboardLiveTest do
       |> element("#collection-#{mount.id} > details > summary")
       |> render_click()
 
-      assert has_element?(lv, "#nested-zone-#{source.id}[data-readonly=\"true\"]")
-
-      assert render_click_copy_bookmark(lv, %{
-               "id" => to_string(bookmark.id),
-               "collection_id" => to_string(target.id),
-               "ordered_ids" => [to_string(bookmark.id)]
-             })
-
-      copied =
-        Repo.get_by!(Bookmark,
-          collection_id: target.id,
-          url: "https://example.com/shared",
-          created_by_id: collaborator.id
-        )
-
-      assert copied.id != bookmark.id
-      assert Collections.get_bookmark!(bookmark.id).collection_id == source.id
-      assert has_element?(lv, "#bookmark-#{copied.id}")
+      assert has_element?(lv, "#nested-zone-#{source.id}")
+      assert has_element?(lv, "#bookmark-#{bookmark.id}")
     end
 
     test "shows total bookmark counts including sub-collections", %{conn: conn} do
@@ -1072,7 +890,6 @@ defmodule LinksWeb.DashboardLiveTest do
 
       render(lv)
       assert has_element?(lv, ~s(#collection-#{mount.id}[data-revoked="true"]))
-      assert has_element?(lv, ~s(#collection-#{mount.id}[data-reorderable="true"]))
     end
 
     test "hides revoked shared collections after one hour", %{conn: conn} do
@@ -1097,34 +914,6 @@ defmodule LinksWeb.DashboardLiveTest do
       {:ok, lv, _html} = live(conn, ~p"/")
 
       refute has_element?(lv, "#collection-#{mount.id}")
-    end
-
-    test "reorders revoked shared collection mounts from the dashboard", %{conn: conn} do
-      owner_scope = user_scope_fixture()
-      collaborator = user_fixture()
-      source = collection_fixture(owner_scope, %{title: "Revoked Shared"})
-
-      assert {:ok, mount} =
-               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
-
-      assert {:ok, _mount} = Collections.revoke_collaboration(owner_scope, mount)
-
-      collaborator_scope = user_scope_fixture(collaborator)
-      {:ok, own} = Collections.create_collection(collaborator_scope, %{title: "Mine"})
-
-      conn = log_in_user(conn, collaborator)
-      {:ok, lv, _html} = live(conn, ~p"/")
-
-      assert has_element?(lv, ~s(#collection-#{mount.id}[data-revoked="true"]))
-      assert has_element?(lv, ~s(#collection-#{mount.id}[data-reorderable="true"]))
-
-      assert render_reorder_collections(lv, %{
-               "parent_id" => "root",
-               "ordered_ids" => [to_string(mount.id), to_string(own.id)]
-             })
-
-      assert Collections.get_collection!(mount.id).position == 0
-      assert Collections.get_collection!(own.id).position == 1
     end
 
     test "collaborator removing a shared collection deletes only their mount", %{conn: conn} do
@@ -1358,23 +1147,5 @@ defmodule LinksWeb.DashboardLiveTest do
   defp select_collaborator_suggestion(view, email) do
     render_click(view, "select_collaborator_email", %{"email" => email})
     view
-  end
-
-  defp render_click_move_bookmark(view, params) do
-    view
-    |> element("#bookmarks-sidebar")
-    |> render_hook("move_bookmark", params)
-  end
-
-  defp render_click_copy_bookmark(view, params) do
-    view
-    |> element("#bookmarks-sidebar")
-    |> render_hook("copy_bookmark", params)
-  end
-
-  defp render_reorder_collections(view, params) do
-    view
-    |> element("#bookmarks-sidebar")
-    |> render_hook("reorder_collections", params)
   end
 end

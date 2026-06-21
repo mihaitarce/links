@@ -70,17 +70,7 @@
 
 #bookmarks-sidebar .menu .sidebar-item-active,
 #bookmarks-sidebar .menu :where(li:not(.menu-title, .disabled) > .bookmark-menu-row:active),
-#bookmarks-sidebar .menu :where(li:not(.menu-title, .disabled) > details > summary:not(.menu-title):active),
-[data-bookmark-sortable] > li[id^="bookmark-"].sortable-chosen > .bookmark-menu-row,
-[data-bookmark-sortable] > li[id^="bookmark-"].sortable-drag > .bookmark-menu-row,
-[data-collection-sortable] > li[id^="collection-"].sortable-chosen > details > summary,
-[data-collection-sortable]
-  > li[id^="collection-"].sortable-chosen[data-revoked="true"]
-  > .revoked-collection
-  > summary,
-li[id^="bookmark-"].sortable-fallback > .bookmark-menu-row,
-li[id^="collection-"].sortable-fallback > details > summary,
-li[id^="collection-"].sortable-fallback > .revoked-collection > summary {
+#bookmarks-sidebar .menu :where(li:not(.menu-title, .disabled) > details > summary:not(.menu-title):active) {
   color: var(--color-base-content);
   background-color: color-mix(in oklab, var(--color-base-content) 10%, transparent);
   background-image: none;
@@ -106,44 +96,14 @@ li[id^="collection-"].sortable-fallback > .revoked-collection > summary {
   }
 }
 
-#bookmarks-sidebar .menu summary.bookmark-drop-highlight,
-#bookmarks-sidebar
-  .menu
-  :where(li > details > summary.sidebar-item-active.bookmark-drop-highlight:not(.menu-title)),
-#bookmarks-sidebar .menu :where(li > .revoked-collection > summary.bookmark-drop-highlight),
-#bookmarks-zone-inbox.bookmark-drop-highlight {
-  color: var(--color-base-content);
-  background-color: color-mix(in oklch, var(--color-primary) 14%, transparent);
-  background-image: none;
-  box-shadow: inset 0 0 0 2px var(--color-primary);
-  border-radius: var(--radius-field);
-  outline-style: none;
-}
-
 #bookmarks-sidebar .menu :where(li > .bookmark-menu-row) {
   padding-block: calc(0.25rem * 1);
-}
-
-[data-bookmark-sortable] > li[id^="bookmark-"] > .bookmark-menu-row {
-  cursor: grab;
-}
-
-[data-bookmark-sortable] > li[id^="bookmark-"].sortable-ghost,
-[data-bookmark-sortable] > li[id^="bookmark-"].sortable-chosen,
-[data-bookmark-sortable] > li[id^="bookmark-"].sortable-drag,
-li[id^="bookmark-"].sortable-fallback {
-  max-width: 100%;
-  overflow: hidden;
-  box-sizing: border-box;
-}
-
-body.bookmark-dragging li[id^="bookmark-"].sortable-fallback {
-  max-width: var(--bookmarks-sidebar-width, 100%);
 }
 
 #bookmarks-sidebar .bookmark-menu-row .bookmark-select-button {
   min-height: 0;
   padding: 0;
+  cursor: pointer;
 }
 
 #bookmarks-sidebar .bookmark-completed .bookmark-title {
@@ -156,22 +116,6 @@ body.bookmark-dragging li[id^="bookmark-"].sortable-fallback {
   height: 1rem;
   min-height: 0;
   padding: 0;
-}
-
-[data-bookmark-sortable] > li[id^="bookmark-"].sortable-chosen > .bookmark-menu-row,
-[data-bookmark-sortable] > li[id^="bookmark-"].sortable-chosen > .bookmark-menu-row > .bookmark-select-button,
-.sortable-drag,
-.sortable-fallback {
-  cursor: grabbing !important;
-}
-
-[data-bookmark-sortable] > li[id^="bookmark-"] > .bookmark-menu-row > .bookmark-select-button {
-  cursor: pointer;
-}
-
-body.bookmark-dragging,
-body.bookmark-dragging * {
-  cursor: grabbing !important;
 }
 
 .sidebar-more-button {
@@ -291,35 +235,6 @@ details > summary .sidebar-more-button {
   cursor: pointer;
 }
 
-[data-collection-sortable] > li[id^="collection-"][data-reorderable="true"] > details > summary {
-  cursor: grab;
-}
-
-[data-collection-sortable]
-  > li[id^="collection-"][data-reorderable="true"][data-revoked="true"]
-  > .revoked-collection
-  > summary {
-  cursor: grab;
-}
-
-[data-collection-sortable] > li[id^="collection-"].sortable-chosen > details > summary {
-  cursor: grabbing;
-}
-
-[data-collection-sortable]
-  > li[id^="collection-"].sortable-chosen[data-revoked="true"]
-  > .revoked-collection
-  > summary {
-  cursor: grabbing;
-}
-
 .revoked-collection > summary::after {
   display: none;
-}
-
-[data-collection-sortable]::before,
-[data-bookmark-sortable]::before {
-  top: 0;
-  bottom: 0;
-  inset-inline-start: 1.2rem;
 }

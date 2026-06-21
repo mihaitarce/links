@@ -68,7 +68,6 @@ defmodule LinksWeb.DashboardLive do
 
           <div
             id="bookmarks-sidebar"
-            phx-hook="CollectionBookmarkSort"
             class="flex min-h-0 flex-1 flex-col"
           >
             <section class="flex min-h-0 max-h-[50dvh] shrink-0 flex-col overflow-hidden border-b border-base-300 p-3">
@@ -85,14 +84,11 @@ defmodule LinksWeb.DashboardLive do
               </div>
               <ul
                 id="bookmarks-zone-inbox"
-                data-bookmark-sortable
-                data-collection-id="inbox"
                 class={sidebar_menu_class(["min-h-0 flex-1 overflow-y-auto overflow-x-hidden"])}
               >
                 <li
                   :for={bookmark <- @dashboard.inbox}
                   id={"bookmark-#{bookmark.id}"}
-                  data-id={bookmark.id}
                 >
                   <.bookmark_menu_link
                     bookmark={bookmark}
@@ -120,8 +116,6 @@ defmodule LinksWeb.DashboardLive do
               </div>
               <ul
                 id="collections-zone-root"
-                data-collection-sortable
-                data-parent-id="root"
                 class={sidebar_menu_class(["overflow-y-auto overflow-x-hidden"])}
               >
                 <.tree_node
@@ -559,19 +553,11 @@ defmodule LinksWeb.DashboardLive do
         :collaboration_mount?,
         Collections.active_collaboration_mount?(assigns.node.collection)
       )
-      |> assign(
-        :reorderable?,
-        Collections.can_reorder_collection?(
-          assigns.current_scope,
-          assigns.node.collection.id
-        )
-      )
 
     ~H"""
     <li
       id={"collection-#{@collection.id}"}
       data-readonly={to_string(@node.readonly || false)}
-      data-reorderable={to_string(@reorderable?)}
       data-revoked={to_string(@node.revoked || false)}
       class="min-w-0 max-w-full"
     >
@@ -630,9 +616,6 @@ defmodule LinksWeb.DashboardLive do
           <ul
             :if={@node.children != []}
             id={"collections-zone-#{@effective.id}"}
-            data-collection-sortable
-            data-parent-id={@effective.id}
-            data-readonly={to_string(@node.readonly || false)}
           >
             <.tree_node
               :for={child <- @node.children}
@@ -646,16 +629,11 @@ defmodule LinksWeb.DashboardLive do
           </ul>
           <ul
             id={"nested-zone-#{@effective.id}"}
-            data-bookmark-sortable
-            data-collection-id={@effective.id}
-            data-empty-bookmarks={to_string(@node.bookmarks == [])}
-            data-readonly={to_string(@node.readonly || false)}
             class={@node.bookmarks == [] && "collection-bookmark-drop-hidden"}
           >
             <li
               :for={bookmark <- @node.bookmarks}
               id={"bookmark-#{bookmark.id}"}
-              data-id={bookmark.id}
             >
               <.bookmark_menu_link
                 bookmark={bookmark}
@@ -1198,10 +1176,6 @@ defmodule LinksWeb.DashboardLive do
      |> select_collection(id)}
   end
 
-  def handle_event("expand_collection", %{"id" => id}, socket) do
-    {:noreply, expand_collection(socket, String.to_integer(id))}
-  end
-
   def handle_event("validate_collection", %{"collection" => params}, socket) do
     collection = socket.assigns.selected_context.effective_collection
     changeset = Collection.changeset(collection, params) |> Map.put(:action, :validate)
@@ -1335,55 +1309,6 @@ defmodule LinksWeb.DashboardLive do
          socket
          |> assign(:confirm_delete_bookmark?, false)
          |> put_flash(:error, "Could not delete bookmark")}
-    end
-  end
-
-  def handle_event("move_bookmark", params, socket) do
-    with %{id: id, collection_id: collection_id, ordered_ids: ordered_ids} <-
-           normalize_move_bookmark_params(params),
-         {:ok, _bookmark} <-
-           Collections.move_bookmark(
-             socket.assigns.current_scope,
-             id,
-             collection_id,
-             ordered_ids
-           ) do
-      {:noreply, refresh_dashboard(socket)}
-    else
-      _ -> {:noreply, put_flash(socket, :error, "Could not move bookmark")}
-    end
-  end
-
-  def handle_event("copy_bookmark", params, socket) do
-    with %{id: id, collection_id: collection_id, ordered_ids: ordered_ids} <-
-           normalize_move_bookmark_params(params),
-         {:ok, _bookmark} <-
-           Collections.copy_bookmark(
-             socket.assigns.current_scope,
-             id,
-             collection_id,
-             ordered_ids
-           ) do
-      {:noreply, refresh_dashboard(socket)}
-    else
-      _ -> {:noreply, put_flash(socket, :error, "Could not copy bookmark")}
-    end
-  end
-
-  def handle_event("reorder_collections", params, socket) do
-    parent_id = params["parent_id"]
-    ordered_ids = params["ordered_ids"] || []
-
-    case Collections.reorder_collections(
-           socket.assigns.current_scope,
-           parent_id,
-           ordered_ids
-         ) do
-      {:ok, _} ->
-        {:noreply, refresh_dashboard(socket)}
-
-      _ ->
-        {:noreply, put_flash(socket, :error, "Could not reorder collections")}
     end
   end
 
@@ -1985,24 +1910,4 @@ defmodule LinksWeb.DashboardLive do
       | extra
     ]
   end
-
-  defp normalize_move_bookmark_params(%{"id" => id, "ordered_ids" => ordered_ids} = params) do
-    collection_id =
-      params
-      |> Map.get("collection_id")
-      |> normalize_move_collection_id()
-
-    %{id: id, collection_id: collection_id, ordered_ids: ordered_ids}
-  end
-
-  defp normalize_move_bookmark_params(_), do: :error
-
-  defp normalize_move_collection_id(collection_id) when collection_id in [nil, "", "inbox"],
-    do: nil
-
-  defp normalize_move_collection_id(collection_id) when is_integer(collection_id),
-    do: collection_id
-
-  defp normalize_move_collection_id(collection_id) when is_binary(collection_id),
-    do: String.to_integer(collection_id)
 end
