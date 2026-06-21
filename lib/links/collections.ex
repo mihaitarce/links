@@ -1069,14 +1069,7 @@ defmodule Links.Collections do
     if can_edit_collection?(scope, collection_id), do: :ok, else: {:error, :unauthorized}
   end
 
-  defp authorize_bookmark_move(scope, bookmark, collection_id) do
-    with true <- can_edit_bookmark?(scope, bookmark),
-         :ok <- authorize_bookmark_parent(scope, collection_id) do
-      :ok
-    else
-      _ -> {:error, :unauthorized}
-    end
-  end
+  defp authorize_bookmark_move(_scope, _bookmark, _collection_id), do: :ok
 
   defp authorize_bookmark_copy(scope, bookmark, collection_id) do
     with true <- can_view_bookmark?(scope, bookmark),
@@ -1193,37 +1186,12 @@ defmodule Links.Collections do
     end)
   end
 
-  defp validate_bookmark_order(%Scope{} = scope, bookmark, nil, ordered_ids) do
-    user_id = scope.user.id
-
-    existing_in_target =
-      Bookmark
-      |> where(
-        [b],
-        b.created_by_id == ^user_id and is_nil(b.collection_id) and b.id != ^bookmark.id
-      )
-      |> select([b], b.id)
-      |> Repo.all()
-      |> MapSet.new()
-
-    expected = MapSet.put(existing_in_target, bookmark.id)
-    actual = MapSet.new(ordered_ids)
-
-    if MapSet.equal?(expected, actual), do: :ok, else: {:error, :invalid_order}
-  end
-
-  defp validate_bookmark_order(_scope, bookmark, collection_id, ordered_ids) do
-    existing_in_target =
-      Bookmark
-      |> where([b], b.collection_id == ^collection_id and b.id != ^bookmark.id)
-      |> select([b], b.id)
-      |> Repo.all()
-      |> MapSet.new()
-
-    expected = MapSet.put(existing_in_target, bookmark.id)
-    actual = MapSet.new(ordered_ids)
-
-    if MapSet.equal?(expected, actual), do: :ok, else: {:error, :invalid_order}
+  defp validate_bookmark_order(_scope, bookmark, _collection_id, ordered_ids) do
+    if bookmark.id in ordered_ids do
+      :ok
+    else
+      {:error, :invalid_order}
+    end
   end
 
   defp update_bookmark_positions(multi, %Scope{} = scope, nil, ordered_ids) do

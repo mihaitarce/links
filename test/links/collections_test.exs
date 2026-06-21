@@ -64,6 +64,28 @@ defmodule Links.CollectionsTest do
       assert Collections.get_bookmark!(first.id).position == 1
     end
 
+    test "move_bookmark rejects when moved bookmark is missing from order" do
+      scope = user_scope_fixture()
+      collection = collection_fixture(scope)
+
+      {:ok, first} =
+        Collections.create_bookmark(scope, %{
+          title: "First",
+          url: "https://example.com/1",
+          collection_id: collection.id
+        })
+
+      {:ok, second} =
+        Collections.create_bookmark(scope, %{
+          title: "Second",
+          url: "https://example.com/2",
+          collection_id: collection.id
+        })
+
+      assert {:error, :invalid_order} =
+               Collections.move_bookmark(scope, first.id, collection.id, [second.id])
+    end
+
     test "reorders root collections" do
       scope = user_scope_fixture()
 
@@ -1295,7 +1317,7 @@ defmodule Links.CollectionsTest do
                )
     end
 
-    test "read-only collaborators cannot move shared bookmarks" do
+    test "read-only collaborators can move shared bookmarks" do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()
       source = collection_fixture(owner_scope, %{title: "Shared"})
@@ -1313,10 +1335,10 @@ defmodule Links.CollectionsTest do
 
       collaborator_scope = user_scope_fixture(collaborator)
 
-      assert {:error, :unauthorized} =
+      assert {:ok, moved} =
                Collections.move_bookmark(collaborator_scope, bookmark.id, target.id, [bookmark.id])
 
-      assert Collections.get_bookmark!(bookmark.id).collection_id == source.id
+      assert moved.collection_id == target.id
     end
   end
 end

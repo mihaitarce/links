@@ -29,6 +29,9 @@ import topbar from "../vendor/topbar"
 const DROP_HIGHLIGHT_CLASS = "collection-drop-target"
 const AUTO_EXPAND_DELAY_MS = 2000
 const COLLECTIONS_GROUP = "collections"
+const BOOKMARKS_GROUP = "bookmarks"
+
+const sidebarRoot = (el) => el.closest("#bookmarks-sidebar") || el
 
 const collectionSortContainers = (root) => root.querySelectorAll("[data-collection-sortable]")
 
@@ -281,6 +284,13 @@ const CollectionSort = {
 const BookmarkSort = {
   mounted() {
     this.sortable = null
+    this.dropTarget = null
+    this.dropTargetCollection = null
+    this.expandTimer = null
+    this.expandTargetId = null
+    this.autoExpandedIds = new Set()
+    this.onCollectionEnter = this.onCollectionEnter.bind(this)
+    this.onCollectionLeave = this.onCollectionLeave.bind(this)
     this.initSortable()
   },
   updated() {
@@ -290,31 +300,197 @@ const BookmarkSort = {
   destroyed() {
     this.destroySortable()
   },
-  orderedBookmarkIds() {
-    return Array.from(this.el.children)
+  sidebar() {
+    return sidebarRoot(this.el)
+  },
+  sortableCollections() {
+    return this.sidebar().querySelectorAll("li[id^='collection-']")
+  },
+  setDropHighlight(collection) {
+    const summary = collection.querySelector("details > summary")
+
+    if (this.dropTarget === summary) return
+
+    this.clearDropHighlight()
+
+    if (summary) {
+      summary.classList.add(DROP_HIGHLIGHT_CLASS)
+      this.dropTarget = summary
+      this.dropTargetCollection = collection
+    }
+  },
+  clearDropHighlight() {
+    if (this.dropTarget) {
+      this.dropTarget.classList.remove(DROP_HIGHLIGHT_CLASS)
+      this.dropTarget = null
+    }
+
+    this.dropTargetCollection = null
+  },
+  clearExpandTimer() {
+    if (this.expandTimer) {
+      clearTimeout(this.expandTimer)
+      this.expandTimer = null
+    }
+
+    this.expandTargetId = null
+  },
+  scheduleExpand(collection) {
+    const details = collection.querySelector("details")
+
+    if (!details || details.open) return
+
+    const collectionId = collection.id.replace("collection-", "")
+
+    if (this.expandTargetId === collectionId && this.expandTimer) return
+
+    this.clearExpandTimer()
+    this.expandTargetId = collectionId
+
+    this.expandTimer = setTimeout(() => {
+      this.expandTimer = null
+      this.expandTargetId = null
+      this.expandCollectionForDrop(collection)
+    }, AUTO_EXPAND_DELAY_MS)
+  },
+  expandCollectionForDrop(collection) {
+    const details = collection.querySelector("details")
+
+    if (!details || details.open) return
+
+    details.open = true
+
+    const collectionId = collection.id.replace("collection-", "")
+
+    if (collectionId) this.autoExpandedIds.add(collectionId)
+
+    this.unbindDropHighlight()
+    this.bindDropHighlight()
+  },
+  syncAutoExpandedCollections() {
+    for (const id of this.autoExpandedIds) {
+      this.pushEvent("expand_collection", {id})
+    }
+
+    this.autoExpandedIds.clear()
+  },
+  onCollectionEnter(event) {
+    this.setDropHighlight(event.currentTarget)
+    this.scheduleExpand(event.currentTarget)
+  },
+  onCollectionLeave(event) {
+    const collection = event.currentTarget
+    const related = event.relatedTarget
+
+    if (related && collection.contains(related)) return
+
+    const summary = collection.querySelector("details > summary")
+
+    if (this.dropTarget === summary) {
+      this.clearDropHighlight()
+    }
+
+    if (this.expandTargetId === collection.id.replace("collection-", "")) {
+      this.clearExpandTimer()
+    }
+  },
+  bindDropHighlight() {
+    this.sortableCollections().forEach((collection) => {
+      collection.addEventListener("dragenter", this.onCollectionEnter)
+      collection.addEventListener("dragleave", this.onCollectionLeave)
+    })
+  },
+  unbindDropHighlight() {
+    this.sortableCollections().forEach((collection) => {
+      collection.removeEventListener("dragenter", this.onCollectionEnter)
+      collection.removeEventListener("dragleave", this.onCollectionLeave)
+    })
+  },
+  bookmarkIdsInCollection(collection) {
+    const collectionId = collection.dataset.bookmarkCollectionId
+    const zone = collectionId && collection.querySelector(`#nested-zone-${collectionId}`)
+
+    if (!zone || zone.classList.contains("collection-bookmark-drop-hidden")) return []
+
+    return this.orderedBookmarkIds(zone)
+  },
+  ensureDropTargetExpanded(collection) {
+    const details = collection.querySelector("details")
+
+    if (!details || details.open) return
+
+    details.open = true
+
+    const collectionId = collection.id.replace("collection-", "")
+
+    if (collectionId) {
+      this.pushEvent("expand_collection", {id: collectionId})
+    }
+  },
+  pushBookmarkNestMove(hook, movedId, targetCollection) {
+    const collectionId = targetCollection.dataset.bookmarkCollectionId
+    const bookmarkIds = hook.bookmarkIdsInCollection(targetCollection).filter((id) => id !== movedId)
+
+    hook.pushEvent("move_bookmark", {
+      id: movedId,
+      collection_id: collectionId,
+      ordered_ids: [movedId, ...bookmarkIds],
+    })
+  },
+  orderedBookmarkIds(container) {
+    return Array.from(container.children)
       .filter((child) => child.id?.startsWith("bookmark-"))
       .map((child) => child.id.replace("bookmark-", ""))
+  },
+  finishDrag(hook) {
+    hook.unbindDropHighlight()
+    hook.clearExpandTimer()
+    hook.syncAutoExpandedCollections()
+    hook.clearDropHighlight()
   },
   initSortable() {
     const hook = this
 
     this.sortable = new Sortable(this.el, {
+      group: BOOKMARKS_GROUP,
       animation: 150,
       draggable: "> li[id^='bookmark-']",
       filter: "input, textarea, select, a, label, #inbox-empty-state",
       preventOnFilter: true,
+      fallbackOnBody: true,
+      onStart() {
+        hook.bindDropHighlight()
+      },
       onEnd(event) {
-        if (event.oldIndex === event.newIndex) return
+        const targetCollection = hook.dropTargetCollection
+        const movedId = event.item.id.replace("bookmark-", "")
+
+        if (targetCollection) {
+          hook.finishDrag(hook)
+          hook.ensureDropTargetExpanded(targetCollection)
+          hook.pushBookmarkNestMove(hook, movedId, targetCollection)
+          return
+        }
+
+        hook.finishDrag(hook)
+
+        if (event.from === event.to && event.oldIndex === event.newIndex) return
 
         hook.pushEvent("move_bookmark", {
-          id: event.item.id.replace("bookmark-", ""),
-          collection_id: hook.el.dataset.collectionId,
-          ordered_ids: hook.orderedBookmarkIds(),
+          id: movedId,
+          collection_id: event.to.dataset.collectionId,
+          ordered_ids: hook.orderedBookmarkIds(event.to),
         })
       },
     })
   },
   destroySortable() {
+    this.unbindDropHighlight()
+    this.clearDropHighlight()
+    this.clearExpandTimer()
+    this.autoExpandedIds.clear()
+    this.dropTargetCollection = null
+
     if (this.sortable) {
       this.sortable.destroy()
       this.sortable = null

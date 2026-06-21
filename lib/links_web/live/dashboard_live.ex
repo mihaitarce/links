@@ -554,6 +554,7 @@ defmodule LinksWeb.DashboardLive do
     <li
       id={"collection-#{@collection.id}"}
       data-nest-parent-id={@effective.id}
+      data-bookmark-collection-id={@effective.id}
       data-readonly={to_string(@node.readonly || false)}
       data-revoked={to_string(@node.revoked || false)}
     >
