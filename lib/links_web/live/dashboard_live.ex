@@ -94,7 +94,6 @@ defmodule LinksWeb.DashboardLive do
                   bookmark={bookmark}
                   selected={selected?(@selected, :bookmark, bookmark.id)}
                   metadata_pending={MapSet.member?(@pending_metadata_ids, bookmark.id)}
-                  editable={true}
                 />
                 <li
                   id="inbox-empty-state"
@@ -393,7 +392,6 @@ defmodule LinksWeb.DashboardLive do
   attr :bookmark, Bookmark, required: true
   attr :selected, :boolean, default: false
   attr :metadata_pending, :boolean, default: false
-  attr :editable, :boolean, default: true
 
   def bookmark_menu_link(assigns) do
     ~H"""
@@ -424,13 +422,6 @@ defmodule LinksWeb.DashboardLive do
           </span>
         </span>
       </button>
-      <label class="btn btn-ghost p-0 min-h-0 h-auto border-0 bg-transparent shadow-none">
-        <.bookmark_completed_toggle
-          :if={@bookmark.collection_id}
-          bookmark={@bookmark}
-          editable={@editable}
-        />
-      </label>
       <a
         id={"bookmark-more-#{@bookmark.id}"}
         href={@bookmark.url}
@@ -637,7 +628,6 @@ defmodule LinksWeb.DashboardLive do
             bookmark={bookmark}
             selected={selected?(@selected, :bookmark, bookmark.id)}
             metadata_pending={MapSet.member?(@pending_metadata_ids, bookmark.id)}
-            editable={not @node.readonly}
           />
         </ul>
       </details>
