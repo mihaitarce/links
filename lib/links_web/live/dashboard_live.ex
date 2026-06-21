@@ -413,7 +413,7 @@ defmodule LinksWeb.DashboardLive do
         class="bookmark-select-button flex-1 items-center gap-2"
       >
         <.bookmark_status_icon bookmark={@bookmark} metadata_pending={@metadata_pending} />
-        <span class="flex flex-1 items-baseline gap-1 overflow-hidden leading-normal">
+        <span class="flex flex-1 items-baseline gap-2 overflow-hidden">
           <span class="bookmark-title truncate">{bookmark_label(@bookmark)}</span>
           <span
             :if={domain = Bookmark.display_host(@bookmark)}
@@ -541,13 +541,35 @@ defmodule LinksWeb.DashboardLive do
   end
 
   attr :label_node, :map, required: true
+  attr :shared, :boolean, default: false
+  attr :collaboration_mount?, :boolean, default: false
+  attr :readonly, :boolean, default: false
 
   def collection_tree_label(assigns) do
     ~H"""
     <span class="truncate">{@label_node.title}</span>
     <span
+      :if={@shared}
+      class="inline-flex shrink-0 items-center opacity-60"
+      aria-label="Shared with others"
+    >
+      <.icon name="hero-user-group" class="size-4" />
+    </span>
+    <span
+      :if={@collaboration_mount?}
+      class="inline-flex shrink-0 items-center opacity-60"
+      aria-label={
+        if(@readonly, do: "Read-only collaboration", else: "Editable collaboration")
+      }
+    >
+      <.icon
+        name={if @readonly, do: "hero-eye", else: "hero-pencil-square"}
+        class="size-4"
+      />
+    </span>
+    <span
       :if={@label_node.source_title}
-      class="text-base-content/50 truncate"
+      class="truncate text-base-content/50"
     >
       {@label_node.source_title}
     </span>
@@ -602,29 +624,12 @@ defmodule LinksWeb.DashboardLive do
         >
           <span class="flex min-w-0 flex-1 items-center gap-2">
             <.folder_icon />
-            <.collection_tree_label label_node={@node} />
-            <span
-              :if={@node.shared}
-              class="inline-flex items-center opacity-60"
-              aria-label="Shared with others"
-            >
-              <.icon name="hero-user-group" class="size-4" />
-            </span>
-            <span
-              :if={@collaboration_mount?}
-              class="inline-flex shrink-0 items-center opacity-60"
-              aria-label={
-                if(@node.readonly,
-                  do: "Read-only collaboration",
-                  else: "Editable collaboration"
-                )
-              }
-            >
-              <.icon
-                name={if @node.readonly, do: "hero-eye", else: "hero-pencil-square"}
-                class="size-4"
-              />
-            </span>
+            <.collection_tree_label
+              label_node={@node}
+              shared={@node.shared}
+              collaboration_mount?={@collaboration_mount?}
+              readonly={@node.readonly}
+            />
           </span>
           <span class="badge badge-sm shrink-0 tabular-nums">
             {Collections.collection_bookmark_badge(@node)}
@@ -831,14 +836,8 @@ defmodule LinksWeb.DashboardLive do
             <p :if={@context.mount} class="text-xs uppercase tracking-wide text-base-content/50">
               Collaborated collection
             </p>
-            <h1 class="flex items-baseline gap-2 text-xl font-semibold">
-              <span>{@title_collection.title}</span>
-              <span
-                :if={@context.mount && @title_collection.title != @context.effective_collection.title}
-                class="text-base-content/50 text-sm font-normal"
-              >
-                {@context.effective_collection.title}
-              </span>
+            <h1 class="text-xl font-semibold">
+              {@title_collection.title}
             </h1>
             <p :if={@readonly} class="mt-1 text-sm text-base-content/60">Read-only access</p>
           </div>
