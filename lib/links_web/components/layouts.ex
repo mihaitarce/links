@@ -99,7 +99,6 @@ defmodule LinksWeb.Layouts do
             >
               Log in
             </.link>
-            <.theme_toggle />
           </div>
         </div>
       </header>
