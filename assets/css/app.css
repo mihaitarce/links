@@ -40,3 +40,11 @@
 #bookmarks-sidebar .menu li.bookmark-menu-row {
    padding-inline-end: 0.75rem;
 }
+
+#collections-zone-root li[id^="collection-"] > details > summary {
+  cursor: grab;
+}
+
+#collections-zone-root li[id^="collection-"].sortable-chosen > details > summary {
+  cursor: grabbing;
+}

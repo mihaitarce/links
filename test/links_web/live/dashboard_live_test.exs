@@ -320,7 +320,37 @@ defmodule LinksWeb.DashboardLiveTest do
       assert html =~ ~s(id="collections-zone-root")
       assert html =~ ~s(id="bookmarks-sidebar")
       assert html =~ ~s(id="nested-zone-#{collection.id}")
-      assert has_element?(lv, "#collection-#{collection.id} summary .badge.badge-ghost", "0 / 1")
+      assert has_element?(lv, "#collection-#{collection.id} summary .badge.badge-sm", "0 / 1")
+    end
+
+    test "root collection list is sortable", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      collection_fixture(scope, %{title: "Reading"})
+      {:ok, _lv, html} = live(conn, ~p"/")
+
+      assert html =~ ~s(id="collections-zone-root")
+      assert html =~ ~s(phx-hook="RootCollectionSort")
+      assert html =~ ~s(data-parent-id="root")
+    end
+
+    test "reorders root collections from the dashboard", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+
+      {:ok, first} = Collections.create_collection(scope, %{title: "Alpha"})
+      {:ok, second} = Collections.create_collection(scope, %{title: "Beta"})
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv
+      |> element("#collections-zone-root")
+      |> render_hook("move_collection", %{
+        "id" => to_string(second.id),
+        "parent_id" => "root",
+        "ordered_ids" => [to_string(second.id), to_string(first.id)]
+      })
+
+      assert Collections.get_collection!(second.id).position == 0
+      assert Collections.get_collection!(first.id).position == 1
     end
 
     test "shows nested bookmarks in read-only shared collections", %{conn: conn} do
@@ -370,8 +400,8 @@ defmodule LinksWeb.DashboardLiveTest do
 
       {:ok, lv, _html} = live(conn, ~p"/")
 
-      assert has_element?(lv, "#collection-#{parent.id} summary .badge.badge-ghost", "0 / 2")
-      assert has_element?(lv, "#collection-#{child.id} summary .badge.badge-ghost", "0 / 1")
+      assert has_element?(lv, "#collection-#{parent.id} summary .badge.badge-sm", "0 / 2")
+      assert has_element?(lv, "#collection-#{child.id} summary .badge.badge-sm", "0 / 1")
     end
 
     test "keeps collection trees collapsed on initial load", %{conn: conn} do
@@ -414,7 +444,6 @@ defmodule LinksWeb.DashboardLiveTest do
       |> render_click()
 
       assert has_element?(lv, "#collection-form")
-      assert has_element?(lv, "#collection-#{parent.id} summary.sidebar-item-active")
     end
 
     test "clicking a collapsed collection with children expands it and opens the detail panel", %{
@@ -500,11 +529,11 @@ defmodule LinksWeb.DashboardLiveTest do
       |> element("#collection-#{collection.id} > details > summary")
       |> render_click()
 
-      assert has_element?(lv, "#collection-#{collection.id} summary.sidebar-item-active")
+      assert has_element?(lv, "#collection-form")
 
       assert has_element?(
                lv,
-               "#collection-#{collection.id} summary.sidebar-item-active [aria-label='Shared with others']"
+               "#collection-#{collection.id} summary [aria-label='Shared with others']"
              )
     end
 

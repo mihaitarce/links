@@ -114,6 +114,8 @@ defmodule LinksWeb.DashboardLive do
               </div>
               <ul
                 id="collections-zone-root"
+                phx-hook="RootCollectionSort"
+                data-parent-id="root"
                 class={sidebar_menu_class(["overflow-y-auto overflow-x-hidden"])}
               >
                 <.tree_node
@@ -549,7 +551,8 @@ defmodule LinksWeb.DashboardLive do
     <li
       id={"collection-#{@collection.id}"}
       data-readonly={to_string(@node.readonly || false)}
-      data-revoked={to_string(@node.revoked || false)}>
+      data-revoked={to_string(@node.revoked || false)}
+    >
       <details open={@expanded}>
         <summary
           class={[
@@ -1144,6 +1147,28 @@ defmodule LinksWeb.DashboardLive do
      socket
      |> assign(:collapsed, collapsed)
      |> select_collection(id)}
+  end
+
+  def handle_event(
+        "move_collection",
+        %{"id" => id, "parent_id" => parent_id, "ordered_ids" => ordered_ids},
+        socket
+      ) do
+    case Collections.move_collection(
+           socket.assigns.current_scope,
+           id,
+           parent_id,
+           ordered_ids
+         ) do
+      {:ok, _} ->
+        {:noreply, refresh_dashboard(socket)}
+
+      {:error, :invalid_order} ->
+        {:noreply, put_flash(socket, :error, "Could not reorder collections")}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Could not move collection")}
+    end
   end
 
   def handle_event("validate_collection", %{"collection" => params}, socket) do

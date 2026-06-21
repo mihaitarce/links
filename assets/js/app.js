@@ -26,8 +26,50 @@ import {hooks as colocatedHooks} from "phoenix-colocated/links"
 import Sortable from "sortablejs"
 import topbar from "../vendor/topbar"
 
-// SortableJS is kept for a future sidebar implementation.
-void Sortable
+const RootCollectionSort = {
+  mounted() {
+    this.initSortable()
+  },
+  updated() {
+    this.destroySortable()
+    this.initSortable()
+  },
+  destroyed() {
+    this.destroySortable()
+  },
+  initSortable() {
+    this.sortable = new Sortable(this.el, {
+      animation: 150,
+      draggable: "> li[id^='collection-']",
+      handle: "li[id^='collection-'] > details > summary",
+      filter: "button, input, textarea, select, a, #collections-empty-state",
+      preventOnFilter: true,
+      fallbackOnBody: true,
+      swapThreshold: 0.3,
+      invertSwap: true,
+      onEnd: (event) => {
+        if (event.from !== event.to || event.oldIndex === event.newIndex) return
+
+        const movedId = event.item.id.replace("collection-", "")
+        const orderedIds = Array.from(event.from.children)
+          .filter((child) => child.id?.startsWith("collection-"))
+          .map((child) => child.id.replace("collection-", ""))
+
+        this.pushEvent("move_collection", {
+          id: movedId,
+          parent_id: this.el.dataset.parentId,
+          ordered_ids: orderedIds,
+        })
+      },
+    })
+  },
+  destroySortable() {
+    if (this.sortable) {
+      this.sortable.destroy()
+      this.sortable = null
+    }
+  },
+}
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocketPath =
@@ -35,7 +77,7 @@ const liveSocketPath =
 const liveSocket = new LiveSocket(liveSocketPath, Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks},
+  hooks: {...colocatedHooks, RootCollectionSort},
 })
 
 // Show progress bar on live navigation and form submits

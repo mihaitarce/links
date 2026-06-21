@@ -261,22 +261,53 @@ defmodule Links.Collections do
     end
   end
 
-  def reorder_collections(%Scope{} = scope, parent_id, ordered_ids) do
+  def move_collection(%Scope{} = scope, collection_id, parent_id, ordered_ids) do
+    collection = get_collection!(collection_id)
     parent_id = normalize_reorder_parent_id(parent_id)
     ordered_ids = Enum.map(ordered_ids, &to_integer/1)
+    source_parent_id = collection.parent_id
 
-    with :ok <- validate_collection_reorder(scope, parent_id, ordered_ids) do
-      Multi.new()
+    with :ok <- validate_collection_move(scope, collection, parent_id, ordered_ids),
+         :ok <- reject_cycle(collection.id, parent_id) do
+      multi =
+        if source_parent_id != parent_id do
+          Multi.new()
+          |> Multi.update(:collection, Collection.changeset(collection, %{parent_id: parent_id}))
+        else
+          Multi.new()
+        end
+
+      multi
       |> update_collection_positions(ordered_ids)
       |> Repo.transaction()
       |> case do
         {:ok, _results} ->
           broadcast_collection_changed(parent_id)
-          {:ok, :reordered}
+
+          if source_parent_id != parent_id do
+            broadcast_collection_changed(source_parent_id)
+          end
+
+          {:ok, :moved}
 
         {:error, _name, reason, _changes} ->
           {:error, reason}
       end
+    end
+  end
+
+  def reorder_collections(%Scope{} = scope, parent_id, ordered_ids) do
+    ordered_ids = Enum.map(ordered_ids, &to_integer/1)
+
+    case ordered_ids do
+      [first | _] ->
+        case move_collection(scope, first, parent_id, ordered_ids) do
+          {:ok, _} -> {:ok, :reordered}
+          error -> error
+        end
+
+      [] ->
+        {:error, :invalid_order}
     end
   end
 
@@ -1124,6 +1155,66 @@ defmodule Links.Collections do
         else: {:error, :invalid_order}
     else
       {:error, :invalid_order}
+    end
+  end
+
+  defp validate_collection_move(%Scope{} = scope, %Collection{} = collection, nil, ordered_ids) do
+    validate_root_collection_move(scope, collection, ordered_ids)
+  end
+
+  defp validate_collection_move(
+         %Scope{} = scope,
+         %Collection{} = collection,
+         parent_id,
+         ordered_ids
+       )
+       when parent_id == collection.parent_id do
+    validate_collection_reorder(scope, parent_id, ordered_ids)
+  end
+
+  defp validate_collection_move(_scope, _collection, _parent_id, _ordered_ids) do
+    {:error, :invalid_parent}
+  end
+
+  defp validate_root_collection_move(%Scope{} = scope, %Collection{} = collection, ordered_ids) do
+    expected = scope |> root_collection_sibling_ids() |> MapSet.new()
+    actual = MapSet.new(ordered_ids)
+
+    with true <- collection.owner_id == scope.user.id,
+         true <- is_nil(collection.parent_id),
+         true <- MapSet.member?(actual, collection.id),
+         true <- MapSet.equal?(expected, actual) do
+      :ok
+    else
+      _ -> {:error, :invalid_order}
+    end
+  end
+
+  defp root_collection_sibling_ids(%Scope{} = scope) do
+    user_id = scope.user.id
+    revoked_mount_cutoff = revoked_mount_visible_cutoff()
+
+    Collection
+    |> where([c], c.owner_id == ^user_id and is_nil(c.parent_id))
+    |> where(
+      [c],
+      is_nil(c.collaboration_revoked_at) or c.collaboration_revoked_at > ^revoked_mount_cutoff
+    )
+    |> select([c], c.id)
+    |> Repo.all()
+  end
+
+  defp reject_cycle(_collection_id, nil), do: :ok
+
+  defp reject_cycle(collection_id, parent_id) when collection_id == parent_id do
+    {:error, :cycle}
+  end
+
+  defp reject_cycle(collection_id, parent_id) do
+    if parent_id in descendant_ids([collection_id]) do
+      {:error, :cycle}
+    else
+      :ok
     end
   end
 

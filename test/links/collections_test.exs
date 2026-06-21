@@ -77,6 +77,38 @@ defmodule Links.CollectionsTest do
       assert Collections.get_collection!(first.id).position == 1
     end
 
+    test "move_collection reorders root collections" do
+      scope = user_scope_fixture()
+
+      {:ok, first} = Collections.create_collection(scope, %{title: "First"})
+      {:ok, second} = Collections.create_collection(scope, %{title: "Second"})
+
+      assert {:ok, :moved} =
+               Collections.move_collection(scope, second.id, "root", [second.id, first.id])
+
+      assert Collections.get_collection!(second.id).position == 0
+      assert Collections.get_collection!(first.id).position == 1
+    end
+
+    test "move_collection rejects invalid root sibling sets" do
+      scope = user_scope_fixture()
+      other_scope = user_scope_fixture()
+
+      {:ok, first} = Collections.create_collection(scope, %{title: "First"})
+      {:ok, second} = Collections.create_collection(scope, %{title: "Second"})
+      {:ok, foreign} = Collections.create_collection(other_scope, %{title: "Foreign"})
+
+      assert {:error, :invalid_order} =
+               Collections.move_collection(scope, first.id, "root", [first.id, foreign.id])
+
+      assert {:error, :invalid_order} =
+               Collections.move_collection(scope, first.id, "root", [
+                 first.id,
+                 second.id,
+                 foreign.id
+               ])
+    end
+
     test "reorders nested collections" do
       scope = user_scope_fixture()
       root = collection_fixture(scope)
