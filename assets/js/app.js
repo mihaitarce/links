@@ -186,7 +186,7 @@ const CollectionSort = {
     hook.pushEvent("move_collection", {
       id: movedId,
       parent_id: parentId,
-      ordered_ids: [...childIds, movedId],
+      ordered_ids: [movedId, ...childIds],
     })
   },
   ensureNestTargetExpanded(collection) {

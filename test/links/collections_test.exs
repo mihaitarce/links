@@ -100,18 +100,18 @@ defmodule Links.CollectionsTest do
                Collections.move_collection(scope, first.id, "root", [second.id])
     end
 
-    test "move_collection nests a collection as the last child of a new parent" do
+    test "move_collection nests a collection as the first child of a new parent" do
       scope = user_scope_fixture()
       parent = collection_fixture(scope, %{title: "Parent"})
       child = collection_fixture(scope, %{title: "Child", parent_id: parent.id})
       moving = collection_fixture(scope, %{title: "Moving"})
 
       assert {:ok, :moved} =
-               Collections.move_collection(scope, moving.id, parent.id, [child.id, moving.id])
+               Collections.move_collection(scope, moving.id, parent.id, [moving.id, child.id])
 
       assert Collections.get_collection!(moving.id).parent_id == parent.id
-      assert Collections.get_collection!(moving.id).position == 1
-      assert Collections.get_collection!(child.id).position == 0
+      assert Collections.get_collection!(moving.id).position == 0
+      assert Collections.get_collection!(child.id).position == 1
     end
 
     test "reorders nested collections" do

@@ -383,7 +383,7 @@ defmodule LinksWeb.DashboardLiveTest do
       assert Collections.get_collection!(first.id).position == 1
     end
 
-    test "nests a collection as the last child of a highlighted target", %{conn: conn} do
+    test "nests a collection as the first child of a highlighted target", %{conn: conn} do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
       {:ok, parent} = Collections.create_collection(scope, %{title: "Parent"})
       {:ok, sibling} = Collections.create_collection(scope, %{title: "Sibling"})
@@ -397,12 +397,12 @@ defmodule LinksWeb.DashboardLiveTest do
       |> render_hook("move_collection", %{
         "id" => to_string(moving.id),
         "parent_id" => to_string(parent.id),
-        "ordered_ids" => [to_string(child.id), to_string(moving.id)]
+        "ordered_ids" => [to_string(moving.id), to_string(child.id)]
       })
 
       assert Collections.get_collection!(moving.id).parent_id == parent.id
-      assert Collections.get_collection!(moving.id).position == 1
-      assert Collections.get_collection!(child.id).position == 0
+      assert Collections.get_collection!(moving.id).position == 0
+      assert Collections.get_collection!(child.id).position == 1
       assert Collections.get_collection!(sibling.id).parent_id == nil
     end
 
