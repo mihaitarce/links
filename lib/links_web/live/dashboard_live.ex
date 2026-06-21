@@ -84,7 +84,7 @@ defmodule LinksWeb.DashboardLive do
               </div>
               <ul
                 id="bookmarks-zone-inbox"
-                class={sidebar_menu_class(["min-h-0 flex-1 overflow-y-auto overflow-x-hidden"])}
+                class={sidebar_menu_class(["overflow-y-auto"])}
               >
                 <.bookmark_menu_link
                   :for={bookmark <- @dashboard.inbox}
@@ -395,8 +395,7 @@ defmodule LinksWeb.DashboardLive do
     <li
       id={"bookmark-#{@bookmark.id}"}
       class={[
-        "bookmark-menu-row flex min-w-0 w-full items-center gap-2",
-        @selected && "sidebar-item-active",
+        "bookmark-menu-row w-full flex flex-row items-center gap-2",
         @bookmark.completed && "bookmark-completed"
       ]}
     >
@@ -407,14 +406,14 @@ defmodule LinksWeb.DashboardLive do
         data-url={@bookmark.url}
         phx-click="select_bookmark"
         phx-value-id={@bookmark.id}
-        class="bookmark-select-button flex min-w-0 flex-1 items-center gap-2 text-left"
+        class="bookmark-select-button flex-1 items-center gap-2"
       >
         <.bookmark_status_icon bookmark={@bookmark} metadata_pending={@metadata_pending} />
-        <span class="flex min-w-0 flex-1 items-baseline gap-1 overflow-hidden leading-normal">
-          <span class="bookmark-title min-w-0 truncate">{bookmark_label(@bookmark)}</span>
+        <span class="flex flex-1 items-baseline gap-1 overflow-hidden leading-normal">
+          <span class="bookmark-title truncate">{bookmark_label(@bookmark)}</span>
           <span
             :if={domain = Bookmark.display_host(@bookmark)}
-            class="bookmark-domain shrink-0 truncate"
+            class="text-base-content/50 shrink-0 max-w-48 truncate"
           >
             {domain}
           </span>
@@ -548,89 +547,72 @@ defmodule LinksWeb.DashboardLive do
     <li
       id={"collection-#{@collection.id}"}
       data-readonly={to_string(@node.readonly || false)}
-      data-revoked={to_string(@node.revoked || false)}
-      class="min-w-0 max-w-full"
-    >
-      <%= if @node.revoked do %>
-        <details class="revoked-collection min-w-0 max-w-full">
-          <summary class="min-w-0 max-w-full line-through opacity-50">
+      data-revoked={to_string(@node.revoked || false)}>
+      <details open={@expanded}>
+        <summary
+          class={[
+            @node.revoked && "line-through opacity-50"
+          ]}
+          phx-click="toggle_collection"
+          phx-value-id={@collection.id}
+        >
+          <span class="flex items-center gap-2">
             <.folder_icon />
-            <span class="min-w-0 truncate leading-normal">{@node.title}</span>
-          </summary>
-        </details>
-      <% else %>
-        <details class="min-w-0 max-w-full" open={@expanded}>
-          <summary
-            class={[
-              "min-w-0 max-w-full",
-              selected?(@selected, :collection, @collection.id) && "sidebar-item-active"
-            ]}
-            phx-click="toggle_collection"
-            phx-value-id={@collection.id}
-          >
-            <.folder_icon />
-            <span class="flex min-w-0 flex-1 items-center leading-none">
-              <span class="min-w-0 truncate leading-normal">{@node.title}</span>
-              <span
-                :if={@node.shared || @collaboration_mount?}
-                class="ms-3 flex shrink-0 items-center gap-1.5"
-              >
-                <span
-                  :if={@node.shared}
-                  class="inline-flex shrink-0 items-center justify-center self-center opacity-60"
-                  aria-label="Shared with others"
-                >
-                  <.icon name="hero-user-group" class="size-4 block leading-none" />
-                </span>
-                <span
-                  :if={@collaboration_mount?}
-                  class="inline-flex shrink-0 items-center justify-center self-center opacity-60"
-                  aria-label={
-                    if(@node.readonly,
-                      do: "Read-only collaboration",
-                      else: "Editable collaboration"
-                    )
-                  }
-                >
-                  <.icon
-                    name={if @node.readonly, do: "hero-eye", else: "hero-pencil-square"}
-                    class="size-4 block leading-none"
-                  />
-                </span>
-              </span>
+            <span class="truncate">{@node.title}</span>
+            <span
+              :if={@node.shared}
+              class="inline-flex items-center opacity-60"
+              aria-label="Shared with others"
+            >
+              <.icon name="hero-user-group" class="size-4" />
             </span>
-            <span class="badge badge-ghost badge-sm shrink-0 tabular-nums">
-              {Collections.collection_bookmark_badge(@node)}
+            <span
+              :if={@collaboration_mount?}
+              class="inline-flex shrink-0 items-center opacity-60"
+              aria-label={
+                if(@node.readonly,
+                  do: "Read-only collaboration",
+                  else: "Editable collaboration"
+                )
+              }
+            >
+              <.icon
+                name={if @node.readonly, do: "hero-eye", else: "hero-pencil-square"}
+                class="size-4"
+              />
             </span>
-          </summary>
-          <ul
-            :if={@node.children != []}
-            id={"collections-zone-#{@effective.id}"}
-          >
-            <.tree_node
-              :for={child <- @node.children}
-              node={child}
-              selected={@selected}
-              collapsed={@collapsed}
-              depth={@depth + 1}
-              current_scope={@current_scope}
-              pending_metadata_ids={@pending_metadata_ids}
-            />
-          </ul>
-          <ul
-            id={"nested-zone-#{@effective.id}"}
-            class={@node.bookmarks == [] && "collection-bookmark-drop-hidden"}
-          >
-            <.bookmark_menu_link
-              :for={bookmark <- @node.bookmarks}
-              bookmark={bookmark}
-              selected={selected?(@selected, :bookmark, bookmark.id)}
-              metadata_pending={MapSet.member?(@pending_metadata_ids, bookmark.id)}
-              editable={not @node.readonly}
-            />
-          </ul>
-        </details>
-      <% end %>
+          </span>
+          <span class="badge badge-sm shrink-0 tabular-nums">
+            {Collections.collection_bookmark_badge(@node)}
+          </span>
+        </summary>
+        <ul
+          :if={@node.children != []}
+          id={"collections-zone-#{@effective.id}"}
+        >
+          <.tree_node
+            :for={child <- @node.children}
+            node={child}
+            selected={@selected}
+            collapsed={@collapsed}
+            depth={@depth + 1}
+            current_scope={@current_scope}
+            pending_metadata_ids={@pending_metadata_ids}
+          />
+        </ul>
+        <ul
+          id={"nested-zone-#{@effective.id}"}
+          class={@node.bookmarks == [] && "collection-bookmark-drop-hidden"}
+        >
+          <.bookmark_menu_link
+            :for={bookmark <- @node.bookmarks}
+            bookmark={bookmark}
+            selected={selected?(@selected, :bookmark, bookmark.id)}
+            metadata_pending={MapSet.member?(@pending_metadata_ids, bookmark.id)}
+            editable={not @node.readonly}
+          />
+        </ul>
+      </details>
     </li>
     """
   end
@@ -1891,8 +1873,7 @@ defmodule LinksWeb.DashboardLive do
 
   defp sidebar_menu_class(extra) do
     [
-      "menu flex-col flex-nowrap bg-base-200 rounded-box w-full min-w-0 max-w-full",
-      "[&_li]:min-w-0 [&_li]:max-w-full [&_a]:min-w-0 [&_details]:min-w-0 [&_details]:max-w-full"
+      "menu flex-nowrap bg-base-200 rounded-box w-full"
       | extra
     ]
   end
