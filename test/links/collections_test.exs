@@ -234,6 +234,32 @@ defmodule Links.CollectionsTest do
                ])
     end
 
+    test "collaborators can reorder children inside editable shared collections" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      parent = collection_fixture(owner_scope, %{title: "Shared Parent"})
+
+      {:ok, first} =
+        Collections.create_collection(owner_scope, %{title: "Child A", parent_id: parent.id})
+
+      {:ok, second} =
+        Collections.create_collection(owner_scope, %{title: "Child B", parent_id: parent.id})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, parent, collaborator.email, false)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:ok, :reordered} =
+               Collections.reorder_collections(collaborator_scope, parent.id, [
+                 second.id,
+                 first.id
+               ])
+
+      assert Collections.get_collection!(second.id).position == 0
+      assert Collections.get_collection!(first.id).position == 1
+    end
+
     test "collaborators cannot nest shared collection mounts" do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()
@@ -279,6 +305,80 @@ defmodule Links.CollectionsTest do
                Collections.move_collection(collaborator_scope, own.id, shared.id, [own.id])
 
       assert Collections.get_collection!(own.id).parent_id == shared.id
+    end
+
+    test "collaborators can move nested collections out of editable shared collections" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      shared = collection_fixture(owner_scope, %{title: "Shared"})
+
+      {:ok, child} =
+        Collections.create_collection(owner_scope, %{
+          title: "Nested",
+          parent_id: shared.id
+        })
+
+      own = collection_fixture(user_scope_fixture(collaborator), %{title: "Mine"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, shared, collaborator.email, false)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:ok, :moved} =
+               Collections.move_collection(collaborator_scope, child.id, own.id, [child.id])
+
+      assert Collections.get_collection!(child.id).parent_id == own.id
+    end
+
+    test "collaborators can move nested collections between editable shared branches" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      shared = collection_fixture(owner_scope, %{title: "Shared"})
+
+      {:ok, branch} =
+        Collections.create_collection(owner_scope, %{
+          title: "Branch",
+          parent_id: shared.id
+        })
+
+      {:ok, nested} =
+        Collections.create_collection(owner_scope, %{
+          title: "Nested",
+          parent_id: shared.id
+        })
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, shared, collaborator.email, false)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:ok, :moved} =
+               Collections.move_collection(collaborator_scope, nested.id, branch.id, [nested.id])
+
+      assert Collections.get_collection!(nested.id).parent_id == branch.id
+    end
+
+    test "collaborators cannot move nested collections out of read-only shared collections" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      shared = collection_fixture(owner_scope, %{title: "Shared"})
+
+      {:ok, child} =
+        Collections.create_collection(owner_scope, %{
+          title: "Nested",
+          parent_id: shared.id
+        })
+
+      own = collection_fixture(user_scope_fixture(collaborator), %{title: "Mine"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, shared, collaborator.email, true)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:error, :unauthorized} =
+               Collections.move_collection(collaborator_scope, child.id, own.id, [child.id])
     end
 
     test "read-only shared collections reject incoming bookmarks" do

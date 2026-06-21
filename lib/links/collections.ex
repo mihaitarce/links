@@ -1218,7 +1218,7 @@ defmodule Links.Collections do
   end
 
   defp authorize_collection_reparent(%Scope{} = scope, %Collection{} = collection, parent_id) do
-    if user_owned_collection?(scope, collection) and drop_target_editable?(scope, parent_id) do
+    if drop_target_editable?(scope, parent_id) and can_reorder_collection?(scope, collection.id) do
       :ok
     else
       {:error, :unauthorized}
@@ -1237,9 +1237,18 @@ defmodule Links.Collections do
       user_owned_collection?(scope, collection) and drop_target_editable?(scope, parent_id) ->
         :ok
 
+      editable_shared_sibling_reorder?(scope, collection, parent_id) ->
+        :ok
+
       true ->
         {:error, :unauthorized}
     end
+  end
+
+  defp editable_shared_sibling_reorder?(%Scope{} = scope, %Collection{} = collection, parent_id) do
+    not is_nil(parent_id) and
+      can_edit_collection?(scope, parent_id) and
+      can_reorder_collection?(scope, collection.id)
   end
 
   defp drop_target_editable?(_scope, nil), do: true
