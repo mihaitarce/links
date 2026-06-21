@@ -267,15 +267,40 @@ defmodule Links.Collections do
     parent_id = normalize_reorder_parent_id(parent_id)
     ordered_ids = Enum.map(ordered_ids, &to_integer/1)
     source_parent_id = collection.parent_id
+    previous_owner_id = collection.owner_id
 
     with :ok <- validate_collection_move(scope, collection, parent_id, ordered_ids),
          :ok <- reject_cycle(collection.id, parent_id) do
+      reparent? = source_parent_id != parent_id
+      transfer? = transfer_root_ownership?(scope, collection, parent_id, source_parent_id)
+      reparent_attrs = collection_reparent_attrs(scope, collection, parent_id, source_parent_id)
+
       multi =
-        if source_parent_id != parent_id do
+        if reparent? do
           Multi.new()
-          |> Multi.update(:collection, Collection.changeset(collection, %{parent_id: parent_id}))
+          |> Multi.update(:collection, Collection.changeset(collection, reparent_attrs))
         else
           Multi.new()
+        end
+
+      multi =
+        if transfer? do
+          descendant_ids =
+            descendant_ids([collection.id])
+            |> Enum.reject(&(&1 == collection.id))
+
+          if descendant_ids == [] do
+            multi
+          else
+            Multi.update_all(
+              multi,
+              :transfer_subtree_ownership,
+              from(c in Collection, where: c.id in ^descendant_ids),
+              set: [owner_id: scope.user.id]
+            )
+          end
+        else
+          multi
         end
 
       multi
@@ -287,6 +312,11 @@ defmodule Links.Collections do
 
           if source_parent_id != parent_id do
             broadcast_collection_changed(source_parent_id)
+          end
+
+          if transfer? do
+            broadcast_user_collections_changed(previous_owner_id)
+            broadcast_user_collections_changed(scope.user.id)
           end
 
           {:ok, :moved}
@@ -1291,6 +1321,33 @@ defmodule Links.Collections do
   defp collaboration_mount?(%Collection{} = collection) do
     not is_nil(collection.collaboration_id)
   end
+
+  defp collection_reparent_attrs(
+         %Scope{} = scope,
+         %Collection{} = collection,
+         parent_id,
+         source_parent_id
+       ) do
+    attrs = %{parent_id: parent_id}
+
+    if transfer_root_ownership?(scope, collection, parent_id, source_parent_id) do
+      Map.put(attrs, :owner_id, scope.user.id)
+    else
+      attrs
+    end
+  end
+
+  defp transfer_root_ownership?(
+         %Scope{} = scope,
+         %Collection{} = collection,
+         nil,
+         source_parent_id
+       )
+       when not is_nil(source_parent_id) do
+    collection.owner_id != scope.user.id
+  end
+
+  defp transfer_root_ownership?(_, _, _, _), do: false
 
   defp reject_cycle(_collection_id, nil), do: :ok
 

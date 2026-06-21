@@ -477,6 +477,48 @@ defmodule Links.CollectionsTest do
       assert Collections.get_collection!(nested.id).parent_id == branch.id
     end
 
+    test "collaborators can move nested collections from editable shared collections to root" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      shared = collection_fixture(owner_scope, %{title: "Shared"})
+
+      {:ok, child} =
+        Collections.create_collection(owner_scope, %{
+          title: "Nested",
+          parent_id: shared.id
+        })
+
+      {:ok, grandchild} =
+        Collections.create_collection(owner_scope, %{
+          title: "Grandchild",
+          parent_id: child.id
+        })
+
+      own = collection_fixture(user_scope_fixture(collaborator), %{title: "Mine"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, shared, collaborator.email, false)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:ok, :moved} =
+               Collections.move_collection(collaborator_scope, child.id, "root", [
+                 child.id,
+                 own.id
+               ])
+
+      child = Collections.get_collection!(child.id)
+      assert child.parent_id == nil
+      assert child.owner_id == collaborator.id
+      assert Collections.get_collection!(grandchild.id).owner_id == collaborator.id
+
+      dashboard = Collections.list_dashboard(collaborator_scope)
+      assert Enum.any?(dashboard.tree, &(&1.title == "Nested"))
+
+      owner_dashboard = Collections.list_dashboard(owner_scope)
+      refute Enum.any?(owner_dashboard.tree, &(&1.title == "Nested"))
+    end
+
     test "collaborators cannot move nested collections out of read-only shared collections" do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()
