@@ -89,19 +89,6 @@ defmodule Links.CollectionsTest do
                Collections.move_bookmark(scope, first.id, collection.id, [second.id])
     end
 
-    test "reorders root collections" do
-      scope = user_scope_fixture()
-
-      {:ok, first} = Collections.create_collection(scope, %{title: "First"})
-      {:ok, second} = Collections.create_collection(scope, %{title: "Second"})
-
-      assert {:ok, :reordered} =
-               Collections.reorder_collections(scope, "root", [second.id, first.id])
-
-      assert Collections.get_collection!(second.id).position == 0
-      assert Collections.get_collection!(first.id).position == 1
-    end
-
     test "move_collection reorders root collections" do
       scope = user_scope_fixture()
 
@@ -325,8 +312,8 @@ defmodule Links.CollectionsTest do
       {:ok, second} =
         Collections.create_collection(scope, %{title: "Child B", parent_id: root.id})
 
-      assert {:ok, :reordered} =
-               Collections.reorder_collections(scope, root.id, [second.id, first.id])
+      assert {:ok, :moved} =
+               Collections.move_collection(scope, second.id, root.id, [second.id, first.id])
 
       assert Collections.get_collection!(second.id).position == 0
       assert Collections.get_collection!(first.id).position == 1
@@ -348,8 +335,8 @@ defmodule Links.CollectionsTest do
       refute Collections.can_edit_collection?(collaborator_scope, mount.id)
       assert Collections.can_reorder_collection?(collaborator_scope, mount.id)
 
-      assert {:ok, :reordered} =
-               Collections.reorder_collections(collaborator_scope, "root", [mount.id, own.id])
+      assert {:ok, :moved} =
+               Collections.move_collection(collaborator_scope, mount.id, "root", [mount.id, own.id])
 
       assert Collections.get_collection!(mount.id).position == 0
       assert Collections.get_collection!(own.id).position == 1
@@ -366,8 +353,8 @@ defmodule Links.CollectionsTest do
       collaborator_scope = user_scope_fixture(collaborator)
       {:ok, own} = Collections.create_collection(collaborator_scope, %{title: "Mine"})
 
-      assert {:ok, :reordered} =
-               Collections.reorder_collections(collaborator_scope, "root", [mount.id, own.id])
+      assert {:ok, :moved} =
+               Collections.move_collection(collaborator_scope, mount.id, "root", [mount.id, own.id])
 
       assert Collections.get_collection!(mount.id).position == 0
       assert Collections.get_collection!(own.id).position == 1
@@ -407,7 +394,7 @@ defmodule Links.CollectionsTest do
       collaborator_scope = user_scope_fixture(collaborator)
 
       assert {:error, :unauthorized} =
-               Collections.reorder_collections(collaborator_scope, parent.id, [
+               Collections.move_collection(collaborator_scope, second.id, parent.id, [
                  second.id,
                  first.id
                ])
@@ -429,8 +416,8 @@ defmodule Links.CollectionsTest do
 
       collaborator_scope = user_scope_fixture(collaborator)
 
-      assert {:ok, :reordered} =
-               Collections.reorder_collections(collaborator_scope, parent.id, [
+      assert {:ok, :moved} =
+               Collections.move_collection(collaborator_scope, second.id, parent.id, [
                  second.id,
                  first.id
                ])

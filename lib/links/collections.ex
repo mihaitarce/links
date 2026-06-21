@@ -346,21 +346,6 @@ defmodule Links.Collections do
     end
   end
 
-  def reorder_collections(%Scope{} = scope, parent_id, ordered_ids) do
-    ordered_ids = Enum.map(ordered_ids, &to_integer/1)
-
-    case ordered_ids do
-      [first | _] ->
-        case move_collection(scope, first, parent_id, ordered_ids) do
-          {:ok, _} -> {:ok, :reordered}
-          error -> error
-        end
-
-      [] ->
-        {:error, :invalid_order}
-    end
-  end
-
   def copy_collection(%Scope{} = scope, collection_id, parent_id, ordered_ids) do
     collection = get_collection!(collection_id)
     parent_id = normalize_reorder_parent_id(parent_id)
