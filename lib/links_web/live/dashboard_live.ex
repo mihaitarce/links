@@ -413,7 +413,7 @@ defmodule LinksWeb.DashboardLive do
         class="bookmark-select-button flex-1 items-center gap-2"
       >
         <.bookmark_status_icon bookmark={@bookmark} metadata_pending={@metadata_pending} />
-        <span class="flex flex-1 items-baseline justify-between gap-1 overflow-hidden leading-normal">
+        <span class="flex flex-1 items-baseline gap-1 overflow-hidden leading-normal">
           <span class="bookmark-title truncate">{bookmark_label(@bookmark)}</span>
           <span
             :if={domain = Bookmark.display_host(@bookmark)}
@@ -540,6 +540,20 @@ defmodule LinksWeb.DashboardLive do
     """
   end
 
+  attr :label_node, :map, required: true
+
+  def collection_tree_label(assigns) do
+    ~H"""
+    <span class="truncate">{@label_node.title}</span>
+    <span
+      :if={@label_node.source_title}
+      class="text-base-content/50 truncate"
+    >
+      {@label_node.source_title}
+    </span>
+    """
+  end
+
   attr :node, :map, required: true
   attr :selected, :map, default: nil
   attr :collapsed, MapSet, required: true
@@ -578,7 +592,7 @@ defmodule LinksWeb.DashboardLive do
       >
         <span class="flex min-w-0 items-center gap-2">
           <.folder_icon />
-          <span class="truncate">{@node.title}</span>
+          <.collection_tree_label label_node={@node} />
         </span>
       </div>
       <details :if={not @node.revoked} open={@expanded}>
@@ -586,9 +600,9 @@ defmodule LinksWeb.DashboardLive do
           phx-click="toggle_collection"
           phx-value-id={@collection.id}
         >
-          <span class="flex items-center gap-2">
+          <span class="flex min-w-0 flex-1 items-center gap-2">
             <.folder_icon />
-            <span class="truncate">{@node.title}</span>
+            <.collection_tree_label label_node={@node} />
             <span
               :if={@node.shared}
               class="inline-flex items-center opacity-60"
@@ -804,7 +818,10 @@ defmodule LinksWeb.DashboardLive do
   end
 
   def detail_panel(assigns) do
-    assigns = assign(assigns, :readonly, assigns.context.readonly)
+    assigns =
+      assigns
+      |> assign(:readonly, assigns.context.readonly)
+      |> assign(:title_collection, title_editable_collection(assigns.context))
 
     ~H"""
     <div class="mx-auto max-w-4xl space-y-4">
@@ -814,7 +831,15 @@ defmodule LinksWeb.DashboardLive do
             <p :if={@context.mount} class="text-xs uppercase tracking-wide text-base-content/50">
               Collaborated collection
             </p>
-            <h1 class="text-xl font-semibold">{@context.effective_collection.title}</h1>
+            <h1 class="flex items-baseline gap-2 text-xl font-semibold">
+              <span>{@title_collection.title}</span>
+              <span
+                :if={@context.mount && @title_collection.title != @context.effective_collection.title}
+                class="text-base-content/50 text-sm font-normal"
+              >
+                {@context.effective_collection.title}
+              </span>
+            </h1>
             <p :if={@readonly} class="mt-1 text-sm text-base-content/60">Read-only access</p>
           </div>
           <button
@@ -1300,17 +1325,19 @@ defmodule LinksWeb.DashboardLive do
   end
 
   def handle_event("validate_collection", %{"collection" => params}, socket) do
-    collection = socket.assigns.selected_context.effective_collection
+    collection = title_editable_collection(socket.assigns.selected_context)
     changeset = Collection.changeset(collection, params) |> Map.put(:action, :validate)
     {:noreply, assign(socket, :collection_form, to_form(changeset))}
   end
 
   def handle_event("save_collection", %{"collection" => params}, socket) do
-    collection = socket.assigns.selected_context.effective_collection
+    collection = title_editable_collection(socket.assigns.selected_context)
 
     case Collections.update_collection(socket.assigns.current_scope, collection, params) do
-      {:ok, collection} ->
-        {:noreply, socket |> refresh_dashboard() |> select_collection(collection.id)}
+      {:ok, _collection} ->
+        select_id = socket.assigns.selected_context.collection.id
+
+        {:noreply, socket |> refresh_dashboard() |> select_collection(select_id)}
 
       {:error, changeset} ->
         {:noreply, assign(socket, :collection_form, to_form(changeset))}
@@ -1918,6 +1945,9 @@ defmodule LinksWeb.DashboardLive do
     |> to_form(as: :child_collection)
   end
 
+  defp title_editable_collection(%{mount: %Collection{} = mount}), do: mount
+  defp title_editable_collection(%{effective_collection: collection}), do: collection
+
   defp select_collection(socket, id) do
     case Collections.resolve_collection(socket.assigns.current_scope, id) do
       {:ok, context} ->
@@ -1957,7 +1987,7 @@ defmodule LinksWeb.DashboardLive do
         |> reset_collaboration_form()
         |> assign(
           :collection_form,
-          to_form(Collection.changeset(context.effective_collection, %{}))
+          to_form(Collection.changeset(title_editable_collection(context), %{}))
         )
         |> assign(:child_collection_form, child_collection_form())
 

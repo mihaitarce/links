@@ -198,6 +198,10 @@ defmodule Links.Collections do
         if updated.parent_id != old_parent_id do
           broadcast_collection_changed(updated.parent_id)
         end
+
+        if active_collaboration_mount?(updated) or revoked_collaboration_mount?(updated) do
+          broadcast_user_collections_changed(updated.owner_id)
+        end
       end)
     else
       {:error, :unauthorized}
@@ -621,6 +625,20 @@ defmodule Links.Collections do
 
   defp tap_join_public_share(result, _user_id), do: result
 
+  defp collaboration_list_titles(
+         %Collection{title: mount_title, collaboration_id: collaboration_id},
+         %Collection{title: source_title}
+       )
+       when not is_nil(collaboration_id) do
+    if mount_title == source_title do
+      {mount_title, nil}
+    else
+      {mount_title, source_title}
+    end
+  end
+
+  defp collaboration_list_titles(_mount, %Collection{title: title}), do: {title, nil}
+
   def fetch_public_share_dashboard(token) when is_binary(token) do
     case get_public_share_by_token(token) do
       %PublicShare{collection: %Collection{} = root} = share ->
@@ -948,6 +966,8 @@ defmodule Links.Collections do
 
         bookmarks = Map.get(bookmarks_by_collection, target.id, [])
 
+        {list_title, list_source_title} = collaboration_list_titles(collection, target)
+
         node(
           collection,
           target,
@@ -956,7 +976,9 @@ defmodule Links.Collections do
           collection,
           collection.collaboration_readonly,
           false,
-          false
+          false,
+          list_title,
+          list_source_title
         )
 
       true ->
@@ -995,7 +1017,9 @@ defmodule Links.Collections do
          mount,
          readonly,
          revoked,
-         shared
+         shared,
+         title \\ nil,
+         source_title \\ nil
        ) do
     bookmark_count =
       length(bookmarks) + Enum.sum(Enum.map(children, & &1.bookmark_count))
@@ -1011,7 +1035,8 @@ defmodule Links.Collections do
       readonly: readonly,
       revoked: revoked,
       shared: shared,
-      title: effective_collection.title,
+      title: title || effective_collection.title,
+      source_title: source_title,
       children: children,
       bookmarks: bookmarks,
       bookmark_count: bookmark_count,

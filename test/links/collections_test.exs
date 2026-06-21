@@ -1181,6 +1181,59 @@ defmodule Links.CollectionsTest do
       assert Collections.can_view_collection?(collaborator_scope, source.id)
     end
 
+    test "updating an owned collection title does not change collaboration mount titles" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      assert {:ok, updated} =
+               Collections.update_collection(owner_scope, source, %{title: "Renamed Shared"})
+
+      assert updated.title == "Renamed Shared"
+      assert Collections.get_collection!(mount.id).title == "Shared"
+    end
+
+    test "collaborators updating a shared collection title changes only their mount" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, false)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:ok, updated} =
+               Collections.update_collection(collaborator_scope, mount, %{title: "Team Reading"})
+
+      assert updated.title == "Team Reading"
+      assert Collections.get_collection!(source.id).title == "Shared"
+
+      dashboard = Collections.list_dashboard(collaborator_scope)
+      assert [%{title: "Team Reading", source_title: "Shared"}] = dashboard.tree
+    end
+
+    test "collaboration mounts show the source title in parentheses when titles differ" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      mount
+      |> Collection.changeset(%{title: "My Sidebar Name"})
+      |> Links.Repo.update!()
+
+      collaborator_scope = user_scope_fixture(collaborator)
+      dashboard = Collections.list_dashboard(collaborator_scope)
+
+      assert [%{title: "My Sidebar Name", source_title: "Shared"}] = dashboard.tree
+    end
+
     test "rejects inviting an active collaborator again" do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()
