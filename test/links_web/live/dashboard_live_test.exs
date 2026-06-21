@@ -80,7 +80,7 @@ defmodule LinksWeb.DashboardLiveTest do
 
       assert Collections.get_bookmark!(bookmark.id).completed
       assert has_element?(lv, "#bookmark-completed-#{bookmark.id}[checked]")
-      assert has_element?(lv, "#bookmark-#{bookmark.id} .bookmark-completed")
+      assert has_element?(lv, "#bookmark-#{bookmark.id}.bookmark-completed")
     end
 
     test "toggles completed from the link detail page", %{conn: conn} do
@@ -109,7 +109,7 @@ defmodule LinksWeb.DashboardLiveTest do
 
       assert Collections.get_bookmark!(bookmark.id).completed
       assert has_element?(lv, "#bookmark-completed-input[checked]")
-      assert has_element?(lv, "#bookmark-#{bookmark.id} .bookmark-completed")
+      assert has_element?(lv, "#bookmark-#{bookmark.id}.bookmark-completed")
     end
 
     test "disables completed checkbox on read-only collection links", %{conn: conn} do

@@ -75,13 +75,10 @@ defmodule LinksWeb.PublicShareLive do
 
             <ul id="public-share-tree" class={sidebar_menu_class(["mt-4", "overflow-y-auto"])}>
               <.tree_node :for={node <- @sections} node={node} />
-              <li
+              <.bookmark_menu_link
                 :for={bookmark <- @root_bookmarks}
-                id={"bookmark-#{bookmark.id}"}
-                class="min-w-0 max-w-full"
-              >
-                <.bookmark_menu_link bookmark={bookmark} />
-              </li>
+                bookmark={bookmark}
+              />
             </ul>
           </div>
         </div>
@@ -123,13 +120,7 @@ defmodule LinksWeb.PublicShareLive do
             <.tree_node :for={child <- @node.children} node={child} />
           </ul>
           <ul :if={@node.bookmarks != []}>
-            <li
-              :for={bookmark <- @node.bookmarks}
-              id={"bookmark-#{bookmark.id}"}
-              class="min-w-0 max-w-full"
-            >
-              <.bookmark_menu_link bookmark={bookmark} />
-            </li>
+            <.bookmark_menu_link :for={bookmark <- @node.bookmarks} bookmark={bookmark} />
           </ul>
         </details>
       <% end %>
@@ -141,7 +132,10 @@ defmodule LinksWeb.PublicShareLive do
 
   def bookmark_menu_link(assigns) do
     ~H"""
-    <div class="bookmark-menu-row flex min-w-0 w-full items-center gap-2">
+    <li
+      id={"bookmark-#{@bookmark.id}"}
+      class="bookmark-menu-row flex min-w-0 w-full max-w-full items-center gap-2"
+    >
       <a
         href={@bookmark.url}
         target="_blank"
@@ -159,7 +153,7 @@ defmodule LinksWeb.PublicShareLive do
           </span>
         </span>
       </a>
-    </div>
+    </li>
     """
   end
 

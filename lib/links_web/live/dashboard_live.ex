@@ -86,21 +86,19 @@ defmodule LinksWeb.DashboardLive do
                 id="bookmarks-zone-inbox"
                 class={sidebar_menu_class(["min-h-0 flex-1 overflow-y-auto overflow-x-hidden"])}
               >
-                <li
+                <.bookmark_menu_link
                   :for={bookmark <- @dashboard.inbox}
-                  id={"bookmark-#{bookmark.id}"}
+                  bookmark={bookmark}
+                  selected={selected?(@selected, :bookmark, bookmark.id)}
+                  metadata_pending={MapSet.member?(@pending_metadata_ids, bookmark.id)}
+                  editable={true}
+                />
+                <li
+                  id="inbox-empty-state"
+                  class="inbox-empty-state bookmark-menu-row flex min-w-0 w-full items-center justify-center"
+                  aria-hidden="true"
                 >
-                  <.bookmark_menu_link
-                    bookmark={bookmark}
-                    selected={selected?(@selected, :bookmark, bookmark.id)}
-                    metadata_pending={MapSet.member?(@pending_metadata_ids, bookmark.id)}
-                    editable={true}
-                  />
-                </li>
-                <li id="inbox-empty-state" class="inbox-empty-state" aria-hidden="true">
-                  <div class="bookmark-menu-row flex min-w-0 w-full items-center justify-center">
-                    <span class="inbox-empty-state-placeholder">Your inbox is empty</span>
-                  </div>
+                  <span class="inbox-empty-state-placeholder">Your inbox is empty</span>
                 </li>
               </ul>
             </section>
@@ -127,12 +125,14 @@ defmodule LinksWeb.DashboardLive do
                   current_scope={@current_scope}
                   pending_metadata_ids={@pending_metadata_ids}
                 />
-                <li id="collections-empty-state" class="inbox-empty-state" aria-hidden="true">
-                  <div class="bookmark-menu-row flex min-w-0 w-full items-center justify-center">
-                    <span class="inbox-empty-state-placeholder">
-                      You don't have any collections yet
-                    </span>
-                  </div>
+                <li
+                  id="collections-empty-state"
+                  class="inbox-empty-state bookmark-menu-row flex min-w-0 w-full items-center justify-center"
+                  aria-hidden="true"
+                >
+                  <span class="inbox-empty-state-placeholder">
+                    You don't have any collections yet
+                  </span>
                 </li>
               </ul>
             </section>
@@ -392,11 +392,14 @@ defmodule LinksWeb.DashboardLive do
 
   def bookmark_menu_link(assigns) do
     ~H"""
-    <div class={[
-      "bookmark-menu-row flex min-w-0 w-full items-center gap-2",
-      @selected && "sidebar-item-active",
-      @bookmark.completed && "bookmark-completed"
-    ]}>
+    <li
+      id={"bookmark-#{@bookmark.id}"}
+      class={[
+        "bookmark-menu-row flex min-w-0 w-full items-center gap-2",
+        @selected && "sidebar-item-active",
+        @bookmark.completed && "bookmark-completed"
+      ]}
+    >
       <button
         type="button"
         id={"bookmark-select-#{@bookmark.id}"}
@@ -432,7 +435,7 @@ defmodule LinksWeb.DashboardLive do
       >
         <.icon name="hero-arrow-top-right-on-square" class="size-4" />
       </a>
-    </div>
+    </li>
     """
   end
 
@@ -450,30 +453,17 @@ defmodule LinksWeb.DashboardLive do
       end)
 
     ~H"""
-    <%= if @bookmark.completed do %>
-      <input
-        type="checkbox"
-        id={@input_id}
-        phx-click="toggle_bookmark_completed"
-        phx-value-id={@bookmark.id}
-        phx-value-completed="false"
-        checked
-        disabled={not @editable}
-        class={@checkbox_class}
-        aria-label={"Mark \"#{bookmark_label(@bookmark)}\" complete"}
-      />
-    <% else %>
-      <input
-        type="checkbox"
-        id={@input_id}
-        phx-click="toggle_bookmark_completed"
-        phx-value-id={@bookmark.id}
-        phx-value-completed="true"
-        disabled={not @editable}
-        class={@checkbox_class}
-        aria-label={"Mark \"#{bookmark_label(@bookmark)}\" complete"}
-      />
-    <% end %>
+    <input
+      type="checkbox"
+      id={@input_id}
+      checked={@bookmark.completed}
+      phx-click="toggle_bookmark_completed"
+      phx-value-id={@bookmark.id}
+      phx-value-completed={to_string(not @bookmark.completed)}
+      disabled={not @editable}
+      class={@checkbox_class}
+      aria-label={"Mark \"#{bookmark_label(@bookmark)}\" complete"}
+    />
     """
   end
 
@@ -631,17 +621,13 @@ defmodule LinksWeb.DashboardLive do
             id={"nested-zone-#{@effective.id}"}
             class={@node.bookmarks == [] && "collection-bookmark-drop-hidden"}
           >
-            <li
+            <.bookmark_menu_link
               :for={bookmark <- @node.bookmarks}
-              id={"bookmark-#{bookmark.id}"}
-            >
-              <.bookmark_menu_link
-                bookmark={bookmark}
-                selected={selected?(@selected, :bookmark, bookmark.id)}
-                metadata_pending={MapSet.member?(@pending_metadata_ids, bookmark.id)}
-                editable={not @node.readonly}
-              />
-            </li>
+              bookmark={bookmark}
+              selected={selected?(@selected, :bookmark, bookmark.id)}
+              metadata_pending={MapSet.member?(@pending_metadata_ids, bookmark.id)}
+              editable={not @node.readonly}
+            />
           </ul>
         </details>
       <% end %>
