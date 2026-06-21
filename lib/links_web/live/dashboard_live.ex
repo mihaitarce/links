@@ -769,18 +769,46 @@ defmodule LinksWeb.DashboardLive do
           phx-submit="save_bookmark"
           phx-change="validate_bookmark"
         >
-          <.input
-            field={@bookmark_form[:title]}
-            id="bookmark-title-input"
-            label="Title"
-            disabled={@context.readonly}
-          />
-          <.input
-            field={@bookmark_form[:description]}
-            type="textarea"
-            label="Description"
-            disabled={@context.readonly}
-          />
+          <div class="mb-2">
+            <label for={@bookmark_form[:title].id} class="label mb-1">Title</label>
+            <input
+              type="text"
+              name={@bookmark_form[:title].name}
+              id={@bookmark_form[:title].id}
+              value={@bookmark_form[:title].value}
+              class={[
+                "input w-full",
+                @bookmark_form[:title].errors != [] && "input-error"
+              ]}
+              disabled={@context.readonly}
+            />
+            <p
+              :for={msg <- bookmark_field_errors(@bookmark_form[:title])}
+              class="mt-1.5 flex items-center gap-2 text-sm text-error"
+            >
+              <.icon name="hero-exclamation-circle" class="size-5" />
+              {msg}
+            </p>
+          </div>
+          <div class="mb-2">
+            <label for={@bookmark_form[:description].id} class="label mb-1">Description</label>
+            <textarea
+              name={@bookmark_form[:description].name}
+              id={@bookmark_form[:description].id}
+              class={[
+                "textarea w-full",
+                @bookmark_form[:description].errors != [] && "textarea-error"
+              ]}
+              disabled={@context.readonly}
+            >{Phoenix.HTML.Form.normalize_value("textarea", @bookmark_form[:description].value)}</textarea>
+            <p
+              :for={msg <- bookmark_field_errors(@bookmark_form[:description])}
+              class="mt-1.5 flex items-center gap-2 text-sm text-error"
+            >
+              <.icon name="hero-exclamation-circle" class="size-5" />
+              {msg}
+            </p>
+          </div>
           <p
             :if={@context.bookmark.metadata_fetched_at}
             id="bookmark-metadata-fetched-at"
@@ -789,7 +817,7 @@ defmodule LinksWeb.DashboardLive do
             Metadata fetched at {format_metadata_fetched_at(@context.bookmark.metadata_fetched_at)}
           </p>
         </.form>
-        <div class={[
+        <div :if={@context.bookmark.collection_id || !@context.readonly} class={[
           "mt-4 flex items-center gap-4",
           @context.bookmark.collection_id && "justify-between",
           is_nil(@context.bookmark.collection_id) && "justify-end"
@@ -834,12 +862,14 @@ defmodule LinksWeb.DashboardLive do
         <div class="mb-4 flex items-start justify-between gap-4">
           <div>
             <p :if={@context.mount} class="text-xs uppercase tracking-wide text-base-content/50">
-              Collaborated collection
+              Shared collection{if(@readonly, do: " (read-only)")}
             </p>
             <h1 class="text-xl font-semibold">
               {@title_collection.title}
             </h1>
-            <p :if={@readonly} class="mt-1 text-sm text-base-content/60">Read-only access</p>
+            <p :if={@readonly && !@context.mount} class="mt-1 text-sm text-base-content/60">
+              Read-only access
+            </p>
           </div>
           <button
             :if={@context.mount || !@readonly}
@@ -868,7 +898,7 @@ defmodule LinksWeb.DashboardLive do
               value={@collection_form[:title].value}
               class="input join-item w-full"
             />
-            <button class="btn btn-primary btn-soft join-item">Save collection</button>
+            <button class="btn btn-primary join-item">Save</button>
           </div>
         </.form>
       </div>
@@ -1861,6 +1891,14 @@ defmodule LinksWeb.DashboardLive do
   end
 
   defp collaboration_email_errors(%Phoenix.HTML.FormField{} = field) do
+    if Phoenix.Component.used_input?(field) do
+      Enum.map(field.errors, &translate_error/1)
+    else
+      []
+    end
+  end
+
+  defp bookmark_field_errors(%Phoenix.HTML.FormField{} = field) do
     if Phoenix.Component.used_input?(field) do
       Enum.map(field.errors, &translate_error/1)
     else
