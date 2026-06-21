@@ -85,6 +85,8 @@ defmodule LinksWeb.DashboardLive do
               </div>
               <ul
                 id="bookmarks-zone-inbox"
+                phx-hook="BookmarkSort"
+                data-collection-id="inbox"
                 class={sidebar_menu_class(["overflow-y-auto"])}
               >
                 <.bookmark_menu_link
@@ -611,6 +613,8 @@ defmodule LinksWeb.DashboardLive do
         </ul>
         <ul
           id={"nested-zone-#{@effective.id}"}
+          phx-hook="BookmarkSort"
+          data-collection-id={@effective.id}
           class={@node.bookmarks == [] && "collection-bookmark-drop-hidden"}
         >
           <.bookmark_menu_link
@@ -1155,6 +1159,28 @@ defmodule LinksWeb.DashboardLive do
 
   def handle_event("expand_collection", %{"id" => id}, socket) do
     {:noreply, expand_collection(socket, String.to_integer(id))}
+  end
+
+  def handle_event(
+        "move_bookmark",
+        %{"id" => id, "collection_id" => collection_id, "ordered_ids" => ordered_ids},
+        socket
+      ) do
+    case Collections.move_bookmark(
+           socket.assigns.current_scope,
+           id,
+           collection_id,
+           ordered_ids
+         ) do
+      {:ok, _} ->
+        {:noreply, refresh_dashboard(socket)}
+
+      {:error, :invalid_order} ->
+        {:noreply, put_flash(socket, :error, "Could not reorder bookmarks")}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Could not move bookmark")}
+    end
   end
 
   def handle_event(

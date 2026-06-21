@@ -278,13 +278,57 @@ const CollectionSort = {
   },
 }
 
+const BookmarkSort = {
+  mounted() {
+    this.sortable = null
+    this.initSortable()
+  },
+  updated() {
+    this.destroySortable()
+    this.initSortable()
+  },
+  destroyed() {
+    this.destroySortable()
+  },
+  orderedBookmarkIds() {
+    return Array.from(this.el.children)
+      .filter((child) => child.id?.startsWith("bookmark-"))
+      .map((child) => child.id.replace("bookmark-", ""))
+  },
+  initSortable() {
+    const hook = this
+
+    this.sortable = new Sortable(this.el, {
+      animation: 150,
+      draggable: "> li[id^='bookmark-']",
+      filter: "input, textarea, select, a, label, #inbox-empty-state",
+      preventOnFilter: true,
+      onEnd(event) {
+        if (event.oldIndex === event.newIndex) return
+
+        hook.pushEvent("move_bookmark", {
+          id: event.item.id.replace("bookmark-", ""),
+          collection_id: hook.el.dataset.collectionId,
+          ordered_ids: hook.orderedBookmarkIds(),
+        })
+      },
+    })
+  },
+  destroySortable() {
+    if (this.sortable) {
+      this.sortable.destroy()
+      this.sortable = null
+    }
+  },
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocketPath =
   document.querySelector("meta[name='live-socket-path']")?.getAttribute("content") || "/live"
 const liveSocket = new LiveSocket(liveSocketPath, Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, CollectionSort},
+  hooks: {...colocatedHooks, CollectionSort, BookmarkSort},
 })
 
 // Show progress bar on live navigation and form submits

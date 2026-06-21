@@ -339,6 +339,95 @@ defmodule LinksWeb.DashboardLiveTest do
       assert html =~ ~s(data-nest-parent-id="#{parent.id}")
     end
 
+    test "bookmark lists are sortable within each zone", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      collection = collection_fixture(scope, %{title: "Reading"})
+
+      {:ok, _bookmark} =
+        Collections.create_bookmark(scope, %{
+          title: "Docs",
+          url: "https://example.com/docs",
+          collection_id: collection.id
+        })
+
+      {:ok, _lv, html} = live(conn, ~p"/")
+
+      assert html =~ ~s(id="bookmarks-zone-inbox")
+      assert html =~ ~s(phx-hook="BookmarkSort")
+      assert html =~ ~s(data-collection-id="inbox")
+      assert html =~ ~s(id="nested-zone-#{collection.id}")
+      assert html =~ ~s(data-collection-id="#{collection.id}")
+    end
+
+    test "hides bookmark drop zones for empty collections", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      collection = collection_fixture(scope, %{title: "Empty"})
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      assert has_element?(lv, "#nested-zone-#{collection.id}.collection-bookmark-drop-hidden")
+    end
+
+    test "reorders inbox bookmarks from the dashboard", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+
+      {:ok, first} =
+        Collections.create_inbox_bookmark(scope, %{
+          title: "First",
+          url: "https://example.com/1"
+        })
+
+      {:ok, second} =
+        Collections.create_inbox_bookmark(scope, %{
+          title: "Second",
+          url: "https://example.com/2"
+        })
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv
+      |> element("#bookmarks-zone-inbox")
+      |> render_hook("move_bookmark", %{
+        "id" => to_string(second.id),
+        "collection_id" => "inbox",
+        "ordered_ids" => [to_string(second.id), to_string(first.id)]
+      })
+
+      assert Collections.get_bookmark!(second.id).position == 0
+      assert Collections.get_bookmark!(first.id).position == 1
+    end
+
+    test "reorders bookmarks within a collection from the dashboard", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      collection = collection_fixture(scope, %{title: "Reading"})
+
+      {:ok, first} =
+        Collections.create_bookmark(scope, %{
+          title: "First",
+          url: "https://example.com/1",
+          collection_id: collection.id
+        })
+
+      {:ok, second} =
+        Collections.create_bookmark(scope, %{
+          title: "Second",
+          url: "https://example.com/2",
+          collection_id: collection.id
+        })
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv
+      |> element("#nested-zone-#{collection.id}")
+      |> render_hook("move_bookmark", %{
+        "id" => to_string(second.id),
+        "collection_id" => to_string(collection.id),
+        "ordered_ids" => [to_string(second.id), to_string(first.id)]
+      })
+
+      assert Collections.get_bookmark!(second.id).position == 0
+      assert Collections.get_bookmark!(first.id).position == 1
+    end
+
     test "reorders top-level collections from the dashboard", %{conn: conn} do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
 

@@ -55,6 +55,18 @@
   border-radius: var(--radius-field);
 }
 
+#bookmarks-sidebar li[id^="bookmark-"] {
+  cursor: grab;
+}
+
+#bookmarks-sidebar li[id^="bookmark-"].sortable-chosen {
+  cursor: grabbing;
+}
+
+#bookmarks-sidebar .collection-bookmark-drop-hidden {
+  display: none;
+}
+
 .sortable-drag,
 .sortable-fallback {
   pointer-events: none;
