@@ -109,12 +109,12 @@ const finishBookmarkDragUi = (hook, {spilled = false} = {}) => {
 
 const startCopyDragMode = (hook, event) => {
   hook.copyMode = Boolean(event.originalEvent?.shiftKey)
-  sidebarRoot(hook.el)?.classList.toggle("dnd-copy-mode", hook.copyMode)
+  document.body.classList.toggle("dnd-copy-mode", hook.copyMode)
 }
 
 const clearCopyDragMode = (hook) => {
   hook.copyMode = false
-  sidebarRoot(hook.el)?.classList.remove("dnd-copy-mode")
+  document.body.classList.remove("dnd-copy-mode")
 }
 const CollectionSort = {
   mounted() {
