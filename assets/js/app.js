@@ -189,6 +189,19 @@ const CollectionSort = {
       ordered_ids: [...childIds, movedId],
     })
   },
+  ensureNestTargetExpanded(collection) {
+    const details = collection.querySelector("details")
+
+    if (!details || details.open) return
+
+    details.open = true
+
+    const collectionId = collection.id.replace("collection-", "")
+
+    if (collectionId) {
+      this.pushEvent("expand_collection", {id: collectionId})
+    }
+  },
   orderedCollectionIds(container) {
     return Array.from(container.children)
       .filter((child) => child.id?.startsWith("collection-"))
@@ -222,6 +235,7 @@ const CollectionSort = {
         hook.draggedItem = null
 
         if (nestTarget && nestTarget !== event.item) {
+          hook.ensureNestTargetExpanded(nestTarget)
           hook.pushNestMove(hook, movedId, nestTarget)
           return
         }

@@ -406,6 +406,31 @@ defmodule LinksWeb.DashboardLiveTest do
       assert Collections.get_collection!(sibling.id).parent_id == nil
     end
 
+    test "nesting into a collapsed collection expands the new parent", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      {:ok, parent} = Collections.create_collection(scope, %{title: "Parent"})
+      {:ok, moving} = Collections.create_collection(scope, %{title: "Moving"})
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      refute has_element?(lv, "#collection-#{parent.id} > details[open]")
+
+      lv
+      |> element("#bookmarks-sidebar")
+      |> render_hook("expand_collection", %{"id" => to_string(parent.id)})
+
+      lv
+      |> element("#bookmarks-sidebar")
+      |> render_hook("move_collection", %{
+        "id" => to_string(moving.id),
+        "parent_id" => to_string(parent.id),
+        "ordered_ids" => [to_string(moving.id)]
+      })
+
+      assert has_element?(lv, "#collection-#{parent.id} > details[open]")
+      assert Collections.get_collection!(moving.id).parent_id == parent.id
+    end
+
     test "shows nested bookmarks in read-only shared collections", %{conn: conn} do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()
