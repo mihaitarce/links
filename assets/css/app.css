@@ -41,6 +41,25 @@
    padding-inline-end: 0.75rem;
 }
 
+/* daisyUI .menu sets display:grid on direct li children, which breaks checkbox checkmarks */
+#bookmarks-sidebar .menu :where(li > .bookmark-completed-toggle) {
+  display: inline-block;
+  width: var(--size);
+  height: var(--size);
+  padding: calc(0.25rem * 1);
+  grid-auto-columns: unset;
+  grid-auto-flow: unset;
+  align-content: unset;
+  align-items: unset;
+  gap: 0;
+  text-wrap: nowrap;
+}
+
+#bookmarks-sidebar .bookmark-completed .bookmark-title {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
 #bookmarks-sidebar li[id^="collection-"]:not([data-readonly="true"]) > details > summary,
 #bookmarks-sidebar li[id^="collection-"][data-collaboration-mount="true"] > details > summary,
 #bookmarks-sidebar li[id^="collection-"][data-revoked="true"] > .collection-tree-row {

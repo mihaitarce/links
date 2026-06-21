@@ -46,7 +46,7 @@ defmodule LinksWeb.DashboardLiveTest do
       assert has_element?(lv, "#new-link-form input[type=\"url\"][value=\"\"]")
     end
 
-    test "does not show completed checkbox in sidebar links", %{conn: conn} do
+    test "shows completed checkbox only on collection links in the sidebar", %{conn: conn} do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
       collection = collection_fixture(scope, %{title: "Reading"})
 
@@ -62,14 +62,47 @@ defmodule LinksWeb.DashboardLiveTest do
 
       {:ok, lv, _html} = live(conn, ~p"/")
 
-      refute has_element?(lv, "#bookmark-completed-#{inbox_bookmark.id}")
-      refute has_element?(lv, "#bookmark-completed-#{collection_bookmark.id}")
+      refute has_element?(lv, "#bookmark-completed-#{inbox_bookmark.id}-unchecked")
+      assert has_element?(lv, "#bookmark-completed-#{collection_bookmark.id}-unchecked")
 
       lv
       |> element("#bookmark-select-#{collection_bookmark.id}")
       |> render_click()
 
-      assert has_element?(lv, "#bookmark-completed-input")
+      assert has_element?(lv, "#bookmark-completed-input-unchecked")
+    end
+
+    test "toggles completed on collection links in the sidebar", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      collection = collection_fixture(scope, %{title: "Reading"})
+
+      {:ok, bookmark} =
+        Collections.create_bookmark(scope, %{
+          title: "Read me",
+          url: "https://example.com/read",
+          collection_id: collection.id
+        })
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      refute Collections.get_bookmark!(bookmark.id).completed
+      assert has_element?(lv, "#bookmark-completed-#{bookmark.id}-unchecked:not([checked])")
+
+      lv
+      |> element("#bookmark-completed-#{bookmark.id}-unchecked")
+      |> render_click()
+
+      assert Collections.get_bookmark!(bookmark.id).completed
+      assert has_element?(lv, "#bookmark-completed-#{bookmark.id}-checked[checked]")
+      assert has_element?(lv, "#bookmark-#{bookmark.id}.bookmark-completed")
+
+      lv
+      |> element("#bookmark-completed-#{bookmark.id}-checked")
+      |> render_click()
+
+      refute Collections.get_bookmark!(bookmark.id).completed
+      assert has_element?(lv, "#bookmark-completed-#{bookmark.id}-unchecked:not([checked])")
+      refute has_element?(lv, "#bookmark-#{bookmark.id}.bookmark-completed")
     end
 
     test "toggles completed from the link detail page", %{conn: conn} do
@@ -90,15 +123,23 @@ defmodule LinksWeb.DashboardLiveTest do
       |> render_click()
 
       refute Collections.get_bookmark!(bookmark.id).completed
-      assert has_element?(lv, "#bookmark-completed-input:not([checked])")
+      assert has_element?(lv, "#bookmark-completed-input-unchecked:not([checked])")
 
       lv
-      |> element("#bookmark-completed-input")
+      |> element("#bookmark-completed-input-unchecked")
       |> render_click()
 
       assert Collections.get_bookmark!(bookmark.id).completed
-      assert has_element?(lv, "#bookmark-completed-input[checked]")
+      assert has_element?(lv, "#bookmark-completed-input-checked[checked]")
       assert has_element?(lv, "#bookmark-#{bookmark.id}.bookmark-completed")
+
+      lv
+      |> element("#bookmark-completed-input-checked")
+      |> render_click()
+
+      refute Collections.get_bookmark!(bookmark.id).completed
+      assert has_element?(lv, "#bookmark-completed-input-unchecked:not([checked])")
+      refute has_element?(lv, "#bookmark-#{bookmark.id}.bookmark-completed")
     end
 
     test "disables completed checkbox on read-only collection links in the detail panel", %{
@@ -108,7 +149,7 @@ defmodule LinksWeb.DashboardLiveTest do
       collaborator = user_fixture()
       source = collection_fixture(owner_scope, %{title: "Shared"})
 
-      assert {:ok, mount} =
+      assert {:ok, _mount} =
                Collections.create_collaboration(owner_scope, source, collaborator.email, true)
 
       {:ok, bookmark} =
@@ -121,17 +162,16 @@ defmodule LinksWeb.DashboardLiveTest do
       conn = log_in_user(conn, collaborator)
       {:ok, lv, _html} = live(conn, ~p"/")
 
-      refute has_element?(lv, "#bookmark-completed-#{bookmark.id}")
-
-      lv
-      |> element("#collection-#{mount.id} > details > summary")
-      |> render_click()
+      assert has_element?(
+               lv,
+               "#bookmark-completed-#{bookmark.id}-unchecked[disabled]"
+             )
 
       lv
       |> element("#bookmark-select-#{bookmark.id}")
       |> render_click()
 
-      assert has_element?(lv, "#bookmark-completed-input[disabled]")
+      assert has_element?(lv, "#bookmark-completed-input-unchecked[disabled]")
     end
 
     test "adds an active public share URL as a read-only collection", %{conn: conn} do

@@ -392,6 +392,7 @@ defmodule LinksWeb.DashboardLive do
   attr :bookmark, Bookmark, required: true
   attr :selected, :boolean, default: false
   attr :metadata_pending, :boolean, default: false
+  attr :editable, :boolean, default: true
 
   def bookmark_menu_link(assigns) do
     ~H"""
@@ -422,6 +423,11 @@ defmodule LinksWeb.DashboardLive do
           </span>
         </span>
       </button>
+      <.bookmark_completed_toggle
+        :if={@bookmark.collection_id}
+        bookmark={@bookmark}
+        editable={@editable}
+      />
       <a
         id={"bookmark-more-#{@bookmark.id}"}
         href={@bookmark.url}
@@ -445,22 +451,33 @@ defmodule LinksWeb.DashboardLive do
 
   def bookmark_completed_toggle(assigns) do
     assigns =
-      assign_new(assigns, :input_id, fn ->
-        assigns.id || "bookmark-completed-#{assigns.bookmark.id}"
-      end)
+      assign(assigns, :input_id, bookmark_completed_input_id(assigns.bookmark, assigns.id))
 
     ~H"""
-    <input
-      type="checkbox"
-      id={@input_id}
-      checked={@bookmark.completed}
-      phx-click="toggle_bookmark_completed"
-      phx-value-id={@bookmark.id}
-      phx-value-completed={to_string(not @bookmark.completed)}
-      disabled={not @editable}
-      class={@checkbox_class}
-      aria-label={"Mark \"#{bookmark_label(@bookmark)}\" complete"}
-    />
+    <%= if @bookmark.completed do %>
+      <input
+        type="checkbox"
+        id={@input_id}
+        phx-click="toggle_bookmark_completed"
+        phx-value-id={@bookmark.id}
+        phx-value-completed="false"
+        checked
+        disabled={not @editable}
+        class={@checkbox_class}
+        aria-label={"Mark \"#{bookmark_label(@bookmark)}\" complete"}
+      />
+    <% else %>
+      <input
+        type="checkbox"
+        id={@input_id}
+        phx-click="toggle_bookmark_completed"
+        phx-value-id={@bookmark.id}
+        phx-value-completed="true"
+        disabled={not @editable}
+        class={@checkbox_class}
+        aria-label={"Mark \"#{bookmark_label(@bookmark)}\" complete"}
+      />
+    <% end %>
     """
   end
 
@@ -628,6 +645,7 @@ defmodule LinksWeb.DashboardLive do
             bookmark={bookmark}
             selected={selected?(@selected, :bookmark, bookmark.id)}
             metadata_pending={MapSet.member?(@pending_metadata_ids, bookmark.id)}
+            editable={not @node.readonly}
           />
         </ul>
       </details>
@@ -765,7 +783,7 @@ defmodule LinksWeb.DashboardLive do
               checkbox_class="checkbox checkbox-lg"
             />
             <label
-              for="bookmark-completed-input"
+              for={bookmark_completed_input_id(@context.bookmark, "bookmark-completed-input")}
               class={["text-base", !@context.readonly && "cursor-pointer"]}
             >
               Completed
@@ -1968,6 +1986,12 @@ defmodule LinksWeb.DashboardLive do
 
   def selected?(%{type: type, id: id}, type, id), do: true
   def selected?(_, _, _), do: false
+
+  defp bookmark_completed_input_id(%Bookmark{id: id, completed: completed}, custom_id) do
+    base = custom_id || "bookmark-completed-#{id}"
+    suffix = if completed, do: "checked", else: "unchecked"
+    "#{base}-#{suffix}"
+  end
 
   def bookmark_label(%Bookmark{title: title}) when is_binary(title) and title != "",
     do: title
