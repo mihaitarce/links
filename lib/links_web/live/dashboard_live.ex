@@ -409,7 +409,7 @@ defmodule LinksWeb.DashboardLive do
         class="bookmark-select-button flex-1 items-center gap-2"
       >
         <.bookmark_status_icon bookmark={@bookmark} metadata_pending={@metadata_pending} />
-        <span class="flex flex-1 items-baseline gap-1 overflow-hidden leading-normal">
+        <span class="flex flex-1 items-baseline justify-between gap-1 overflow-hidden leading-normal">
           <span class="bookmark-title truncate">{bookmark_label(@bookmark)}</span>
           <span
             :if={domain = Bookmark.display_host(@bookmark)}
@@ -419,11 +419,13 @@ defmodule LinksWeb.DashboardLive do
           </span>
         </span>
       </button>
-      <.bookmark_completed_toggle
-        :if={@bookmark.collection_id}
-        bookmark={@bookmark}
-        editable={@editable}
-      />
+      <label class="btn btn-ghost p-0 min-h-0 h-auto border-0 bg-transparent shadow-none">
+        <.bookmark_completed_toggle
+          :if={@bookmark.collection_id}
+          bookmark={@bookmark}
+          editable={@editable}
+        />
+      </label>
       <a
         id={"bookmark-more-#{@bookmark.id}"}
         href={@bookmark.url}

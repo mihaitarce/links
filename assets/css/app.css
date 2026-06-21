@@ -31,3 +31,12 @@
 .inbox-empty-state:not(:only-child) {
   display: none;
 }
+
+#bookmarks-sidebar .menu :where(li > details > summary:not(.menu-title))::after,
+#public-share-sidebar .menu :where(li > details > summary:not(.menu-title))::after {
+  display: none;
+}
+
+#bookmarks-sidebar .menu li.bookmark-menu-row {
+   padding-inline-end: 0.75rem;
+}
