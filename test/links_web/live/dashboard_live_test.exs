@@ -461,6 +461,31 @@ defmodule LinksWeb.DashboardLiveTest do
       assert Collections.get_bookmark!(existing.id).position == 1
     end
 
+    test "moves a bookmark into a nested collection as the first item", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      parent = collection_fixture(scope, %{title: "Parent"})
+      child = collection_fixture(scope, %{title: "Child", parent_id: parent.id})
+
+      {:ok, moving} =
+        Collections.create_inbox_bookmark(scope, %{
+          title: "Moving",
+          url: "https://example.com/moving"
+        })
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv
+      |> element("#nested-zone-#{child.id}")
+      |> render_hook("move_bookmark", %{
+        "id" => to_string(moving.id),
+        "collection_id" => to_string(child.id),
+        "ordered_ids" => [to_string(moving.id)]
+      })
+
+      assert Collections.get_bookmark!(moving.id).collection_id == child.id
+      assert Collections.get_bookmark!(moving.id).position == 0
+    end
+
     test "reorders top-level collections from the dashboard", %{conn: conn} do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
 

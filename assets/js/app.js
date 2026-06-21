@@ -375,35 +375,46 @@ const BookmarkSort = {
     this.autoExpandedIds.clear()
   },
   onCollectionEnter(event) {
-    this.setDropHighlight(event.currentTarget)
-    this.scheduleExpand(event.currentTarget)
+    const collection = event.currentTarget.closest("li[id^='collection-']")
+
+    if (!collection) return
+
+    this.setDropHighlight(collection)
+    this.scheduleExpand(collection)
   },
   onCollectionLeave(event) {
-    const collection = event.currentTarget
+    const summary = event.currentTarget
+    const collection = summary.closest("li[id^='collection-']")
     const related = event.relatedTarget
 
-    if (related && collection.contains(related)) return
-
-    const summary = collection.querySelector("details > summary")
+    if (related && summary.contains(related)) return
 
     if (this.dropTarget === summary) {
       this.clearDropHighlight()
     }
 
-    if (this.expandTargetId === collection.id.replace("collection-", "")) {
+    if (collection && this.expandTargetId === collection.id.replace("collection-", "")) {
       this.clearExpandTimer()
     }
   },
   bindDropHighlight() {
     this.sortableCollections().forEach((collection) => {
-      collection.addEventListener("dragenter", this.onCollectionEnter)
-      collection.addEventListener("dragleave", this.onCollectionLeave)
+      const summary = collection.querySelector(":scope > details > summary")
+
+      if (!summary) return
+
+      summary.addEventListener("dragenter", this.onCollectionEnter)
+      summary.addEventListener("dragleave", this.onCollectionLeave)
     })
   },
   unbindDropHighlight() {
     this.sortableCollections().forEach((collection) => {
-      collection.removeEventListener("dragenter", this.onCollectionEnter)
-      collection.removeEventListener("dragleave", this.onCollectionLeave)
+      const summary = collection.querySelector(":scope > details > summary")
+
+      if (!summary) return
+
+      summary.removeEventListener("dragenter", this.onCollectionEnter)
+      summary.removeEventListener("dragleave", this.onCollectionLeave)
     })
   },
   bookmarkIdsInCollection(collection) {
