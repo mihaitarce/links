@@ -41,6 +41,10 @@
    padding-inline-end: 0.75rem;
 }
 
+#public-share-sidebar .menu li.bookmark-menu-row {
+  padding-inline: 0;
+}
+
 /* daisyUI .menu sets display:grid on direct li children, which breaks checkbox checkmarks */
 #bookmarks-sidebar .menu :where(li > .bookmark-completed-toggle) {
   display: inline-block;
@@ -58,6 +62,16 @@
 #bookmarks-sidebar .bookmark-completed .bookmark-title {
   text-decoration: line-through;
   opacity: 0.6;
+}
+
+#public-share-sidebar .bookmark-menu-row .bookmark-select-button {
+  min-height: 0;
+  padding: 0.5rem 0.625rem;
+  border-radius: var(--radius-field, 0.25rem);
+}
+
+#public-share-sidebar .menu :where(li > .bookmark-menu-row) {
+  padding-block: 0.125rem;
 }
 
 #bookmarks-sidebar li[id^="collection-"]:not([data-readonly="true"]) > details > summary,
@@ -90,7 +104,8 @@ body.dnd-copy-mode * {
   cursor: copy !important;
 }
 
-#bookmarks-sidebar .collection-bookmark-drop-hidden {
+#bookmarks-sidebar .collection-bookmark-drop-hidden,
+#public-share-sidebar .collection-bookmark-drop-hidden {
   display: none;
 }
 

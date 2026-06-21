@@ -40,10 +40,28 @@ defmodule LinksWeb.PublicShareLiveTest do
       assert has_element?(lv, "#bookmark-#{bookmark.id}")
       refute has_element?(lv, "header.navbar a[href=\"/\"]")
       assert has_element?(lv, "#app-brand")
+      assert has_element?(lv, "header.navbar img[src=\"/images/logo.svg\"]")
       refute has_element?(lv, "#collection-#{collection.id}")
     end
 
-    test "does not show an expand control for empty sub-collections", %{conn: conn} do
+    test "shows header logo with home link for logged-in users", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      collection = collection_fixture(owner_scope, %{title: "Public Reading"})
+      assert {:ok, share} = Collections.create_public_share(owner_scope, collection)
+
+      viewer = user_fixture()
+      conn = log_in_user(conn, viewer)
+
+      {:ok, lv, _html} = live(conn, ~p"/share/#{share.token}")
+
+      assert has_element?(lv, "header.navbar a[href=\"/\"]")
+      assert has_element?(lv, "header.navbar img[src=\"/images/logo.svg\"]")
+      refute has_element?(lv, "#app-brand")
+    end
+
+    test "renders empty sub-collections with the same tree structure as the dashboard", %{
+      conn: conn
+    } do
       scope = user_scope_fixture()
       collection = collection_fixture(scope, %{title: "Public Reading"})
       empty_child = collection_fixture(scope, %{title: "Empty Folder", parent_id: collection.id})
@@ -53,8 +71,9 @@ defmodule LinksWeb.PublicShareLiveTest do
       {:ok, lv, _html} = live(conn, ~p"/share/#{share.token}")
 
       assert has_element?(lv, "#collection-#{empty_child.id}", "Empty Folder")
-      refute has_element?(lv, "#collection-#{empty_child.id} details")
-      refute has_element?(lv, "#collection-#{empty_child.id} summary")
+      assert has_element?(lv, "#collection-#{empty_child.id} details")
+      assert has_element?(lv, "#collection-#{empty_child.id} summary")
+      refute has_element?(lv, "#collection-#{empty_child.id} .badge")
     end
 
     test "shows unavailable message for invalid tokens", %{conn: conn} do

@@ -20,8 +20,7 @@ defmodule LinksWeb.PublicShareLive do
           socket
           |> assign(:share, dashboard.share)
           |> assign(:root, dashboard.root)
-          |> assign(:root_bookmarks, root_node.bookmarks)
-          |> assign(:sections, root_node.children)
+          |> assign(:root_node, root_node)
           |> assign(:collection_ids, dashboard.collection_ids)
           |> assign(:page_title, dashboard.root.title)
 
@@ -41,8 +40,7 @@ defmodule LinksWeb.PublicShareLive do
          socket
          |> assign(:share, nil)
          |> assign(:root, nil)
-         |> assign(:root_bookmarks, [])
-         |> assign(:sections, [])
+         |> assign(:root_node, nil)
          |> assign(:collection_ids, [])
          |> assign(:page_title, "Shared collection")
          |> assign(:not_found, true)}
@@ -52,7 +50,11 @@ defmodule LinksWeb.PublicShareLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope} show_home_link={false}>
+    <Layouts.app
+      flash={@flash}
+      current_scope={@current_scope}
+      show_home_link={logged_in?(@current_scope)}
+    >
       <%= if @not_found do %>
         <div class="flex h-full items-center justify-center p-4">
           <div class="max-w-md rounded-box border border-dashed border-base-300 bg-base-100 p-8 text-center">
@@ -74,9 +76,9 @@ defmodule LinksWeb.PublicShareLive do
             <h1 class="truncate text-xl font-semibold">{@root.title}</h1>
 
             <ul id="public-share-tree" class={sidebar_menu_class(["mt-4", "overflow-y-auto"])}>
-              <.tree_node :for={node <- @sections} node={node} />
+              <.tree_node :for={node <- @root_node.children} node={node} />
               <.bookmark_menu_link
-                :for={bookmark <- @root_bookmarks}
+                :for={bookmark <- @root_node.bookmarks}
                 bookmark={bookmark}
               />
             </ul>
@@ -90,40 +92,27 @@ defmodule LinksWeb.PublicShareLive do
   attr :node, :map, required: true
 
   def tree_node(assigns) do
-    assigns =
-      assigns
-      |> assign(:collection, assigns.node.collection)
-      |> assign(:empty?, empty_collection?(assigns.node))
+    assigns = assign(assigns, :collection, assigns.node.collection)
 
     ~H"""
-    <li id={"collection-#{@collection.id}"} class="min-w-0 max-w-full">
-      <%= if @empty? do %>
-        <span class="flex min-w-0 w-full items-center gap-2">
-          <.folder_icon />
-          <span class="flex min-w-0 flex-1 items-center gap-1.5 leading-none">
-            <span class="min-w-0 truncate leading-normal">{@node.title}</span>
-            <span class="badge badge-ghost badge-sm shrink-0 tabular-nums">0</span>
-          </span>
-        </span>
-      <% else %>
-        <details class="min-w-0 max-w-full" open>
-          <summary class="min-w-0 max-w-full">
+    <li id={"collection-#{@collection.id}"} data-readonly="true">
+      <details open>
+        <summary>
+          <span class="flex items-center gap-2">
             <.folder_icon />
-            <span class="flex min-w-0 flex-1 items-center gap-1.5 leading-none">
-              <span class="min-w-0 truncate leading-normal">{@node.title}</span>
-              <span class="badge badge-ghost badge-sm shrink-0 tabular-nums">
-                {@node.bookmark_count}
-              </span>
-            </span>
-          </summary>
-          <ul :if={@node.children != []}>
-            <.tree_node :for={child <- @node.children} node={child} />
-          </ul>
-          <ul :if={@node.bookmarks != []}>
-            <.bookmark_menu_link :for={bookmark <- @node.bookmarks} bookmark={bookmark} />
-          </ul>
-        </details>
-      <% end %>
+            <span class="truncate">{@node.title}</span>
+          </span>
+        </summary>
+        <ul :if={@node.children != []}>
+          <.tree_node :for={child <- @node.children} node={child} />
+        </ul>
+        <ul
+          id={"nested-zone-#{@collection.id}"}
+          class={@node.bookmarks == [] && "collection-bookmark-drop-hidden"}
+        >
+          <.bookmark_menu_link :for={bookmark <- @node.bookmarks} bookmark={bookmark} />
+        </ul>
+      </details>
     </li>
     """
   end
@@ -134,20 +123,21 @@ defmodule LinksWeb.PublicShareLive do
     ~H"""
     <li
       id={"bookmark-#{@bookmark.id}"}
-      class="bookmark-menu-row flex min-w-0 w-full max-w-full items-center gap-2"
+      class="bookmark-menu-row w-full flex flex-row items-center gap-2"
     >
       <a
+        id={"bookmark-open-#{@bookmark.id}"}
         href={@bookmark.url}
         target="_blank"
         rel="noopener noreferrer"
-        class="flex min-w-0 flex-1 items-center gap-2"
+        class="bookmark-select-button flex min-w-0 flex-1 items-center gap-2 text-left"
       >
-        <.bookmark_icon bookmark={@bookmark} />
-        <span class="flex min-w-0 flex-1 items-baseline gap-1 overflow-hidden text-left leading-normal">
-          <span class="min-w-0 truncate">{bookmark_label(@bookmark)}</span>
+        <.bookmark_icon bookmark={@bookmark} class="size-4" />
+        <span class="flex min-w-0 flex-1 items-baseline justify-between gap-1 overflow-hidden leading-normal">
+          <span class="bookmark-title truncate">{bookmark_label(@bookmark)}</span>
           <span
             :if={domain = Bookmark.display_host(@bookmark)}
-            class="bookmark-domain shrink-0 truncate"
+            class="text-base-content/50 shrink-0 max-w-48 truncate"
           >
             {domain}
           </span>
@@ -158,7 +148,7 @@ defmodule LinksWeb.PublicShareLive do
   end
 
   attr :bookmark, Bookmark, required: true
-  attr :class, :string, default: "h-4 w-4"
+  attr :class, :string, default: "size-4"
 
   def bookmark_icon(assigns) do
     ~H"""
@@ -239,8 +229,7 @@ defmodule LinksWeb.PublicShareLive do
         |> assign(:not_found, false)
         |> assign(:share, dashboard.share)
         |> assign(:root, dashboard.root)
-        |> assign(:root_bookmarks, root_node.bookmarks)
-        |> assign(:sections, root_node.children)
+        |> assign(:root_node, root_node)
         |> assign(:collection_ids, dashboard.collection_ids)
         |> assign(:page_title, dashboard.root.title)
         |> sync_collection_subscriptions(dashboard.collection_ids)
@@ -250,8 +239,7 @@ defmodule LinksWeb.PublicShareLive do
         |> assign(:not_found, true)
         |> assign(:share, nil)
         |> assign(:root, nil)
-        |> assign(:root_bookmarks, [])
-        |> assign(:sections, [])
+        |> assign(:root_node, nil)
         |> assign(:collection_ids, [])
     end
   end
@@ -288,15 +276,14 @@ defmodule LinksWeb.PublicShareLive do
 
   defp sidebar_menu_class(extra) do
     [
-      "menu flex-col flex-nowrap bg-base-200 rounded-box w-full min-w-0",
-      "[&_li]:min-w-0 [&_a]:min-w-0"
+      "menu flex-nowrap bg-base-200 rounded-box w-full"
       | extra
     ]
   end
 
-  defp empty_collection?(node) do
-    node.children == [] and node.bookmarks == []
-  end
+  defp logged_in?(nil), do: false
+  defp logged_in?(%{user: user}) when not is_nil(user), do: true
+  defp logged_in?(_), do: false
 
   defp favicon_data_url(%Bookmark{favicon_data: data, favicon_content_type: content_type})
        when is_binary(data) and byte_size(data) > 0 and is_binary(content_type) and

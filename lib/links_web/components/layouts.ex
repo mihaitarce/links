@@ -35,6 +35,10 @@ defmodule LinksWeb.Layouts do
     default: true,
     doc: "when false, renders the app title without linking to the authenticated home page"
 
+  attr :show_brand, :boolean,
+    default: true,
+    doc: "when false, hides the app logo and title from the header"
+
   slot :inner_block, required: true
 
   def app(assigns) do
@@ -44,16 +48,18 @@ defmodule LinksWeb.Layouts do
     <div class="flex h-dvh flex-col overflow-hidden">
       <header class="navbar min-h-12 shrink-0 border-b border-base-300 bg-base-100 px-3">
         <div class="flex-1">
-          <%= if @show_home_link do %>
-            <a href={~p"/"} class="flex w-fit items-center gap-2">
-              <img src={~p"/images/logo.svg"} width="28" />
-              <span class="text-sm font-semibold tracking-tight">Links</span>
-            </a>
-          <% else %>
-            <span id="app-brand" class="flex w-fit items-center gap-2">
-              <img src={~p"/images/logo.svg"} width="28" alt="" />
-              <span class="text-sm font-semibold tracking-tight">Links</span>
-            </span>
+          <%= if @show_brand do %>
+            <%= if @show_home_link do %>
+              <a href={~p"/"} class="flex w-fit items-center gap-2">
+                <img src={~p"/images/logo.svg"} width="28" />
+                <span class="text-sm font-semibold tracking-tight">Links</span>
+              </a>
+            <% else %>
+              <span id="app-brand" class="flex w-fit items-center gap-2">
+                <img src={~p"/images/logo.svg"} width="28" alt="" />
+                <span class="text-sm font-semibold tracking-tight">Links</span>
+              </span>
+            <% end %>
           <% end %>
         </div>
         <div class="flex-none">
