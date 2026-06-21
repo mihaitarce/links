@@ -28,6 +28,15 @@
 
 /* This file is for your main application CSS */
 
+.scrollbar-hidden {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
 .empty-state:not(:only-child) {
   display: none;
 }

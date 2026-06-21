@@ -2103,7 +2103,8 @@ defmodule LinksWeb.DashboardLive do
 
   defp sidebar_menu_class do
     [
-      "menu flex-nowrap bg-base-200 rounded-box w-full overflow-y-auto overflow-x-hidden"
+      "menu flex-nowrap bg-base-200 rounded-box w-full min-h-0 flex-1",
+      "overflow-y-auto overflow-x-hidden scrollbar-hidden"
     ]
   end
 end
