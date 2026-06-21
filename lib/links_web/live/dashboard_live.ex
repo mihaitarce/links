@@ -114,7 +114,7 @@ defmodule LinksWeb.DashboardLive do
               </div>
               <ul
                 id="collections-zone-root"
-                phx-hook="RootCollectionSort"
+                phx-hook="CollectionSort"
                 data-parent-id="root"
                 class={sidebar_menu_class(["overflow-y-auto overflow-x-hidden"])}
               >
@@ -1147,6 +1147,10 @@ defmodule LinksWeb.DashboardLive do
      socket
      |> assign(:collapsed, collapsed)
      |> select_collection(id)}
+  end
+
+  def handle_event("expand_collection", %{"id" => id}, socket) do
+    {:noreply, expand_collection(socket, String.to_integer(id))}
   end
 
   def handle_event(

@@ -323,17 +323,17 @@ defmodule LinksWeb.DashboardLiveTest do
       assert has_element?(lv, "#collection-#{collection.id} summary .badge.badge-sm", "0 / 1")
     end
 
-    test "root collection list is sortable", %{conn: conn} do
+    test "top-level collection list is sortable", %{conn: conn} do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
       collection_fixture(scope, %{title: "Reading"})
       {:ok, _lv, html} = live(conn, ~p"/")
 
       assert html =~ ~s(id="collections-zone-root")
-      assert html =~ ~s(phx-hook="RootCollectionSort")
+      assert html =~ ~s(phx-hook="CollectionSort")
       assert html =~ ~s(data-parent-id="root")
     end
 
-    test "reorders root collections from the dashboard", %{conn: conn} do
+    test "reorders top-level collections from the dashboard", %{conn: conn} do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
 
       {:ok, first} = Collections.create_collection(scope, %{title: "Alpha"})
@@ -412,6 +412,19 @@ defmodule LinksWeb.DashboardLiveTest do
       {:ok, _lv, html} = live(conn, ~p"/")
 
       refute html =~ ~s(<details open)
+    end
+
+    test "expand_collection opens a collapsed collection", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      parent = collection_fixture(scope, %{title: "Parent"})
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      refute has_element?(lv, "#collection-#{parent.id} > details[open]")
+
+      assert render_click(lv, "expand_collection", %{"id" => to_string(parent.id)})
+
+      assert has_element?(lv, "#collection-#{parent.id} > details[open]")
     end
 
     test "collapsing a collection keeps the detail panel when it is selected", %{conn: conn} do

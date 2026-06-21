@@ -27,11 +27,15 @@ import Sortable from "sortablejs"
 import topbar from "../vendor/topbar"
 
 const DROP_HIGHLIGHT_CLASS = "collection-drop-target"
+const AUTO_EXPAND_DELAY_MS = 2000
 
-const RootCollectionSort = {
+const CollectionSort = {
   mounted() {
     this.dropTarget = null
     this.draggedItem = null
+    this.expandTimer = null
+    this.expandTargetId = null
+    this.autoExpandedIds = new Set()
     this.onCollectionEnter = this.onCollectionEnter.bind(this)
     this.onCollectionLeave = this.onCollectionLeave.bind(this)
     this.initSortable()
@@ -43,7 +47,7 @@ const RootCollectionSort = {
   destroyed() {
     this.destroySortable()
   },
-  rootCollections() {
+  sortableCollections() {
     return Array.from(this.el.children).filter((child) => child.id?.startsWith("collection-"))
   },
   setDropHighlight(collection) {
@@ -64,22 +68,78 @@ const RootCollectionSort = {
       this.dropTarget = null
     }
   },
+  clearExpandTimer() {
+    if (this.expandTimer) {
+      clearTimeout(this.expandTimer)
+      this.expandTimer = null
+    }
+
+    this.expandTargetId = null
+  },
+  scheduleExpand(collection) {
+    if (collection === this.draggedItem) return
+
+    const details = collection.querySelector("details")
+
+    if (!details || details.open) return
+
+    const collectionId = collection.id.replace("collection-", "")
+
+    if (this.expandTargetId === collectionId && this.expandTimer) return
+
+    this.clearExpandTimer()
+    this.expandTargetId = collectionId
+
+    this.expandTimer = setTimeout(() => {
+      this.expandTimer = null
+      this.expandTargetId = null
+      this.expandCollectionForDrop(collection)
+    }, AUTO_EXPAND_DELAY_MS)
+  },
+  expandCollectionForDrop(collection) {
+    const details = collection.querySelector("details")
+
+    if (!details || details.open) return
+
+    details.open = true
+
+    const collectionId = collection.id.replace("collection-", "")
+
+    if (collectionId) this.autoExpandedIds.add(collectionId)
+  },
+  syncAutoExpandedCollections() {
+    for (const id of this.autoExpandedIds) {
+      this.pushEvent("expand_collection", {id})
+    }
+
+    this.autoExpandedIds.clear()
+  },
   onCollectionEnter(event) {
     const collection = event.currentTarget
 
     if (collection !== this.draggedItem) {
       this.setDropHighlight(collection)
+      this.scheduleExpand(collection)
     }
   },
   onCollectionLeave(event) {
-    const summary = event.currentTarget.querySelector("details > summary")
+    const collection = event.currentTarget
+    const related = event.relatedTarget
+
+    if (related && collection.contains(related)) return
+
+    const summary = collection.querySelector("details > summary")
 
     if (this.dropTarget === summary) {
       this.clearDropHighlight()
     }
+
+    if (this.expandTargetId === collection.id.replace("collection-", "")) {
+      this.clearExpandTimer()
+    }
   },
   bindDropHighlight() {
-    this.rootCollections().forEach((collection) => {
+    this.sortableCollections().forEach((collection) => {
       if (collection === this.draggedItem) return
 
       collection.addEventListener("dragenter", this.onCollectionEnter)
@@ -87,7 +147,7 @@ const RootCollectionSort = {
     })
   },
   unbindDropHighlight() {
-    this.rootCollections().forEach((collection) => {
+    this.sortableCollections().forEach((collection) => {
       collection.removeEventListener("dragenter", this.onCollectionEnter)
       collection.removeEventListener("dragleave", this.onCollectionLeave)
     })
@@ -111,6 +171,8 @@ const RootCollectionSort = {
       onEnd(event) {
         hook.unbindDropHighlight()
         hook.clearDropHighlight()
+        hook.clearExpandTimer()
+        hook.syncAutoExpandedCollections()
         hook.draggedItem = null
 
         if (event.from !== event.to || event.oldIndex === event.newIndex) return
@@ -131,6 +193,8 @@ const RootCollectionSort = {
   destroySortable() {
     this.unbindDropHighlight()
     this.clearDropHighlight()
+    this.clearExpandTimer()
+    this.autoExpandedIds.clear()
     this.draggedItem = null
 
     if (this.sortable) {
@@ -146,7 +210,7 @@ const liveSocketPath =
 const liveSocket = new LiveSocket(liveSocketPath, Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, RootCollectionSort},
+  hooks: {...colocatedHooks, CollectionSort},
 })
 
 // Show progress bar on live navigation and form submits
