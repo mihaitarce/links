@@ -65,7 +65,7 @@ defmodule LinksWeb.PublicShareLive do
           </div>
         </div>
       <% else %>
-        <div class="h-full overflow-auto bg-base-200 p-4 text-sm">
+        <div class="w-full bg-base-200 p-4 text-sm">
           <div
             id="public-share-sidebar"
             class="mx-auto w-full max-w-[120ch] rounded-box border border-base-300 bg-base-100 p-4"
@@ -95,13 +95,11 @@ defmodule LinksWeb.PublicShareLive do
     assigns = assign(assigns, :collection, assigns.node.collection)
 
     ~H"""
-    <li id={"collection-#{@collection.id}"} data-readonly="true">
-      <details open>
-        <summary>
-          <span class="flex items-center gap-2">
-            <.folder_icon />
-            <span class="truncate">{@node.title}</span>
-          </span>
+    <li id={"collection-#{@collection.id}"}>
+      <details class="w-full" open>
+        <summary class="flex items-center gap-2">
+          <.folder_icon />
+          <span class="truncate">{@node.title}</span>
         </summary>
         <ul :if={@node.children != []}>
           <.tree_node :for={child <- @node.children} node={child} />
