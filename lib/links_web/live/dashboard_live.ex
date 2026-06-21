@@ -1171,6 +1171,31 @@ defmodule LinksWeb.DashboardLive do
   end
 
   def handle_event(
+        "copy_bookmark",
+        %{"id" => id, "collection_id" => collection_id, "ordered_ids" => ordered_ids},
+        socket
+      ) do
+    case Collections.copy_bookmark(
+           socket.assigns.current_scope,
+           id,
+           collection_id,
+           ordered_ids
+         ) do
+      {:ok, _} ->
+        {:noreply, refresh_dashboard(socket)}
+
+      {:error, :invalid_order} ->
+        {:noreply, put_flash(socket, :error, "Could not copy bookmark")}
+
+      {:error, :unauthorized} ->
+        {:noreply, put_flash(socket, :error, "You do not have permission to copy this link")}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Could not copy bookmark")}
+    end
+  end
+
+  def handle_event(
         "move_bookmark",
         %{"id" => id, "collection_id" => collection_id, "ordered_ids" => ordered_ids},
         socket
@@ -1192,6 +1217,32 @@ defmodule LinksWeb.DashboardLive do
 
       {:error, _} ->
         {:noreply, put_flash(socket, :error, "Could not move bookmark")}
+    end
+  end
+
+  def handle_event(
+        "copy_collection",
+        %{"id" => id, "parent_id" => parent_id, "ordered_ids" => ordered_ids},
+        socket
+      ) do
+    case Collections.copy_collection(
+           socket.assigns.current_scope,
+           id,
+           parent_id,
+           ordered_ids
+         ) do
+      {:ok, _} ->
+        {:noreply, refresh_dashboard(socket)}
+
+      {:error, :invalid_order} ->
+        {:noreply, put_flash(socket, :error, "Could not copy collection")}
+
+      {:error, :unauthorized} ->
+        {:noreply,
+         put_flash(socket, :error, "You do not have permission to copy this collection")}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Could not copy collection")}
     end
   end
 

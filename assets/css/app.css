@@ -64,6 +64,17 @@
   cursor: grabbing;
 }
 
+#bookmarks-sidebar.dnd-copy-mode li[id^="collection-"]:not([data-readonly="true"]) > details > summary,
+#bookmarks-sidebar.dnd-copy-mode li[id^="collection-"][data-collaboration-mount="true"] > details > summary,
+#bookmarks-sidebar.dnd-copy-mode li[id^="bookmark-"]:not([data-readonly="true"]) {
+  cursor: copy;
+}
+
+#bookmarks-sidebar.dnd-copy-mode li[id^="collection-"].sortable-chosen > details > summary,
+#bookmarks-sidebar.dnd-copy-mode li[id^="bookmark-"].sortable-chosen {
+  cursor: copy;
+}
+
 #bookmarks-sidebar .collection-bookmark-drop-hidden {
   display: none;
 }

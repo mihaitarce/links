@@ -4,9 +4,12 @@ defmodule Links.CollectionsTest do
   import Links.AccountsFixtures
   import Links.CollectionsFixtures
 
+  alias Links.Bookmarks.Bookmark
   alias Links.Collections
   alias Links.Collections.Collection
   alias Links.Repo
+
+  import Ecto.Query
 
   describe "collections and inbox bookmarks" do
     test "creates nested collections and inbox bookmarks" do
@@ -134,6 +137,121 @@ defmodule Links.CollectionsTest do
       assert Collections.get_collection!(moving.id).parent_id == parent.id
       assert Collections.get_collection!(moving.id).position == 0
       assert Collections.get_collection!(child.id).position == 1
+    end
+
+    test "copy_collection duplicates a collection with nested children and bookmarks" do
+      scope = user_scope_fixture()
+      parent = collection_fixture(scope, %{title: "Parent"})
+      child = collection_fixture(scope, %{title: "Child", parent_id: parent.id})
+      source = collection_fixture(scope, %{title: "Source"})
+
+      {:ok, bookmark} =
+        Collections.create_bookmark(scope, %{
+          title: "Saved",
+          url: "https://example.com/saved",
+          collection_id: source.id
+        })
+
+      assert {:ok, copied} =
+               Collections.copy_collection(scope, source.id, parent.id, [source.id, child.id])
+
+      assert copied.id != source.id
+      assert copied.parent_id == parent.id
+      assert copied.owner_id == scope.user.id
+      assert Collections.get_collection!(source.id).parent_id == nil
+
+      copied_children =
+        Collection
+        |> where([c], c.parent_id == ^copied.id)
+        |> Links.Repo.all()
+
+      assert copied_children == []
+
+      copied_bookmarks =
+        Bookmark
+        |> where([b], b.collection_id == ^copied.id)
+        |> Links.Repo.all()
+
+      assert length(copied_bookmarks) == 1
+      assert hd(copied_bookmarks).id != bookmark.id
+      assert hd(copied_bookmarks).url == bookmark.url
+    end
+
+    test "copy_collection duplicates nested child collections" do
+      scope = user_scope_fixture()
+      parent = collection_fixture(scope, %{title: "Parent"})
+      source = collection_fixture(scope, %{title: "Source", parent_id: parent.id})
+
+      {:ok, nested} =
+        Collections.create_collection(scope, %{
+          title: "Nested",
+          parent_id: source.id
+        })
+
+      target = collection_fixture(scope, %{title: "Target"})
+
+      assert {:ok, copied} =
+               Collections.copy_collection(scope, source.id, target.id, [source.id])
+
+      assert copied.parent_id == target.id
+
+      copied_children =
+        Collection
+        |> where([c], c.parent_id == ^copied.id)
+        |> order_by([c], asc: c.title)
+        |> Links.Repo.all()
+
+      assert Enum.map(copied_children, & &1.title) == ["Nested"]
+      assert Collections.get_collection!(nested.id).parent_id == source.id
+    end
+
+    test "collaborators can copy nested collections from editable shared collections" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      shared = collection_fixture(owner_scope, %{title: "Shared"})
+
+      {:ok, nested} =
+        Collections.create_collection(owner_scope, %{
+          title: "Nested",
+          parent_id: shared.id
+        })
+
+      own = collection_fixture(user_scope_fixture(collaborator), %{title: "Mine"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, shared, collaborator.email, false)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:ok, copied} =
+               Collections.copy_collection(collaborator_scope, nested.id, own.id, [nested.id])
+
+      assert copied.id != nested.id
+      assert copied.parent_id == own.id
+      assert copied.owner_id == collaborator.id
+      assert Collections.get_collection!(nested.id).parent_id == shared.id
+    end
+
+    test "collaborators cannot copy nested collections from read-only shared collections" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      shared = collection_fixture(owner_scope, %{title: "Shared"})
+
+      {:ok, nested} =
+        Collections.create_collection(owner_scope, %{
+          title: "Nested",
+          parent_id: shared.id
+        })
+
+      own = collection_fixture(user_scope_fixture(collaborator), %{title: "Mine"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, shared, collaborator.email, true)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:error, :unauthorized} =
+               Collections.copy_collection(collaborator_scope, nested.id, own.id, [nested.id])
     end
 
     test "reorders nested collections" do
@@ -1413,7 +1531,7 @@ defmodule Links.CollectionsTest do
       assert Collections.list_collaborators(collaborator_scope, source) == []
     end
 
-    test "read-only collaborators can copy bookmarks into their own collections" do
+    test "collaborators can copy bookmarks from read-only shared collections" do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()
       source = collection_fixture(owner_scope, %{title: "Shared"})
@@ -1446,7 +1564,7 @@ defmodule Links.CollectionsTest do
       assert Collections.get_bookmark!(bookmark.id).collection_id == source.id
     end
 
-    test "read-only collaborators can copy bookmarks into inbox" do
+    test "collaborators can copy bookmarks from read-only shared collections into inbox" do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()
       source = collection_fixture(owner_scope, %{title: "Shared"})
@@ -1472,7 +1590,7 @@ defmodule Links.CollectionsTest do
       assert Collections.list_inbox_bookmarks(collaborator_scope) == [copied]
     end
 
-    test "copy_bookmark rejects reordering within the same collection" do
+    test "copy_bookmark rejects copying within the same read-only collection" do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()
       source = collection_fixture(owner_scope, %{title: "Shared"})
@@ -1503,6 +1621,36 @@ defmodule Links.CollectionsTest do
                  source.id,
                  [second.id, first.id]
                )
+    end
+
+    test "collaborators can duplicate bookmarks within editable shared collections" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, false)
+
+      {:ok, bookmark} =
+        Collections.create_bookmark(owner_scope, %{
+          title: "Shared link",
+          url: "https://example.com/shared",
+          collection_id: source.id
+        })
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:ok, copied} =
+               Collections.copy_bookmark(
+                 collaborator_scope,
+                 bookmark.id,
+                 source.id,
+                 [bookmark.id]
+               )
+
+      assert copied.id != bookmark.id
+      assert copied.collection_id == source.id
+      assert Collections.get_bookmark!(bookmark.id).collection_id == source.id
     end
 
     test "read-only collaborators can move shared bookmarks" do

@@ -10,6 +10,8 @@ defmodule LinksWeb.DashboardLiveTest do
   alias Links.Collections.Collection
   alias Links.Repo
 
+  import Ecto.Query
+
   describe "dashboard access" do
     test "redirects anonymous users to login", %{conn: conn} do
       assert {:error, {:redirect, %{to: "/users/log-in"}}} = live(conn, ~p"/")
@@ -461,6 +463,45 @@ defmodule LinksWeb.DashboardLiveTest do
       assert Collections.get_bookmark!(existing.id).position == 1
     end
 
+    test "copies a bookmark into a collection from the dashboard", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      collection = collection_fixture(scope, %{title: "Reading"})
+
+      {:ok, existing} =
+        Collections.create_bookmark(scope, %{
+          title: "Existing",
+          url: "https://example.com/existing",
+          collection_id: collection.id
+        })
+
+      {:ok, source} =
+        Collections.create_inbox_bookmark(scope, %{
+          title: "Source",
+          url: "https://example.com/source"
+        })
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv
+      |> element("#nested-zone-#{collection.id}")
+      |> render_hook("copy_bookmark", %{
+        "id" => to_string(source.id),
+        "collection_id" => to_string(collection.id),
+        "ordered_ids" => [to_string(source.id), to_string(existing.id)]
+      })
+
+      assert Collections.get_bookmark!(source.id).collection_id == nil
+
+      copied =
+        Bookmark
+        |> where([b], b.collection_id == ^collection.id and b.id != ^existing.id)
+        |> Repo.one!()
+
+      assert copied.url == source.url
+      assert copied.position == 0
+      assert Collections.get_bookmark!(existing.id).position == 1
+    end
+
     test "moves a bookmark into a nested collection as the first item", %{conn: conn} do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
       parent = collection_fixture(scope, %{title: "Parent"})
@@ -528,6 +569,32 @@ defmodule LinksWeb.DashboardLiveTest do
 
       assert Collections.get_collection!(second.id).position == 0
       assert Collections.get_collection!(first.id).position == 1
+    end
+
+    test "copies a collection into another collection from the dashboard", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      parent = collection_fixture(scope, %{title: "Parent"})
+      source = collection_fixture(scope, %{title: "Source"})
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv
+      |> element("#bookmarks-sidebar")
+      |> render_hook("copy_collection", %{
+        "id" => to_string(source.id),
+        "parent_id" => to_string(parent.id),
+        "ordered_ids" => [to_string(source.id)]
+      })
+
+      assert Collections.get_collection!(source.id).parent_id == nil
+
+      copied =
+        Collection
+        |> where([c], c.parent_id == ^parent.id)
+        |> Repo.one!()
+
+      assert copied.id != source.id
+      assert copied.title == "Source"
     end
 
     test "nests a collection as the first child of a highlighted target", %{conn: conn} do

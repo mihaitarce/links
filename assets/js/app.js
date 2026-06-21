@@ -79,6 +79,7 @@ const revertSortableItem = ({item, from, oldIndex}) => {
 const finishCollectionDragUi = (hook, {spilled = false} = {}) => {
   hook.unbindDropHighlight()
   hook.clearExpandTimer()
+  clearCopyDragMode(hook)
 
   if (spilled) {
     revertAutoExpandedCollections(hook.el, hook.autoExpandedIds)
@@ -94,6 +95,7 @@ const finishCollectionDragUi = (hook, {spilled = false} = {}) => {
 const finishBookmarkDragUi = (hook, {spilled = false} = {}) => {
   hook.unbindDropHighlight()
   hook.clearExpandTimer()
+  clearCopyDragMode(hook)
 
   if (spilled) {
     revertAutoExpandedCollections(hook.sidebar(), hook.autoExpandedIds)
@@ -105,6 +107,15 @@ const finishBookmarkDragUi = (hook, {spilled = false} = {}) => {
   hook.clearDropHighlight()
 }
 
+const startCopyDragMode = (hook, event) => {
+  hook.copyMode = Boolean(event.originalEvent?.shiftKey)
+  sidebarRoot(hook.el)?.classList.toggle("dnd-copy-mode", hook.copyMode)
+}
+
+const clearCopyDragMode = (hook) => {
+  hook.copyMode = false
+  sidebarRoot(hook.el)?.classList.remove("dnd-copy-mode")
+}
 const CollectionSort = {
   mounted() {
     this.sortables = []
@@ -255,15 +266,16 @@ const CollectionSort = {
   nestTargetParentId(collection) {
     return collection.dataset.nestParentId
   },
-  pushNestMove(hook, movedId, nestTarget) {
+  pushNestMove(hook, movedId, nestTarget, copyMode) {
     const parentId = hook.nestTargetParentId(nestTarget)
     const childIds = hook.childCollectionIds(nestTarget).filter((id) => id !== movedId)
-
-    hook.pushEvent("move_collection", {
+    const payload = {
       id: movedId,
       parent_id: parentId,
       ordered_ids: [movedId, ...childIds],
-    })
+    }
+
+    hook.pushEvent(copyMode ? "copy_collection" : "move_collection", payload)
   },
   ensureNestTargetExpanded(collection) {
     const details = collection.querySelector("details")
@@ -309,6 +321,7 @@ const CollectionSort = {
       onStart(event) {
         hook.spilled = false
         hook.draggedItem = event.item
+        startCopyDragMode(hook, event)
 
         if (!isCollaborationMount(event.item)) {
           hook.bindDropHighlight()
@@ -316,6 +329,7 @@ const CollectionSort = {
       },
       onEnd(event) {
         const spilled = hook.spilled
+        const copyMode = hook.copyMode
         hook.spilled = false
         const nestTarget = hook.nestTargetCollection
         const movedId = event.item.id.replace("collection-", "")
@@ -327,9 +341,10 @@ const CollectionSort = {
             return
           }
 
+          if (copyMode) revertSortableItem(event)
           finishCollectionDragUi(hook)
           hook.ensureNestTargetExpanded(nestTarget)
-          hook.pushNestMove(hook, movedId, nestTarget)
+          hook.pushNestMove(hook, movedId, nestTarget, copyMode)
           return
         }
 
@@ -339,18 +354,20 @@ const CollectionSort = {
           return
         }
 
+        if (copyMode) revertSortableItem(event)
         finishCollectionDragUi(hook)
 
         if (event.from === event.to && event.oldIndex === event.newIndex) return
 
         const targetContainer = event.to
         const orderedIds = hook.orderedCollectionIds(targetContainer)
-
-        hook.pushEvent("move_collection", {
+        const payload = {
           id: movedId,
           parent_id: targetContainer.dataset.parentId,
           ordered_ids: orderedIds,
-        })
+        }
+
+        hook.pushEvent(copyMode ? "copy_collection" : "move_collection", payload)
       },
     })
   },
@@ -539,17 +556,18 @@ const BookmarkSort = {
       this.pushEvent("expand_collection", {id: collectionId})
     }
   },
-  pushBookmarkNestMove(hook, movedId, targetCollection) {
+  pushBookmarkNestMove(hook, movedId, targetCollection, copyMode) {
     if (!collectionAcceptsDrops(targetCollection)) return
 
     const collectionId = targetCollection.dataset.bookmarkCollectionId
     const bookmarkIds = hook.bookmarkIdsInCollection(targetCollection).filter((id) => id !== movedId)
-
-    hook.pushEvent("move_bookmark", {
+    const payload = {
       id: movedId,
       collection_id: collectionId,
       ordered_ids: [movedId, ...bookmarkIds],
-    })
+    }
+
+    hook.pushEvent(copyMode ? "copy_bookmark" : "move_bookmark", payload)
   },
   orderedBookmarkIds(container) {
     return Array.from(container.children)
@@ -575,12 +593,14 @@ const BookmarkSort = {
       onMove(event) {
         return event.to.dataset.readonly !== "true"
       },
-      onStart() {
+      onStart(event) {
         hook.spilled = false
+        startCopyDragMode(hook, event)
         hook.bindDropHighlight()
       },
       onEnd(event) {
         const spilled = hook.spilled
+        const copyMode = hook.copyMode
         hook.spilled = false
         const targetCollection = hook.dropTargetCollection
         const movedId = event.item.id.replace("bookmark-", "")
@@ -592,9 +612,10 @@ const BookmarkSort = {
             return
           }
 
+          if (copyMode) revertSortableItem(event)
           hook.finishDrag(hook)
           hook.ensureDropTargetExpanded(targetCollection)
-          hook.pushBookmarkNestMove(hook, movedId, targetCollection)
+          hook.pushBookmarkNestMove(hook, movedId, targetCollection, copyMode)
           return
         }
 
@@ -603,15 +624,18 @@ const BookmarkSort = {
           return
         }
 
+        if (copyMode) revertSortableItem(event)
         hook.finishDrag(hook)
 
         if (event.from === event.to && event.oldIndex === event.newIndex) return
 
-        hook.pushEvent("move_bookmark", {
+        const payload = {
           id: movedId,
           collection_id: event.to.dataset.collectionId,
           ordered_ids: hook.orderedBookmarkIds(event.to),
-        })
+        }
+
+        hook.pushEvent(copyMode ? "copy_bookmark" : "move_bookmark", payload)
       },
     })
   },

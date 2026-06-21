@@ -311,6 +311,37 @@ defmodule Links.Collections do
     end
   end
 
+  def copy_collection(%Scope{} = scope, collection_id, parent_id, ordered_ids) do
+    collection = get_collection!(collection_id)
+    parent_id = normalize_reorder_parent_id(parent_id)
+    ordered_ids = Enum.map(ordered_ids, &to_integer/1)
+
+    with :ok <- validate_collection_copy(scope, collection, parent_id, ordered_ids) do
+      Multi.new()
+      |> Multi.run(:collection, fn repo, _changes ->
+        duplicate_collection_subtree(scope, repo, collection, parent_id)
+      end)
+      |> Multi.merge(fn %{collection: new_collection} ->
+        final_ordered_ids =
+          Enum.map(ordered_ids, fn
+            id when id == collection.id -> new_collection.id
+            id -> id
+          end)
+
+        update_collection_positions(Multi.new(), final_ordered_ids)
+      end)
+      |> Repo.transaction()
+      |> case do
+        {:ok, %{collection: new_collection}} ->
+          broadcast_collection_changed(parent_id)
+          {:ok, new_collection}
+
+        {:error, _name, reason, _changes} ->
+          {:error, reason}
+      end
+    end
+  end
+
   def create_inbox_bookmark(%Scope{} = scope, attrs) do
     attrs =
       attrs
@@ -411,8 +442,8 @@ defmodule Links.Collections do
     collection_id = normalize_collection_id(collection_id)
     ordered_ids = Enum.map(ordered_ids, &to_integer/1)
 
-    with :ok <- authorize_bookmark_copy(scope, bookmark, collection_id),
-         :ok <- validate_copy_bookmark_order(scope, bookmark, collection_id, ordered_ids) do
+    with :ok <- authorize_bookmark_move(scope, bookmark, collection_id),
+         :ok <- validate_bookmark_order(scope, bookmark, collection_id, ordered_ids) do
       Multi.new()
       |> Multi.insert(:bookmark, duplicate_bookmark_changeset(scope, bookmark, collection_id))
       |> Multi.merge(fn %{bookmark: new_bookmark} ->
@@ -1108,30 +1139,14 @@ defmodule Links.Collections do
 
   defp same_bookmark_location?(left, right), do: left == right
 
-  defp authorize_bookmark_copy(scope, bookmark, collection_id) do
-    with true <- can_view_bookmark?(scope, bookmark),
-         false <- can_edit_bookmark?(scope, bookmark),
-         :ok <- authorize_bookmark_parent(scope, collection_id),
-         false <- same_bookmark_collection?(bookmark, collection_id) do
-      :ok
-    else
-      _ -> {:error, :unauthorized}
-    end
-  end
-
-  defp same_bookmark_collection?(%Bookmark{collection_id: nil}, nil), do: true
-
-  defp same_bookmark_collection?(%Bookmark{collection_id: collection_id}, collection_id),
-    do: true
-
-  defp same_bookmark_collection?(_, _), do: false
-
   defp duplicate_bookmark_changeset(%Scope{} = scope, %Bookmark{} = source, collection_id) do
     %Bookmark{}
     |> Bookmark.changeset(%{
       title: source.title,
       url: source.url,
       description: source.description,
+      position: source.position,
+      completed: source.completed,
       created_by_id: scope.user.id,
       collection_id: collection_id
     })
@@ -1142,49 +1157,50 @@ defmodule Links.Collections do
     |> Ecto.Changeset.put_change(:metadata_fetched_at, source.metadata_fetched_at)
   end
 
-  defp validate_copy_bookmark_order(%Scope{} = scope, source, nil, ordered_ids) do
-    user_id = scope.user.id
+  defp duplicate_collection_subtree(scope, repo, %Collection{} = source, parent_id) do
+    {:ok, new_collection} =
+      %Collection{}
+      |> Collection.changeset(%{
+        title: source.title,
+        owner_id: scope.user.id,
+        parent_id: parent_id,
+        position: 0
+      })
+      |> repo.insert()
 
-    if source.id in ordered_ids do
-      existing_in_target =
-        Bookmark
-        |> where([b], b.created_by_id == ^user_id and is_nil(b.collection_id))
-        |> select([b], b.id)
-        |> Repo.all()
-        |> MapSet.new()
+    duplicate_collection_bookmarks(scope, repo, source, new_collection)
+    duplicate_collection_children(scope, repo, source, new_collection)
 
-      actual_without_source =
-        ordered_ids
-        |> List.delete(source.id)
-        |> MapSet.new()
-
-      if MapSet.equal?(existing_in_target, actual_without_source),
-        do: :ok,
-        else: {:error, :invalid_order}
-    else
-      {:error, :invalid_order}
-    end
+    {:ok, new_collection}
   end
 
-  defp validate_copy_bookmark_order(_scope, source, collection_id, ordered_ids) do
-    if source.id in ordered_ids do
-      existing_in_target =
-        Bookmark
-        |> where([b], b.collection_id == ^collection_id)
-        |> select([b], b.id)
-        |> Repo.all()
-        |> MapSet.new()
+  defp duplicate_collection_bookmarks(scope, repo, %Collection{} = source, %Collection{} = target) do
+    Bookmark
+    |> where([b], b.collection_id == ^source.id)
+    |> order_by([b], asc: b.position, asc: b.id)
+    |> repo.all()
+    |> Enum.each(fn bookmark ->
+      {:ok, _bookmark} =
+        duplicate_bookmark_changeset(scope, bookmark, target.id)
+        |> repo.insert()
+    end)
+  end
 
-      actual_without_source =
-        ordered_ids
-        |> List.delete(source.id)
-        |> MapSet.new()
+  defp duplicate_collection_children(scope, repo, %Collection{} = source, %Collection{} = target) do
+    Collection
+    |> where([c], c.parent_id == ^source.id)
+    |> order_by([c], asc: c.position, asc: c.id)
+    |> repo.all()
+    |> Enum.each(fn child ->
+      {:ok, _child} = duplicate_collection_subtree(scope, repo, child, target.id)
+    end)
+  end
 
-      if MapSet.equal?(existing_in_target, actual_without_source),
-        do: :ok,
-        else: {:error, :invalid_order}
+  defp validate_collection_copy(scope, %Collection{} = collection, parent_id, ordered_ids) do
+    if collaboration_mount?(collection) do
+      {:error, :unauthorized}
     else
-      {:error, :invalid_order}
+      validate_collection_move(scope, collection, parent_id, ordered_ids)
     end
   end
 
