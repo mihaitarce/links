@@ -172,6 +172,7 @@ defmodule LinksWeb.PublicShareLive do
       <img
         src={url}
         alt=""
+        loading="lazy"
         class={["shrink-0 rounded-sm object-contain", @class]}
       />
     <% else %>

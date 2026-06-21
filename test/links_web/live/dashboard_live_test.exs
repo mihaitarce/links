@@ -1329,6 +1329,7 @@ defmodule LinksWeb.DashboardLiveTest do
 
       assert html =~ "Example Domain"
       assert html =~ ~s(/bookmarks/#{bookmark.id}/favicon)
+      assert html =~ ~s(loading="lazy")
 
       lv
       |> element("#bookmark-select-#{bookmark.id}")

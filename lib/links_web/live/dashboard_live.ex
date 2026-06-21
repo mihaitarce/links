@@ -382,6 +382,7 @@ defmodule LinksWeb.DashboardLive do
       <img
         src={~p"/bookmarks/#{@bookmark.id}/favicon"}
         alt=""
+        loading="lazy"
         class={["shrink-0 rounded-sm object-contain", @class]}
       />
     <% else %>
