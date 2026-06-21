@@ -272,7 +272,11 @@ defmodule Links.Collections do
     with :ok <- validate_collection_move(scope, collection, parent_id, ordered_ids),
          :ok <- reject_cycle(collection.id, parent_id) do
       reparent? = source_parent_id != parent_id
-      transfer? = transfer_root_ownership?(scope, collection, parent_id, source_parent_id)
+
+      transfer_owner_id =
+        ownership_transfer_target(scope, collection, parent_id, source_parent_id)
+
+      transfer? = not is_nil(transfer_owner_id)
       reparent_attrs = collection_reparent_attrs(scope, collection, parent_id, source_parent_id)
 
       multi =
@@ -296,7 +300,7 @@ defmodule Links.Collections do
               multi,
               :transfer_subtree_ownership,
               from(c in Collection, where: c.id in ^descendant_ids),
-              set: [owner_id: scope.user.id]
+              set: [owner_id: transfer_owner_id]
             )
           end
         else
@@ -316,7 +320,7 @@ defmodule Links.Collections do
 
           if transfer? do
             broadcast_user_collections_changed(previous_owner_id)
-            broadcast_user_collections_changed(scope.user.id)
+            broadcast_user_collections_changed(transfer_owner_id)
           end
 
           {:ok, :moved}
@@ -365,6 +369,11 @@ defmodule Links.Collections do
       |> case do
         {:ok, %{collection: new_collection}} ->
           broadcast_collection_changed(parent_id)
+
+          if new_collection.owner_id != scope.user.id do
+            broadcast_user_collections_changed(new_collection.owner_id)
+          end
+
           {:ok, new_collection}
 
         {:error, _name, reason, _changes} ->
@@ -1201,11 +1210,13 @@ defmodule Links.Collections do
   end
 
   defp duplicate_collection_subtree(scope, repo, %Collection{} = source, parent_id) do
+    owner_id = collection_owner_id_for_parent(scope, parent_id)
+
     {:ok, new_collection} =
       %Collection{}
       |> Collection.changeset(%{
         title: source.title,
-        owner_id: scope.user.id,
+        owner_id: owner_id,
         parent_id: parent_id,
         position: 0
       })
@@ -1330,24 +1341,53 @@ defmodule Links.Collections do
        ) do
     attrs = %{parent_id: parent_id}
 
-    if transfer_root_ownership?(scope, collection, parent_id, source_parent_id) do
-      Map.put(attrs, :owner_id, scope.user.id)
-    else
-      attrs
+    case ownership_transfer_target(scope, collection, parent_id, source_parent_id) do
+      nil -> attrs
+      owner_id -> Map.put(attrs, :owner_id, owner_id)
     end
   end
 
-  defp transfer_root_ownership?(
+  defp ownership_transfer_target(
          %Scope{} = scope,
          %Collection{} = collection,
          nil,
          source_parent_id
        )
        when not is_nil(source_parent_id) do
-    collection.owner_id != scope.user.id
+    if collection.owner_id != scope.user.id, do: scope.user.id, else: nil
   end
 
-  defp transfer_root_ownership?(_, _, _, _), do: false
+  defp ownership_transfer_target(
+         %Scope{} = scope,
+         %Collection{} = collection,
+         parent_id,
+         _source_parent_id
+       )
+       when not is_nil(parent_id) do
+    case Repo.get(Collection, parent_id) do
+      %Collection{owner_id: owner_id}
+      when owner_id != scope.user.id and collection.owner_id != owner_id ->
+        owner_id
+
+      _ ->
+        nil
+    end
+  end
+
+  defp ownership_transfer_target(_scope, _collection, _parent_id, _source_parent_id), do: nil
+
+  defp collection_owner_id_for_parent(%Scope{} = scope, parent_id) do
+    case parent_id do
+      nil ->
+        scope.user.id
+
+      parent_id ->
+        case Repo.get(Collection, parent_id) do
+          %Collection{owner_id: owner_id} when owner_id != scope.user.id -> owner_id
+          _ -> scope.user.id
+        end
+    end
+  end
 
   defp reject_cycle(_collection_id, nil), do: :ok
 

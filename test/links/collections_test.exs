@@ -422,7 +422,29 @@ defmodule Links.CollectionsTest do
       assert {:ok, :moved} =
                Collections.move_collection(collaborator_scope, own.id, shared.id, [own.id])
 
-      assert Collections.get_collection!(own.id).parent_id == shared.id
+      moved = Collections.get_collection!(own.id)
+      assert moved.parent_id == shared.id
+      assert moved.owner_id == owner_scope.user.id
+    end
+
+    test "copying into editable shared collections transfers ownership to the share owner" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      shared = collection_fixture(owner_scope, %{title: "Shared"})
+      own = collection_fixture(user_scope_fixture(collaborator), %{title: "Mine"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, shared, collaborator.email, false)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:ok, copied} =
+               Collections.copy_collection(collaborator_scope, own.id, shared.id, [own.id])
+
+      assert copied.id != own.id
+      assert copied.parent_id == shared.id
+      assert copied.owner_id == owner_scope.user.id
+      assert Collections.get_collection!(own.id).parent_id == nil
     end
 
     test "collaborators can move nested collections out of editable shared collections" do
