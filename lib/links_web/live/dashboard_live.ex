@@ -87,7 +87,7 @@ defmodule LinksWeb.DashboardLive do
                 id="bookmarks-zone-inbox"
                 phx-hook="BookmarkSort"
                 data-collection-id="inbox"
-                class={sidebar_menu_class(["overflow-y-auto"])}
+                class={sidebar_menu_class()}
               >
                 <.bookmark_menu_link
                   :for={bookmark <- @dashboard.inbox}
@@ -97,10 +97,12 @@ defmodule LinksWeb.DashboardLive do
                 />
                 <li
                   id="inbox-empty-state"
-                  class="inbox-empty-state bookmark-menu-row flex min-w-0 w-full items-center justify-center"
+                  class="empty-state bookmark-menu-row flex min-w-0 w-full items-center justify-center"
                   aria-hidden="true"
                 >
-                  <span class="inbox-empty-state-placeholder">Your inbox is empty</span>
+                  <span class="empty-state-placeholder text-sm select-none">
+                    Your inbox is empty
+                  </span>
                 </li>
               </ul>
             </section>
@@ -118,7 +120,7 @@ defmodule LinksWeb.DashboardLive do
                 id="collections-zone-root"
                 data-collection-sortable
                 data-parent-id="root"
-                class={sidebar_menu_class(["overflow-y-auto overflow-x-hidden"])}
+                class={sidebar_menu_class()}
               >
                 <.tree_node
                   :for={node <- @dashboard.tree}
@@ -131,10 +133,10 @@ defmodule LinksWeb.DashboardLive do
                 />
                 <li
                   id="collections-empty-state"
-                  class="inbox-empty-state bookmark-menu-row flex min-w-0 w-full items-center justify-center"
+                  class="empty-state bookmark-menu-row flex min-w-0 w-full items-center justify-center"
                   aria-hidden="true"
                 >
-                  <span class="inbox-empty-state-placeholder">
+                  <span class="empty-state-placeholder text-sm select-none">
                     You don't have any collections yet
                   </span>
                 </li>
@@ -2099,10 +2101,9 @@ defmodule LinksWeb.DashboardLive do
     url(~p"/share/#{token}")
   end
 
-  defp sidebar_menu_class(extra) do
+  defp sidebar_menu_class do
     [
-      "menu flex-nowrap bg-base-200 rounded-box w-full"
-      | extra
+      "menu flex-nowrap bg-base-200 rounded-box w-full overflow-y-auto overflow-x-hidden"
     ]
   end
 end

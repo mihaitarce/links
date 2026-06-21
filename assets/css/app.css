@@ -28,8 +28,20 @@
 
 /* This file is for your main application CSS */
 
-.inbox-empty-state:not(:only-child) {
+.empty-state:not(:only-child) {
   display: none;
+}
+
+#bookmarks-sidebar .menu li.empty-state > * {
+  pointer-events: none;
+  cursor: default;
+  background-color: transparent;
+  color: color-mix(in oklch, var(--color-base-content) 50%, transparent);
+}
+
+#bookmarks-sidebar .menu li.empty-state > *:is(:hover, :active, :focus, :focus-visible, :focus-within) {
+  background-color: transparent;
+  color: color-mix(in oklch, var(--color-base-content) 50%, transparent);
 }
 
 #bookmarks-sidebar .menu :where(li > details > summary:not(.menu-title))::after,
