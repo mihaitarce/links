@@ -33,7 +33,7 @@
 }
 
 #bookmarks-sidebar .inbox-empty-state > .bookmark-menu-row {
-  min-height: calc(1rem + 0.25rem * 2);
+  min-height: calc(1rem + 0.375rem * 2);
 }
 
 .inbox-empty-state > .inbox-empty-state-placeholder,
@@ -97,7 +97,13 @@
 }
 
 #bookmarks-sidebar .menu :where(li > .bookmark-menu-row) {
-  padding-block: calc(0.25rem * 1);
+  padding-inline: calc(0.25rem * 3);
+  padding-block: calc(0.25rem * 1.5);
+}
+
+#public-share-sidebar .menu :where(li > .bookmark-menu-row) {
+  padding-inline: calc(0.25rem * 3);
+  padding-block: calc(0.25rem * 1.5);
 }
 
 #bookmarks-sidebar .bookmark-menu-row .bookmark-select-button {
