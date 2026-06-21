@@ -68,6 +68,7 @@ defmodule LinksWeb.DashboardLive do
 
           <div
             id="bookmarks-sidebar"
+            phx-hook="CollectionSort"
             class="flex min-h-0 flex-1 flex-col"
           >
             <section class="flex min-h-0 max-h-[50dvh] shrink-0 flex-col overflow-hidden border-b border-base-300 p-3">
@@ -114,7 +115,7 @@ defmodule LinksWeb.DashboardLive do
               </div>
               <ul
                 id="collections-zone-root"
-                phx-hook="CollectionSort"
+                data-collection-sortable
                 data-parent-id="root"
                 class={sidebar_menu_class(["overflow-y-auto overflow-x-hidden"])}
               >
@@ -550,6 +551,7 @@ defmodule LinksWeb.DashboardLive do
     ~H"""
     <li
       id={"collection-#{@collection.id}"}
+      data-nest-parent-id={@effective.id}
       data-readonly={to_string(@node.readonly || false)}
       data-revoked={to_string(@node.revoked || false)}
     >
@@ -594,6 +596,8 @@ defmodule LinksWeb.DashboardLive do
         <ul
           :if={@node.children != []}
           id={"collections-zone-#{@effective.id}"}
+          data-collection-sortable
+          data-parent-id={@effective.id}
         >
           <.tree_node
             :for={child <- @node.children}

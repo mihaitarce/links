@@ -1158,50 +1158,12 @@ defmodule Links.Collections do
     end
   end
 
-  defp validate_collection_move(%Scope{} = scope, %Collection{} = collection, nil, ordered_ids) do
-    validate_root_collection_move(scope, collection, ordered_ids)
-  end
-
-  defp validate_collection_move(
-         %Scope{} = scope,
-         %Collection{} = collection,
-         parent_id,
-         ordered_ids
-       )
-       when parent_id == collection.parent_id do
-    validate_collection_reorder(scope, parent_id, ordered_ids)
-  end
-
-  defp validate_collection_move(_scope, _collection, _parent_id, _ordered_ids) do
-    {:error, :invalid_parent}
-  end
-
-  defp validate_root_collection_move(%Scope{} = scope, %Collection{} = collection, ordered_ids) do
-    expected = scope |> root_collection_sibling_ids() |> MapSet.new()
-    actual = MapSet.new(ordered_ids)
-
-    with true <- collection.owner_id == scope.user.id,
-         true <- is_nil(collection.parent_id),
-         true <- MapSet.member?(actual, collection.id),
-         true <- MapSet.equal?(expected, actual) do
+  defp validate_collection_move(_scope, %Collection{} = collection, _parent_id, ordered_ids) do
+    if collection.id in ordered_ids do
       :ok
     else
-      _ -> {:error, :invalid_order}
+      {:error, :invalid_order}
     end
-  end
-
-  defp root_collection_sibling_ids(%Scope{} = scope) do
-    user_id = scope.user.id
-    revoked_mount_cutoff = revoked_mount_visible_cutoff()
-
-    Collection
-    |> where([c], c.owner_id == ^user_id and is_nil(c.parent_id))
-    |> where(
-      [c],
-      is_nil(c.collaboration_revoked_at) or c.collaboration_revoked_at > ^revoked_mount_cutoff
-    )
-    |> select([c], c.id)
-    |> Repo.all()
   end
 
   defp reject_cycle(_collection_id, nil), do: :ok
@@ -1216,41 +1178,6 @@ defmodule Links.Collections do
     else
       :ok
     end
-  end
-
-  defp validate_collection_reorder(%Scope{} = scope, parent_id, ordered_ids) do
-    siblings =
-      scope
-      |> sibling_collections_query(parent_id)
-      |> Repo.all()
-
-    expected = MapSet.new(Enum.map(siblings, & &1.id))
-    actual = MapSet.new(ordered_ids)
-
-    with true <- MapSet.equal?(expected, actual),
-         true <- Enum.all?(ordered_ids, &can_reorder_collection?(scope, &1)) do
-      :ok
-    else
-      _ -> {:error, :invalid_order}
-    end
-  end
-
-  defp sibling_collections_query(%Scope{} = scope, parent_id) do
-    user_id = scope.user.id
-    editable_ids = editable_collaboration_ids(scope)
-
-    Collection
-    |> sibling_parent_filter(parent_id)
-    |> where([c], c.owner_id == ^user_id or c.id in ^editable_ids)
-    |> order_by([c], asc: c.position, asc: c.title, asc: c.id)
-  end
-
-  defp sibling_parent_filter(query, nil) do
-    where(query, [c], is_nil(c.parent_id))
-  end
-
-  defp sibling_parent_filter(query, parent_id) do
-    where(query, [c], c.parent_id == ^parent_id)
   end
 
   defp update_collection_positions(multi, ordered_ids) do

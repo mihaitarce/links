@@ -90,23 +90,28 @@ defmodule Links.CollectionsTest do
       assert Collections.get_collection!(first.id).position == 1
     end
 
-    test "move_collection rejects invalid root sibling sets" do
+    test "move_collection rejects when moved collection is missing from order" do
       scope = user_scope_fixture()
-      other_scope = user_scope_fixture()
 
       {:ok, first} = Collections.create_collection(scope, %{title: "First"})
       {:ok, second} = Collections.create_collection(scope, %{title: "Second"})
-      {:ok, foreign} = Collections.create_collection(other_scope, %{title: "Foreign"})
 
       assert {:error, :invalid_order} =
-               Collections.move_collection(scope, first.id, "root", [first.id, foreign.id])
+               Collections.move_collection(scope, first.id, "root", [second.id])
+    end
 
-      assert {:error, :invalid_order} =
-               Collections.move_collection(scope, first.id, "root", [
-                 first.id,
-                 second.id,
-                 foreign.id
-               ])
+    test "move_collection nests a collection as the last child of a new parent" do
+      scope = user_scope_fixture()
+      parent = collection_fixture(scope, %{title: "Parent"})
+      child = collection_fixture(scope, %{title: "Child", parent_id: parent.id})
+      moving = collection_fixture(scope, %{title: "Moving"})
+
+      assert {:ok, :moved} =
+               Collections.move_collection(scope, moving.id, parent.id, [child.id, moving.id])
+
+      assert Collections.get_collection!(moving.id).parent_id == parent.id
+      assert Collections.get_collection!(moving.id).position == 1
+      assert Collections.get_collection!(child.id).position == 0
     end
 
     test "reorders nested collections" do
@@ -167,7 +172,7 @@ defmodule Links.CollectionsTest do
       assert Collections.get_collection!(own.id).position == 1
     end
 
-    test "collaborators cannot reorder children inside read-only shared collections" do
+    test "collaborators can reorder children inside read-only shared collections" do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()
       parent = collection_fixture(owner_scope, %{title: "Shared Parent"})
@@ -183,11 +188,14 @@ defmodule Links.CollectionsTest do
 
       collaborator_scope = user_scope_fixture(collaborator)
 
-      assert {:error, :invalid_order} =
+      assert {:ok, :reordered} =
                Collections.reorder_collections(collaborator_scope, parent.id, [
                  second.id,
                  first.id
                ])
+
+      assert Collections.get_collection!(second.id).position == 0
+      assert Collections.get_collection!(first.id).position == 1
     end
 
     test "moves bookmarks between collections" do

@@ -28,27 +28,32 @@ import topbar from "../vendor/topbar"
 
 const DROP_HIGHLIGHT_CLASS = "collection-drop-target"
 const AUTO_EXPAND_DELAY_MS = 2000
+const COLLECTIONS_GROUP = "collections"
+
+const collectionSortContainers = (root) => root.querySelectorAll("[data-collection-sortable]")
 
 const CollectionSort = {
   mounted() {
+    this.sortables = []
     this.dropTarget = null
+    this.nestTargetCollection = null
     this.draggedItem = null
     this.expandTimer = null
     this.expandTargetId = null
     this.autoExpandedIds = new Set()
     this.onCollectionEnter = this.onCollectionEnter.bind(this)
     this.onCollectionLeave = this.onCollectionLeave.bind(this)
-    this.initSortable()
+    this.initSortables()
   },
   updated() {
-    this.destroySortable()
-    this.initSortable()
+    this.destroySortables()
+    this.initSortables()
   },
   destroyed() {
-    this.destroySortable()
+    this.destroySortables()
   },
   sortableCollections() {
-    return Array.from(this.el.children).filter((child) => child.id?.startsWith("collection-"))
+    return this.el.querySelectorAll("li[id^='collection-']")
   },
   setDropHighlight(collection) {
     const summary = collection.querySelector("details > summary")
@@ -60,6 +65,7 @@ const CollectionSort = {
     if (summary) {
       summary.classList.add(DROP_HIGHLIGHT_CLASS)
       this.dropTarget = summary
+      this.nestTargetCollection = collection
     }
   },
   clearDropHighlight() {
@@ -67,6 +73,8 @@ const CollectionSort = {
       this.dropTarget.classList.remove(DROP_HIGHLIGHT_CLASS)
       this.dropTarget = null
     }
+
+    this.nestTargetCollection = null
   },
   clearExpandTimer() {
     if (this.expandTimer) {
@@ -106,6 +114,15 @@ const CollectionSort = {
     const collectionId = collection.id.replace("collection-", "")
 
     if (collectionId) this.autoExpandedIds.add(collectionId)
+
+    collectionSortContainers(this.el).forEach((el) => {
+      if (this.sortables.some((sortable) => sortable.el === el)) return
+
+      this.sortables.push(this.createCollectionSortable(el))
+    })
+
+    this.unbindDropHighlight()
+    this.bindDropHighlight()
   },
   syncAutoExpandedCollections() {
     for (const id of this.autoExpandedIds) {
@@ -152,10 +169,36 @@ const CollectionSort = {
       collection.removeEventListener("dragleave", this.onCollectionLeave)
     })
   },
-  initSortable() {
+  childCollectionIds(collection) {
+    const childZone = collection.querySelector("details > [data-collection-sortable]")
+
+    if (!childZone) return []
+
+    return this.orderedCollectionIds(childZone)
+  },
+  nestTargetParentId(collection) {
+    return collection.dataset.nestParentId
+  },
+  pushNestMove(hook, movedId, nestTarget) {
+    const parentId = hook.nestTargetParentId(nestTarget)
+    const childIds = hook.childCollectionIds(nestTarget).filter((id) => id !== movedId)
+
+    hook.pushEvent("move_collection", {
+      id: movedId,
+      parent_id: parentId,
+      ordered_ids: [...childIds, movedId],
+    })
+  },
+  orderedCollectionIds(container) {
+    return Array.from(container.children)
+      .filter((child) => child.id?.startsWith("collection-"))
+      .map((child) => child.id.replace("collection-", ""))
+  },
+  createCollectionSortable(el) {
     const hook = this
 
-    this.sortable = new Sortable(this.el, {
+    return new Sortable(el, {
+      group: COLLECTIONS_GROUP,
       animation: 150,
       draggable: "> li[id^='collection-']",
       handle: "li[id^='collection-'] > details > summary",
@@ -169,38 +212,55 @@ const CollectionSort = {
         hook.bindDropHighlight()
       },
       onEnd(event) {
+        const nestTarget = hook.nestTargetCollection
+        const movedId = event.item.id.replace("collection-", "")
+
         hook.unbindDropHighlight()
-        hook.clearDropHighlight()
         hook.clearExpandTimer()
         hook.syncAutoExpandedCollections()
+        hook.clearDropHighlight()
         hook.draggedItem = null
 
-        if (event.from !== event.to || event.oldIndex === event.newIndex) return
+        if (nestTarget && nestTarget !== event.item) {
+          hook.pushNestMove(hook, movedId, nestTarget)
+          return
+        }
 
-        const movedId = event.item.id.replace("collection-", "")
-        const orderedIds = Array.from(event.from.children)
-          .filter((child) => child.id?.startsWith("collection-"))
-          .map((child) => child.id.replace("collection-", ""))
+        if (event.from === event.to && event.oldIndex === event.newIndex) return
+
+        const targetContainer = event.to
+        const orderedIds = hook.orderedCollectionIds(targetContainer)
 
         hook.pushEvent("move_collection", {
           id: movedId,
-          parent_id: hook.el.dataset.parentId,
+          parent_id: targetContainer.dataset.parentId,
           ordered_ids: orderedIds,
         })
       },
     })
   },
-  destroySortable() {
+  initSortables() {
+    this.sortables = []
+
+    collectionSortContainers(this.el).forEach((el) => {
+      if (this.sortables.some((sortable) => sortable.el === el)) return
+
+      this.sortables.push(this.createCollectionSortable(el))
+    })
+  },
+  destroySortables() {
     this.unbindDropHighlight()
     this.clearDropHighlight()
     this.clearExpandTimer()
     this.autoExpandedIds.clear()
+    this.nestTargetCollection = null
     this.draggedItem = null
 
-    if (this.sortable) {
-      this.sortable.destroy()
-      this.sortable = null
+    if (this.sortables) {
+      this.sortables.forEach((sortable) => sortable.destroy())
     }
+
+    this.sortables = []
   },
 }
 

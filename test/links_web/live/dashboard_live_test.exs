@@ -323,14 +323,20 @@ defmodule LinksWeb.DashboardLiveTest do
       assert has_element?(lv, "#collection-#{collection.id} summary .badge.badge-sm", "0 / 1")
     end
 
-    test "top-level collection list is sortable", %{conn: conn} do
+    test "collection lists are sortable at every level", %{conn: conn} do
       %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
-      collection_fixture(scope, %{title: "Reading"})
+      parent = collection_fixture(scope, %{title: "Parent"})
+      collection_fixture(scope, %{title: "Child", parent_id: parent.id})
       {:ok, _lv, html} = live(conn, ~p"/")
 
-      assert html =~ ~s(id="collections-zone-root")
+      assert html =~ ~s(id="bookmarks-sidebar")
       assert html =~ ~s(phx-hook="CollectionSort")
+      assert html =~ ~s(id="collections-zone-root")
+      assert html =~ ~s(data-collection-sortable)
       assert html =~ ~s(data-parent-id="root")
+      assert html =~ ~s(id="collections-zone-#{parent.id}")
+      assert html =~ ~s(data-parent-id="#{parent.id}")
+      assert html =~ ~s(data-nest-parent-id="#{parent.id}")
     end
 
     test "reorders top-level collections from the dashboard", %{conn: conn} do
@@ -342,7 +348,7 @@ defmodule LinksWeb.DashboardLiveTest do
       {:ok, lv, _html} = live(conn, ~p"/")
 
       lv
-      |> element("#collections-zone-root")
+      |> element("#bookmarks-sidebar")
       |> render_hook("move_collection", %{
         "id" => to_string(second.id),
         "parent_id" => "root",
@@ -351,6 +357,53 @@ defmodule LinksWeb.DashboardLiveTest do
 
       assert Collections.get_collection!(second.id).position == 0
       assert Collections.get_collection!(first.id).position == 1
+    end
+
+    test "reorders nested collections from the dashboard", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      parent = collection_fixture(scope, %{title: "Parent"})
+
+      {:ok, first} =
+        Collections.create_collection(scope, %{title: "Child A", parent_id: parent.id})
+
+      {:ok, second} =
+        Collections.create_collection(scope, %{title: "Child B", parent_id: parent.id})
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv
+      |> element("#bookmarks-sidebar")
+      |> render_hook("move_collection", %{
+        "id" => to_string(second.id),
+        "parent_id" => to_string(parent.id),
+        "ordered_ids" => [to_string(second.id), to_string(first.id)]
+      })
+
+      assert Collections.get_collection!(second.id).position == 0
+      assert Collections.get_collection!(first.id).position == 1
+    end
+
+    test "nests a collection as the last child of a highlighted target", %{conn: conn} do
+      %{conn: conn, scope: scope} = register_and_log_in_user(%{conn: conn})
+      {:ok, parent} = Collections.create_collection(scope, %{title: "Parent"})
+      {:ok, sibling} = Collections.create_collection(scope, %{title: "Sibling"})
+      {:ok, child} = Collections.create_collection(scope, %{title: "Child", parent_id: parent.id})
+      {:ok, moving} = Collections.create_collection(scope, %{title: "Moving"})
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv
+      |> element("#bookmarks-sidebar")
+      |> render_hook("move_collection", %{
+        "id" => to_string(moving.id),
+        "parent_id" => to_string(parent.id),
+        "ordered_ids" => [to_string(child.id), to_string(moving.id)]
+      })
+
+      assert Collections.get_collection!(moving.id).parent_id == parent.id
+      assert Collections.get_collection!(moving.id).position == 1
+      assert Collections.get_collection!(child.id).position == 0
+      assert Collections.get_collection!(sibling.id).parent_id == nil
     end
 
     test "shows nested bookmarks in read-only shared collections", %{conn: conn} do
