@@ -625,6 +625,17 @@ defmodule Links.CollectionsTest do
       assert Collections.collection_bookmark_badge(parent_node) == "2 / 2"
     end
 
+    test "formats empty collection badges as zero" do
+      scope = user_scope_fixture()
+      collection = collection_fixture(scope, %{title: "Empty"})
+
+      [node] = Collections.list_dashboard(scope).tree
+
+      assert node.bookmark_count == 0
+      assert Collections.collection_bookmark_badge(node) == "0"
+      assert Collections.bookmark_badge(0, 0) == "0"
+    end
+
     test "formats inbox bookmark badges" do
       scope = user_scope_fixture()
 

@@ -971,6 +971,8 @@ defmodule Links.Collections do
   @doc """
   Formats a bookmark badge as completed/total.
   """
+  def bookmark_badge(_completed, 0), do: "0"
+
   def bookmark_badge(completed, total) when is_integer(completed) and is_integer(total) do
     "#{completed} / #{total}"
   end

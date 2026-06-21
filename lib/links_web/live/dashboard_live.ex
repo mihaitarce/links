@@ -572,9 +572,6 @@ defmodule LinksWeb.DashboardLive do
           <.folder_icon />
           <span class="truncate">{@node.title}</span>
         </span>
-        <span class="badge badge-sm shrink-0 tabular-nums">
-          {Collections.collection_bookmark_badge(@node)}
-        </span>
       </div>
       <details :if={not @node.revoked} open={@expanded}>
         <summary
