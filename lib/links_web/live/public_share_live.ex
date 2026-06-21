@@ -22,7 +22,7 @@ defmodule LinksWeb.PublicShareLive do
           |> assign(:root, dashboard.root)
           |> assign(:root_node, root_node)
           |> assign(:collection_ids, dashboard.collection_ids)
-          |> assign(:page_title, dashboard.root.title)
+          |> assign(:page_title, public_share_page_title(dashboard.root.title))
 
         socket =
           if connected?(socket) do
@@ -42,7 +42,7 @@ defmodule LinksWeb.PublicShareLive do
          |> assign(:root, nil)
          |> assign(:root_node, nil)
          |> assign(:collection_ids, [])
-         |> assign(:page_title, "Shared collection")
+         |> assign(:page_title, "links: Shared collection")
          |> assign(:not_found, true)}
     end
   end
@@ -231,7 +231,7 @@ defmodule LinksWeb.PublicShareLive do
         |> assign(:root, dashboard.root)
         |> assign(:root_node, root_node)
         |> assign(:collection_ids, dashboard.collection_ids)
-        |> assign(:page_title, dashboard.root.title)
+        |> assign(:page_title, public_share_page_title(dashboard.root.title))
         |> sync_collection_subscriptions(dashboard.collection_ids)
 
       {:error, :not_found} ->
@@ -280,6 +280,9 @@ defmodule LinksWeb.PublicShareLive do
       | extra
     ]
   end
+
+  defp public_share_page_title(title) when is_binary(title), do: "links: #{title}"
+  defp public_share_page_title(_), do: "links: Shared collection"
 
   defp logged_in?(nil), do: false
   defp logged_in?(%{user: user}) when not is_nil(user), do: true

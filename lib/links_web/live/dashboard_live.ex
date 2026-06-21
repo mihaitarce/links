@@ -25,7 +25,7 @@ defmodule LinksWeb.DashboardLive do
 
     {:ok,
      socket
-     |> assign(:page_title, "Dashboard")
+     |> assign(:page_title, "links: dashboard")
      |> assign(:collapsed, MapSet.new())
      |> assign(:subscribed_collection_ids, MapSet.new())
      |> assign(:selected, nil)

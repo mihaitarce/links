@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content={get_csrf_token()} />
     <meta name="live-socket-path" content={LinksWeb.Endpoint.path("/live")} />
-    <.live_title default="Links" suffix=" · Phoenix Framework">
+    <.live_title default="links">
       {assigns[:page_title]}
     </.live_title>
     <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
