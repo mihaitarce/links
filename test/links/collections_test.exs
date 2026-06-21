@@ -232,7 +232,66 @@ defmodule Links.CollectionsTest do
       assert Collections.get_collection!(nested.id).parent_id == shared.id
     end
 
-    test "collaborators cannot copy nested collections from read-only shared collections" do
+    test "collaborators can copy nested collections from read-only shared collections" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      shared = collection_fixture(owner_scope, %{title: "Shared"})
+
+      {:ok, nested} =
+        Collections.create_collection(owner_scope, %{
+          title: "Nested",
+          parent_id: shared.id
+        })
+
+      own = collection_fixture(user_scope_fixture(collaborator), %{title: "Mine"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, shared, collaborator.email, true)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:ok, copied} =
+               Collections.copy_collection(collaborator_scope, nested.id, own.id, [nested.id])
+
+      assert copied.id != nested.id
+      assert copied.parent_id == own.id
+      assert copied.owner_id == collaborator.id
+      assert Collections.get_collection!(nested.id).parent_id == shared.id
+    end
+
+    test "collaborators can copy read-only shared collection mounts into their own collections" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared Root"})
+
+      _child =
+        collection_fixture(owner_scope, %{title: "Nested", parent_id: source.id})
+
+      own = collection_fixture(user_scope_fixture(collaborator), %{title: "Mine"})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:ok, copied} =
+               Collections.copy_collection(collaborator_scope, mount.id, own.id, [mount.id])
+
+      assert copied.id != source.id
+      assert copied.parent_id == own.id
+      assert copied.owner_id == collaborator.id
+      assert Collections.get_collection!(source.id).title == "Shared Root"
+
+      copied_children =
+        Collection
+        |> where([c], c.parent_id == ^copied.id)
+        |> order_by([c], asc: c.title)
+        |> Links.Repo.all()
+
+      assert Enum.map(copied_children, & &1.title) == ["Nested"]
+    end
+
+    test "collaborators cannot move nested collections from read-only shared collections" do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()
       shared = collection_fixture(owner_scope, %{title: "Shared"})
@@ -251,7 +310,9 @@ defmodule Links.CollectionsTest do
       collaborator_scope = user_scope_fixture(collaborator)
 
       assert {:error, :unauthorized} =
-               Collections.copy_collection(collaborator_scope, nested.id, own.id, [nested.id])
+               Collections.move_collection(collaborator_scope, nested.id, own.id, [nested.id])
+
+      assert Collections.get_collection!(nested.id).parent_id == shared.id
     end
 
     test "reorders nested collections" do
@@ -1538,6 +1599,46 @@ defmodule Links.CollectionsTest do
       assert {:ok, _deleted_mount} = Collections.delete_collection(collaborator_scope, mount)
       assert Collections.get_collection!(source.id).id == source.id
       refute Repo.get(Collection, mount.id)
+    end
+
+    test "editable collaborators can delete nested collections inside a shared collection" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      parent = collection_fixture(owner_scope, %{title: "Shared Parent"})
+
+      child =
+        collection_fixture(owner_scope, %{title: "Nested Folder", parent_id: parent.id})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, parent, collaborator.email, false)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert Collections.can_edit_collection?(collaborator_scope, child.id)
+      assert {:ok, _deleted} = Collections.delete_collection(collaborator_scope, child)
+      refute Repo.get(Collection, child.id)
+      assert Collections.get_collection!(parent.id).title == "Shared Parent"
+    end
+
+    test "read-only collaborators cannot delete nested collections inside a shared collection" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      parent = collection_fixture(owner_scope, %{title: "Shared Parent"})
+
+      child =
+        collection_fixture(owner_scope, %{title: "Nested Folder", parent_id: parent.id})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, parent, collaborator.email, true)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      refute Collections.can_edit_collection?(collaborator_scope, child.id)
+
+      assert {:error, :unauthorized} =
+               Collections.delete_collection(collaborator_scope, child)
+
+      assert Collections.get_collection!(child.id).title == "Nested Folder"
     end
 
     test "editable collaborators can invite and list collaborators" do

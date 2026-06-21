@@ -621,7 +621,7 @@ defmodule LinksWeb.DashboardLive do
           id={"collections-zone-#{@effective.id}"}
           data-parent-id={@effective.id}
           data-readonly={to_string(@node.readonly || false)}
-          data-collection-sortable={(!@node.readonly && "") || nil}
+          data-collection-sortable
         >
           <.tree_node
             :for={child <- @node.children}

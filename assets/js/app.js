@@ -41,6 +41,19 @@ const isCollaborationMount = (collection) => collection?.dataset.collaborationMo
 
 const sortZoneAcceptsCollections = (zone) => zone?.dataset.readonly !== "true"
 
+const sortZoneAcceptsCollectionCopy = (zone) =>
+  zone?.dataset.parentId === "root" || sortZoneAcceptsCollections(zone)
+
+const collectionDraggedFromReadonly = (dragged, from) => {
+  if (isCollaborationMount(dragged) && from?.dataset.parentId === "root") return false
+
+  return (
+    dragged?.dataset.readonly === "true" ||
+    dragged?.closest("li[id^='collection-']")?.dataset.readonly === "true" ||
+    from?.dataset.readonly === "true"
+  )
+}
+
 const revertAutoExpandedCollections = (root, autoExpandedIds) => {
   for (const id of autoExpandedIds) {
     const collection = root.querySelector(`#collection-${id}`)
@@ -202,7 +215,6 @@ const CollectionSort = {
     if (collectionId) this.autoExpandedIds.add(collectionId)
 
     collectionSortContainers(this.el).forEach((el) => {
-      if (el.dataset.readonly === "true") return
       if (this.sortables.some((sortable) => sortable.el === el)) return
 
       this.sortables.push(this.createCollectionSortable(el))
@@ -310,9 +322,17 @@ const CollectionSort = {
       invertSwap: true,
       ...sortableSpillOptions(hook),
       onMove(event) {
-        const {dragged, to} = event
+        const {dragged, to, from} = event
 
-        if (isCollaborationMount(dragged) && to.dataset.parentId !== "root") {
+        if (hook.copyMode) {
+          return sortZoneAcceptsCollectionCopy(to)
+        }
+
+        if (isCollaborationMount(dragged)) {
+          return to.dataset.parentId === "root"
+        }
+
+        if (from.dataset.readonly === "true" || dragged.dataset.readonly === "true") {
           return false
         }
 
@@ -323,7 +343,7 @@ const CollectionSort = {
         hook.draggedItem = event.item
         startCopyDragMode(hook, event)
 
-        if (!isCollaborationMount(event.item)) {
+        if (!isCollaborationMount(event.item) || hook.copyMode) {
           hook.bindDropHighlight()
         }
       },
@@ -335,7 +355,13 @@ const CollectionSort = {
         const movedId = event.item.id.replace("collection-", "")
 
         if (nestTarget && nestTarget !== event.item) {
-          if (!collectionAcceptsDrops(nestTarget) || isCollaborationMount(event.item)) {
+          if (!copyMode && (!collectionAcceptsDrops(nestTarget) || isCollaborationMount(event.item))) {
+            revertSortableItem(event)
+            finishCollectionDragUi(hook, {spilled: true})
+            return
+          }
+
+          if (copyMode && !collectionAcceptsDrops(nestTarget)) {
             revertSortableItem(event)
             finishCollectionDragUi(hook, {spilled: true})
             return
@@ -354,12 +380,23 @@ const CollectionSort = {
           return
         }
 
+        if (!copyMode && collectionDraggedFromReadonly(event.item, event.from)) {
+          revertSortableItem(event)
+          finishCollectionDragUi(hook, {spilled: true})
+          return
+        }
+
         if (copyMode) revertSortableItem(event)
         finishCollectionDragUi(hook)
 
         if (event.from === event.to && event.oldIndex === event.newIndex) return
 
         const targetContainer = event.to
+
+        if (copyMode && !sortZoneAcceptsCollectionCopy(targetContainer)) {
+          return
+        }
+
         const orderedIds = hook.orderedCollectionIds(targetContainer)
         const payload = {
           id: movedId,
@@ -375,7 +412,6 @@ const CollectionSort = {
     this.sortables = []
 
     collectionSortContainers(this.el).forEach((el) => {
-      if (el.dataset.readonly === "true") return
       if (this.sortables.some((sortable) => sortable.el === el)) return
 
       this.sortables.push(this.createCollectionSortable(el))

@@ -704,7 +704,7 @@ defmodule LinksWeb.DashboardLiveTest do
       refute has_element?(lv, "#nested-zone-#{source.id}[phx-hook=\"BookmarkSort\"]")
     end
 
-    test "read-only shared collections omit nested collection sort zones", %{conn: conn} do
+    test "read-only shared collections keep nested collection zones copy-only", %{conn: conn} do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()
       parent = collection_fixture(owner_scope, %{title: "Shared Parent"})
@@ -721,8 +721,8 @@ defmodule LinksWeb.DashboardLiveTest do
       |> element("#collection-#{mount.id} > details > summary")
       |> render_click()
 
-      assert has_element?(lv, "#collections-zone-#{parent.id}")
-      refute has_element?(lv, "#collections-zone-#{parent.id}[data-collection-sortable]")
+      assert has_element?(lv, "#collections-zone-#{parent.id}[data-collection-sortable]")
+      assert has_element?(lv, "#collections-zone-#{parent.id}[data-readonly=\"true\"]")
     end
 
     test "shows total bookmark counts including sub-collections", %{conn: conn} do
@@ -1360,6 +1360,40 @@ defmodule LinksWeb.DashboardLiveTest do
       refute html =~ "Shared To Remove"
       assert Collections.get_collection!(source.id).title == "Shared To Remove"
       refute Repo.get(Collection, mount.id)
+    end
+
+    test "editable collaborator can delete a nested collection inside a shared collection", %{
+      conn: conn
+    } do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared Root"})
+
+      child =
+        collection_fixture(owner_scope, %{title: "Nested Folder", parent_id: source.id})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, false)
+
+      conn = log_in_user(conn, collaborator)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv = open_collection_details(lv, child.id)
+
+      assert has_element?(lv, "#delete-collection-button", "Delete")
+
+      lv
+      |> element("#delete-collection-button")
+      |> render_click()
+
+      lv
+      |> element("#delete-collection-confirm-button")
+      |> render_click()
+
+      html = render(lv)
+      refute html =~ "Nested Folder"
+      assert html =~ "Shared Root"
+      assert Collections.get_collection!(source.id).title == "Shared Root"
     end
 
     test "canceling collection delete confirmation keeps the collection", %{conn: conn} do

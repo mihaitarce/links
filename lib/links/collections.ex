@@ -215,18 +215,29 @@ defmodule Links.Collections do
   end
 
   defp delete_owned_collection(%Scope{} = scope, %Collection{} = collection) do
-    if collection.owner_id == scope.user.id and is_nil(collection.collaboration_id) do
+    if deletable_collection?(scope, collection) do
       collection_id = collection.id
       parent_id = collection.parent_id
+      owner_id = collection.owner_id
 
       with {:ok, collection} <- Repo.delete(collection) do
         broadcast_collection_changed(collection_id)
         broadcast_collection_changed(parent_id)
+
+        if owner_id != scope.user.id do
+          broadcast_user_collections_changed(owner_id)
+        end
+
         {:ok, collection}
       end
     else
       {:error, :unauthorized}
     end
+  end
+
+  defp deletable_collection?(%Scope{} = scope, %Collection{} = collection) do
+    is_nil(collection.collaboration_id) and
+      (collection.owner_id == scope.user.id or can_edit_collection?(scope, collection.id))
   end
 
   defp delete_collaboration_mount(%Scope{} = scope, %Collection{} = mount) do
@@ -350,6 +361,7 @@ defmodule Links.Collections do
     collection = get_collection!(collection_id)
     parent_id = normalize_reorder_parent_id(parent_id)
     ordered_ids = Enum.map(ordered_ids, &to_integer/1)
+    {collection, ordered_ids} = normalize_collection_copy_source(collection, ordered_ids)
 
     with :ok <- validate_collection_copy(scope, collection, parent_id, ordered_ids) do
       Multi.new()
@@ -1251,11 +1263,35 @@ defmodule Links.Collections do
   end
 
   defp validate_collection_copy(scope, %Collection{} = collection, parent_id, ordered_ids) do
-    if collaboration_mount?(collection) do
-      {:error, :unauthorized}
+    normalized_parent = normalize_reorder_parent_id(parent_id)
+
+    with :ok <- ensure_moved_in_order(collection, ordered_ids),
+         true <- can_take_collection?(scope, collection),
+         true <- drop_target_editable?(scope, normalized_parent) do
+      :ok
     else
-      validate_collection_move(scope, collection, parent_id, ordered_ids)
+      false -> {:error, :unauthorized}
+      {:error, reason} -> {:error, reason}
     end
+  end
+
+  defp normalize_collection_copy_source(%Collection{collaboration_id: id} = mount, ordered_ids)
+       when not is_nil(id) do
+    source = Repo.get!(Collection, id)
+
+    ordered_ids =
+      Enum.map(ordered_ids, fn
+        collection_id when collection_id == mount.id -> source.id
+        collection_id -> collection_id
+      end)
+
+    {source, ordered_ids}
+  end
+
+  defp normalize_collection_copy_source(collection, ordered_ids), do: {collection, ordered_ids}
+
+  defp can_take_collection?(%Scope{} = scope, %Collection{} = collection) do
+    user_owned_collection?(scope, collection) or can_view_collection?(scope, collection.id)
   end
 
   defp validate_collection_move(scope, %Collection{} = collection, parent_id, ordered_ids) do
