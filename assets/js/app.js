@@ -35,6 +35,12 @@ const sidebarRoot = (el) => el.closest("#bookmarks-sidebar") || el
 
 const collectionSortContainers = (root) => root.querySelectorAll("[data-collection-sortable]")
 
+const collectionAcceptsDrops = (collection) => collection?.dataset.readonly !== "true"
+
+const isCollaborationMount = (collection) => collection?.dataset.collaborationMount === "true"
+
+const sortZoneAcceptsCollections = (zone) => zone?.dataset.readonly !== "true"
+
 const CollectionSort = {
   mounted() {
     this.sortables = []
@@ -59,6 +65,8 @@ const CollectionSort = {
     return this.el.querySelectorAll("li[id^='collection-']")
   },
   setDropHighlight(collection) {
+    if (!collectionAcceptsDrops(collection)) return
+
     const summary = collection.querySelector("details > summary")
 
     if (this.dropTarget === summary) return
@@ -218,14 +226,26 @@ const CollectionSort = {
       animation: 150,
       draggable: "> li[id^='collection-']",
       handle: "li[id^='collection-'] > details > summary",
-      filter: "button, input, textarea, select, a, #collections-empty-state",
+      filter: "button, input, textarea, select, a, #collections-empty-state, .collection-sort-disabled",
       preventOnFilter: true,
       fallbackOnBody: true,
       swapThreshold: 0.4,
       invertSwap: true,
+      onMove(event) {
+        const {dragged, to} = event
+
+        if (isCollaborationMount(dragged) && to.dataset.parentId !== "root") {
+          return false
+        }
+
+        return sortZoneAcceptsCollections(to)
+      },
       onStart(event) {
         hook.draggedItem = event.item
-        hook.bindDropHighlight()
+
+        if (!isCollaborationMount(event.item)) {
+          hook.bindDropHighlight()
+        }
       },
       onEnd(event) {
         const nestTarget = hook.nestTargetCollection
@@ -238,6 +258,8 @@ const CollectionSort = {
         hook.draggedItem = null
 
         if (nestTarget && nestTarget !== event.item) {
+          if (!collectionAcceptsDrops(nestTarget) || isCollaborationMount(event.item)) return
+
           hook.ensureNestTargetExpanded(nestTarget)
           hook.pushNestMove(hook, movedId, nestTarget)
           return
@@ -307,6 +329,8 @@ const BookmarkSort = {
     return this.sidebar().querySelectorAll("li[id^='collection-']")
   },
   setDropHighlight(collection) {
+    if (!collectionAcceptsDrops(collection)) return
+
     const summary = collection.querySelector("details > summary")
 
     if (this.dropTarget === summary) return
@@ -439,6 +463,8 @@ const BookmarkSort = {
     }
   },
   pushBookmarkNestMove(hook, movedId, targetCollection) {
+    if (!collectionAcceptsDrops(targetCollection)) return
+
     const collectionId = targetCollection.dataset.bookmarkCollectionId
     const bookmarkIds = hook.bookmarkIdsInCollection(targetCollection).filter((id) => id !== movedId)
 
@@ -469,6 +495,9 @@ const BookmarkSort = {
       filter: "input, textarea, select, a, label, #inbox-empty-state",
       preventOnFilter: true,
       fallbackOnBody: true,
+      onMove(event) {
+        return event.to.dataset.readonly !== "true"
+      },
       onStart() {
         hook.bindDropHighlight()
       },
@@ -477,6 +506,11 @@ const BookmarkSort = {
         const movedId = event.item.id.replace("bookmark-", "")
 
         if (targetCollection) {
+          if (!collectionAcceptsDrops(targetCollection)) {
+            hook.finishDrag(hook)
+            return
+          }
+
           hook.finishDrag(hook)
           hook.ensureDropTargetExpanded(targetCollection)
           hook.pushBookmarkNestMove(hook, movedId, targetCollection)

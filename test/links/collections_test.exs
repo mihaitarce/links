@@ -194,7 +194,7 @@ defmodule Links.CollectionsTest do
       assert Collections.get_collection!(own.id).position == 1
     end
 
-    test "collaborators can reorder children inside read-only shared collections" do
+    test "collaborators cannot reorder children inside read-only shared collections" do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()
       parent = collection_fixture(owner_scope, %{title: "Shared Parent"})
@@ -210,14 +210,85 @@ defmodule Links.CollectionsTest do
 
       collaborator_scope = user_scope_fixture(collaborator)
 
-      assert {:ok, :reordered} =
+      assert {:error, :unauthorized} =
                Collections.reorder_collections(collaborator_scope, parent.id, [
                  second.id,
                  first.id
                ])
+    end
 
-      assert Collections.get_collection!(second.id).position == 0
-      assert Collections.get_collection!(first.id).position == 1
+    test "collaborators cannot nest shared collection mounts" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Shared"})
+      parent = collection_fixture(user_scope_fixture(collaborator), %{title: "Mine"})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:error, :unauthorized} =
+               Collections.move_collection(collaborator_scope, mount.id, parent.id, [mount.id])
+    end
+
+    test "read-only shared collections reject nested collections" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      shared = collection_fixture(owner_scope, %{title: "Shared"})
+      own = collection_fixture(user_scope_fixture(collaborator), %{title: "Mine"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, shared, collaborator.email, true)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:error, :unauthorized} =
+               Collections.move_collection(collaborator_scope, own.id, shared.id, [own.id])
+    end
+
+    test "editable shared collections accept the collaborator's own collections" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      shared = collection_fixture(owner_scope, %{title: "Shared"})
+      own = collection_fixture(user_scope_fixture(collaborator), %{title: "Mine"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, shared, collaborator.email, false)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:ok, :moved} =
+               Collections.move_collection(collaborator_scope, own.id, shared.id, [own.id])
+
+      assert Collections.get_collection!(own.id).parent_id == shared.id
+    end
+
+    test "read-only shared collections reject incoming bookmarks" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      shared = collection_fixture(owner_scope, %{title: "Shared"})
+      target = collection_fixture(user_scope_fixture(collaborator), %{title: "Saved"})
+
+      assert {:ok, _mount} =
+               Collections.create_collaboration(owner_scope, shared, collaborator.email, true)
+
+      {:ok, bookmark} =
+        Collections.create_bookmark(owner_scope, %{
+          title: "Shared link",
+          url: "https://example.com/shared",
+          collection_id: shared.id
+        })
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:error, :unauthorized} =
+               Collections.move_bookmark(collaborator_scope, bookmark.id, shared.id, [bookmark.id])
+
+      assert {:ok, moved} =
+               Collections.move_bookmark(collaborator_scope, bookmark.id, target.id, [bookmark.id])
+
+      assert moved.collection_id == target.id
     end
 
     test "moves bookmarks between collections" do

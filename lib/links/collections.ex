@@ -1069,7 +1069,44 @@ defmodule Links.Collections do
     if can_edit_collection?(scope, collection_id), do: :ok, else: {:error, :unauthorized}
   end
 
-  defp authorize_bookmark_move(_scope, _bookmark, _collection_id), do: :ok
+  defp authorize_bookmark_move(scope, bookmark, collection_id) do
+    target_id = normalize_collection_id(collection_id)
+
+    if same_bookmark_location?(bookmark.collection_id, target_id) do
+      authorize_bookmark_reorder(scope, bookmark)
+    else
+      authorize_bookmark_transfer(scope, bookmark, target_id)
+    end
+  end
+
+  defp authorize_bookmark_reorder(%Scope{} = scope, %Bookmark{} = bookmark) do
+    if can_edit_bookmark?(scope, bookmark), do: :ok, else: {:error, :unauthorized}
+  end
+
+  defp authorize_bookmark_transfer(%Scope{} = scope, %Bookmark{} = bookmark, target_id) do
+    with true <- can_take_bookmark?(scope, bookmark),
+         :ok <- authorize_bookmark_target(scope, target_id) do
+      :ok
+    else
+      _ -> {:error, :unauthorized}
+    end
+  end
+
+  defp can_take_bookmark?(%Scope{} = scope, %Bookmark{collection_id: nil} = bookmark) do
+    bookmark.created_by_id == scope.user.id
+  end
+
+  defp can_take_bookmark?(%Scope{} = scope, %Bookmark{} = bookmark) do
+    can_edit_bookmark?(scope, bookmark) or can_view_bookmark?(scope, bookmark)
+  end
+
+  defp authorize_bookmark_target(_scope, nil), do: :ok
+
+  defp authorize_bookmark_target(%Scope{} = scope, collection_id) do
+    if can_edit_collection?(scope, collection_id), do: :ok, else: {:error, :unauthorized}
+  end
+
+  defp same_bookmark_location?(left, right), do: left == right
 
   defp authorize_bookmark_copy(scope, bookmark, collection_id) do
     with true <- can_view_bookmark?(scope, bookmark),
@@ -1151,12 +1188,70 @@ defmodule Links.Collections do
     end
   end
 
-  defp validate_collection_move(_scope, %Collection{} = collection, _parent_id, ordered_ids) do
-    if collection.id in ordered_ids do
+  defp validate_collection_move(scope, %Collection{} = collection, parent_id, ordered_ids) do
+    with :ok <- ensure_moved_in_order(collection, ordered_ids),
+         :ok <- authorize_collection_move(scope, collection, parent_id) do
+      :ok
+    end
+  end
+
+  defp ensure_moved_in_order(%Collection{} = collection, ordered_ids) do
+    if collection.id in ordered_ids, do: :ok, else: {:error, :invalid_order}
+  end
+
+  defp authorize_collection_move(%Scope{} = scope, %Collection{} = collection, parent_id) do
+    normalized_parent = normalize_reorder_parent_id(parent_id)
+
+    cond do
+      not can_reorder_collection?(scope, collection.id) ->
+        {:error, :unauthorized}
+
+      collaboration_mount?(collection) and not is_nil(normalized_parent) ->
+        {:error, :unauthorized}
+
+      collection.parent_id != normalized_parent ->
+        authorize_collection_reparent(scope, collection, normalized_parent)
+
+      true ->
+        authorize_collection_sibling_reorder(scope, collection, normalized_parent)
+    end
+  end
+
+  defp authorize_collection_reparent(%Scope{} = scope, %Collection{} = collection, parent_id) do
+    if user_owned_collection?(scope, collection) and drop_target_editable?(scope, parent_id) do
       :ok
     else
-      {:error, :invalid_order}
+      {:error, :unauthorized}
     end
+  end
+
+  defp authorize_collection_sibling_reorder(
+         %Scope{} = scope,
+         %Collection{} = collection,
+         parent_id
+       ) do
+    cond do
+      collaboration_mount?(collection) and is_nil(parent_id) ->
+        :ok
+
+      user_owned_collection?(scope, collection) and drop_target_editable?(scope, parent_id) ->
+        :ok
+
+      true ->
+        {:error, :unauthorized}
+    end
+  end
+
+  defp drop_target_editable?(_scope, nil), do: true
+
+  defp drop_target_editable?(scope, parent_id), do: can_edit_collection?(scope, parent_id)
+
+  defp user_owned_collection?(%Scope{} = scope, %Collection{} = collection) do
+    collection.owner_id == scope.user.id and is_nil(collection.collaboration_id)
+  end
+
+  defp collaboration_mount?(%Collection{} = collection) do
+    not is_nil(collection.collaboration_id)
   end
 
   defp reject_cycle(_collection_id, nil), do: :ok

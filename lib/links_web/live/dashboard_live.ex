@@ -557,6 +557,8 @@ defmodule LinksWeb.DashboardLive do
       data-bookmark-collection-id={@effective.id}
       data-readonly={to_string(@node.readonly || false)}
       data-revoked={to_string(@node.revoked || false)}
+      data-collaboration-mount={to_string(@collaboration_mount? || false)}
+      class={@node.readonly && !@collaboration_mount? && "collection-sort-disabled"}
     >
       <details open={@expanded}>
         <summary
@@ -601,6 +603,7 @@ defmodule LinksWeb.DashboardLive do
           id={"collections-zone-#{@effective.id}"}
           data-collection-sortable
           data-parent-id={@effective.id}
+          data-readonly={to_string(@node.readonly || false)}
         >
           <.tree_node
             :for={child <- @node.children}
@@ -616,6 +619,7 @@ defmodule LinksWeb.DashboardLive do
           id={"nested-zone-#{@effective.id}"}
           phx-hook="BookmarkSort"
           data-collection-id={@effective.id}
+          data-readonly={to_string(@node.readonly || false)}
           class={@node.bookmarks == [] && "collection-bookmark-drop-hidden"}
         >
           <.bookmark_menu_link
@@ -1179,6 +1183,9 @@ defmodule LinksWeb.DashboardLive do
       {:error, :invalid_order} ->
         {:noreply, put_flash(socket, :error, "Could not reorder bookmarks")}
 
+      {:error, :unauthorized} ->
+        {:noreply, put_flash(socket, :error, "You do not have permission to move this link")}
+
       {:error, _} ->
         {:noreply, put_flash(socket, :error, "Could not move bookmark")}
     end
@@ -1200,6 +1207,10 @@ defmodule LinksWeb.DashboardLive do
 
       {:error, :invalid_order} ->
         {:noreply, put_flash(socket, :error, "Could not reorder collections")}
+
+      {:error, :unauthorized} ->
+        {:noreply,
+         put_flash(socket, :error, "You do not have permission to move this collection")}
 
       {:error, _} ->
         {:noreply, put_flash(socket, :error, "Could not move collection")}
