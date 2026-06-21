@@ -602,6 +602,28 @@ defmodule LinksWeb.DashboardLiveTest do
 
       assert has_element?(lv, "#nested-zone-#{source.id}")
       assert has_element?(lv, "#bookmark-#{bookmark.id}")
+      refute has_element?(lv, "#nested-zone-#{source.id}[phx-hook=\"BookmarkSort\"]")
+    end
+
+    test "read-only shared collections omit nested collection sort zones", %{conn: conn} do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      parent = collection_fixture(owner_scope, %{title: "Shared Parent"})
+
+      collection_fixture(owner_scope, %{title: "Child", parent_id: parent.id})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, parent, collaborator.email, true)
+
+      conn = log_in_user(conn, collaborator)
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv
+      |> element("#collection-#{mount.id} > details > summary")
+      |> render_click()
+
+      assert has_element?(lv, "#collections-zone-#{parent.id}")
+      refute has_element?(lv, "#collections-zone-#{parent.id}[data-collection-sortable]")
     end
 
     test "shows total bookmark counts including sub-collections", %{conn: conn} do

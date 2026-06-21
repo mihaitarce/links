@@ -194,6 +194,23 @@ defmodule Links.CollectionsTest do
       assert Collections.get_collection!(own.id).position == 1
     end
 
+    test "collaborators cannot nest revoked shared collection mounts" do
+      owner_scope = user_scope_fixture()
+      collaborator = user_fixture()
+      source = collection_fixture(owner_scope, %{title: "Revoked Shared"})
+      parent = collection_fixture(user_scope_fixture(collaborator), %{title: "Mine"})
+
+      assert {:ok, mount} =
+               Collections.create_collaboration(owner_scope, source, collaborator.email, true)
+
+      assert {:ok, mount} = Collections.revoke_collaboration(owner_scope, mount)
+
+      collaborator_scope = user_scope_fixture(collaborator)
+
+      assert {:error, :unauthorized} =
+               Collections.move_collection(collaborator_scope, mount.id, parent.id, [mount.id])
+    end
+
     test "collaborators cannot reorder children inside read-only shared collections" do
       owner_scope = user_scope_fixture()
       collaborator = user_fixture()

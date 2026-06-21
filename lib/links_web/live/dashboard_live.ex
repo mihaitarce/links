@@ -549,6 +549,11 @@ defmodule LinksWeb.DashboardLive do
         :collaboration_mount?,
         Collections.active_collaboration_mount?(assigns.node.collection)
       )
+      |> assign(
+        :root_only_mount?,
+        Collections.active_collaboration_mount?(assigns.node.collection) or
+          Collections.revoked_collaboration_mount?(assigns.node.collection)
+      )
 
     ~H"""
     <li
@@ -557,8 +562,7 @@ defmodule LinksWeb.DashboardLive do
       data-bookmark-collection-id={@effective.id}
       data-readonly={to_string(@node.readonly || false)}
       data-revoked={to_string(@node.revoked || false)}
-      data-collaboration-mount={to_string(@collaboration_mount? || false)}
-      class={@node.readonly && !@collaboration_mount? && "collection-sort-disabled"}
+      data-collaboration-mount={to_string(@root_only_mount? || false)}
     >
       <details open={@expanded}>
         <summary
@@ -601,9 +605,9 @@ defmodule LinksWeb.DashboardLive do
         <ul
           :if={@node.children != []}
           id={"collections-zone-#{@effective.id}"}
-          data-collection-sortable
           data-parent-id={@effective.id}
           data-readonly={to_string(@node.readonly || false)}
+          data-collection-sortable={(!@node.readonly && "") || nil}
         >
           <.tree_node
             :for={child <- @node.children}
@@ -617,7 +621,7 @@ defmodule LinksWeb.DashboardLive do
         </ul>
         <ul
           id={"nested-zone-#{@effective.id}"}
-          phx-hook="BookmarkSort"
+          phx-hook={(!@node.readonly && "BookmarkSort") || nil}
           data-collection-id={@effective.id}
           data-readonly={to_string(@node.readonly || false)}
           class={@node.bookmarks == [] && "collection-bookmark-drop-hidden"}

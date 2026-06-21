@@ -41,6 +41,70 @@ const isCollaborationMount = (collection) => collection?.dataset.collaborationMo
 
 const sortZoneAcceptsCollections = (zone) => zone?.dataset.readonly !== "true"
 
+const revertAutoExpandedCollections = (root, autoExpandedIds) => {
+  for (const id of autoExpandedIds) {
+    const collection = root.querySelector(`#collection-${id}`)
+    const details = collection?.querySelector(":scope > details") || collection?.querySelector("details")
+
+    if (details) details.open = false
+  }
+}
+
+const sortableSpillOptions = (hook) => ({
+  revertOnSpill: false,
+  removeOnSpill: false,
+  onSpill() {
+    hook.spilled = true
+  },
+})
+
+const bookmarkSpillOptions = (hook) => ({
+  revertOnSpill: true,
+  removeOnSpill: false,
+  onSpill() {
+    hook.spilled = true
+  },
+})
+
+const revertSortableItem = ({item, from, oldIndex}) => {
+  if (!from || !item) return
+
+  const sibling = from.children[oldIndex]
+
+  if (item.parentNode === from && sibling === item) return
+
+  from.insertBefore(item, sibling || null)
+}
+
+const finishCollectionDragUi = (hook, {spilled = false} = {}) => {
+  hook.unbindDropHighlight()
+  hook.clearExpandTimer()
+
+  if (spilled) {
+    revertAutoExpandedCollections(hook.el, hook.autoExpandedIds)
+    hook.autoExpandedIds.clear()
+  } else {
+    hook.syncAutoExpandedCollections()
+  }
+
+  hook.clearDropHighlight()
+  hook.draggedItem = null
+}
+
+const finishBookmarkDragUi = (hook, {spilled = false} = {}) => {
+  hook.unbindDropHighlight()
+  hook.clearExpandTimer()
+
+  if (spilled) {
+    revertAutoExpandedCollections(hook.sidebar(), hook.autoExpandedIds)
+    hook.autoExpandedIds.clear()
+  } else {
+    hook.syncAutoExpandedCollections()
+  }
+
+  hook.clearDropHighlight()
+}
+
 const CollectionSort = {
   mounted() {
     this.sortables = []
@@ -127,6 +191,7 @@ const CollectionSort = {
     if (collectionId) this.autoExpandedIds.add(collectionId)
 
     collectionSortContainers(this.el).forEach((el) => {
+      if (el.dataset.readonly === "true") return
       if (this.sortables.some((sortable) => sortable.el === el)) return
 
       this.sortables.push(this.createCollectionSortable(el))
@@ -226,11 +291,12 @@ const CollectionSort = {
       animation: 150,
       draggable: "> li[id^='collection-']",
       handle: "li[id^='collection-'] > details > summary",
-      filter: "button, input, textarea, select, a, #collections-empty-state, .collection-sort-disabled",
+      filter: "button, input, textarea, select, a, #collections-empty-state",
       preventOnFilter: true,
       fallbackOnBody: true,
       swapThreshold: 0.4,
       invertSwap: true,
+      ...sortableSpillOptions(hook),
       onMove(event) {
         const {dragged, to} = event
 
@@ -241,6 +307,7 @@ const CollectionSort = {
         return sortZoneAcceptsCollections(to)
       },
       onStart(event) {
+        hook.spilled = false
         hook.draggedItem = event.item
 
         if (!isCollaborationMount(event.item)) {
@@ -248,22 +315,31 @@ const CollectionSort = {
         }
       },
       onEnd(event) {
+        const spilled = hook.spilled
+        hook.spilled = false
         const nestTarget = hook.nestTargetCollection
         const movedId = event.item.id.replace("collection-", "")
 
-        hook.unbindDropHighlight()
-        hook.clearExpandTimer()
-        hook.syncAutoExpandedCollections()
-        hook.clearDropHighlight()
-        hook.draggedItem = null
-
         if (nestTarget && nestTarget !== event.item) {
-          if (!collectionAcceptsDrops(nestTarget) || isCollaborationMount(event.item)) return
+          if (!collectionAcceptsDrops(nestTarget) || isCollaborationMount(event.item)) {
+            revertSortableItem(event)
+            finishCollectionDragUi(hook, {spilled: true})
+            return
+          }
 
+          finishCollectionDragUi(hook)
           hook.ensureNestTargetExpanded(nestTarget)
           hook.pushNestMove(hook, movedId, nestTarget)
           return
         }
+
+        if (spilled) {
+          revertSortableItem(event)
+          finishCollectionDragUi(hook, {spilled: true})
+          return
+        }
+
+        finishCollectionDragUi(hook)
 
         if (event.from === event.to && event.oldIndex === event.newIndex) return
 
@@ -282,6 +358,7 @@ const CollectionSort = {
     this.sortables = []
 
     collectionSortContainers(this.el).forEach((el) => {
+      if (el.dataset.readonly === "true") return
       if (this.sortables.some((sortable) => sortable.el === el)) return
 
       this.sortables.push(this.createCollectionSortable(el))
@@ -479,14 +556,13 @@ const BookmarkSort = {
       .filter((child) => child.id?.startsWith("bookmark-"))
       .map((child) => child.id.replace("bookmark-", ""))
   },
-  finishDrag(hook) {
-    hook.unbindDropHighlight()
-    hook.clearExpandTimer()
-    hook.syncAutoExpandedCollections()
-    hook.clearDropHighlight()
+  finishDrag(hook, {spilled = false} = {}) {
+    finishBookmarkDragUi(hook, {spilled})
   },
   initSortable() {
     const hook = this
+
+    if (this.el.dataset.readonly === "true") return
 
     this.sortable = new Sortable(this.el, {
       group: BOOKMARKS_GROUP,
@@ -495,25 +571,35 @@ const BookmarkSort = {
       filter: "input, textarea, select, a, label, #inbox-empty-state",
       preventOnFilter: true,
       fallbackOnBody: true,
+      ...bookmarkSpillOptions(hook),
       onMove(event) {
         return event.to.dataset.readonly !== "true"
       },
       onStart() {
+        hook.spilled = false
         hook.bindDropHighlight()
       },
       onEnd(event) {
+        const spilled = hook.spilled
+        hook.spilled = false
         const targetCollection = hook.dropTargetCollection
         const movedId = event.item.id.replace("bookmark-", "")
 
         if (targetCollection) {
           if (!collectionAcceptsDrops(targetCollection)) {
-            hook.finishDrag(hook)
+            revertSortableItem(event)
+            hook.finishDrag(hook, {spilled: true})
             return
           }
 
           hook.finishDrag(hook)
           hook.ensureDropTargetExpanded(targetCollection)
           hook.pushBookmarkNestMove(hook, movedId, targetCollection)
+          return
+        }
+
+        if (spilled) {
+          hook.finishDrag(hook, {spilled: true})
           return
         }
 

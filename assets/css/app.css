@@ -41,7 +41,8 @@
    padding-inline-end: 0.75rem;
 }
 
-#bookmarks-sidebar li[id^="collection-"] > details > summary {
+#bookmarks-sidebar li[id^="collection-"]:not([data-readonly="true"]) > details > summary,
+#bookmarks-sidebar li[id^="collection-"][data-collaboration-mount="true"] > details > summary {
   cursor: grab;
 }
 
@@ -55,7 +56,7 @@
   border-radius: var(--radius-field);
 }
 
-#bookmarks-sidebar li[id^="bookmark-"] {
+#bookmarks-sidebar li[id^="bookmark-"]:not([data-readonly="true"]) {
   cursor: grab;
 }
 
