@@ -48,3 +48,14 @@
 #collections-zone-root li[id^="collection-"].sortable-chosen > details > summary {
   cursor: grabbing;
 }
+
+#collections-zone-root li[id^="collection-"] > details > summary.collection-drop-target {
+  background-color: color-mix(in oklch, var(--color-primary) 12%, transparent);
+  box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--color-primary) 30%, transparent);
+  border-radius: var(--radius-field);
+}
+
+.sortable-drag,
+.sortable-fallback {
+  pointer-events: none;
+}

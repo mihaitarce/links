@@ -26,8 +26,14 @@ import {hooks as colocatedHooks} from "phoenix-colocated/links"
 import Sortable from "sortablejs"
 import topbar from "../vendor/topbar"
 
+const DROP_HIGHLIGHT_CLASS = "collection-drop-target"
+
 const RootCollectionSort = {
   mounted() {
+    this.dropTarget = null
+    this.draggedItem = null
+    this.onCollectionEnter = this.onCollectionEnter.bind(this)
+    this.onCollectionLeave = this.onCollectionLeave.bind(this)
     this.initSortable()
   },
   updated() {
@@ -37,7 +43,58 @@ const RootCollectionSort = {
   destroyed() {
     this.destroySortable()
   },
+  rootCollections() {
+    return Array.from(this.el.children).filter((child) => child.id?.startsWith("collection-"))
+  },
+  setDropHighlight(collection) {
+    const summary = collection.querySelector("details > summary")
+
+    if (this.dropTarget === summary) return
+
+    this.clearDropHighlight()
+
+    if (summary) {
+      summary.classList.add(DROP_HIGHLIGHT_CLASS)
+      this.dropTarget = summary
+    }
+  },
+  clearDropHighlight() {
+    if (this.dropTarget) {
+      this.dropTarget.classList.remove(DROP_HIGHLIGHT_CLASS)
+      this.dropTarget = null
+    }
+  },
+  onCollectionEnter(event) {
+    const collection = event.currentTarget
+
+    if (collection !== this.draggedItem) {
+      this.setDropHighlight(collection)
+    }
+  },
+  onCollectionLeave(event) {
+    const summary = event.currentTarget.querySelector("details > summary")
+
+    if (this.dropTarget === summary) {
+      this.clearDropHighlight()
+    }
+  },
+  bindDropHighlight() {
+    this.rootCollections().forEach((collection) => {
+      if (collection === this.draggedItem) return
+
+      collection.addEventListener("dragenter", this.onCollectionEnter)
+      collection.addEventListener("dragleave", this.onCollectionLeave)
+    })
+  },
+  unbindDropHighlight() {
+    this.rootCollections().forEach((collection) => {
+      collection.removeEventListener("dragenter", this.onCollectionEnter)
+      collection.removeEventListener("dragleave", this.onCollectionLeave)
+    })
+  },
   initSortable() {
+    const hook = this
+
     this.sortable = new Sortable(this.el, {
       animation: 150,
       draggable: "> li[id^='collection-']",
@@ -45,9 +102,17 @@ const RootCollectionSort = {
       filter: "button, input, textarea, select, a, #collections-empty-state",
       preventOnFilter: true,
       fallbackOnBody: true,
-      swapThreshold: 0.3,
+      swapThreshold: 0.4,
       invertSwap: true,
-      onEnd: (event) => {
+      onStart(event) {
+        hook.draggedItem = event.item
+        hook.bindDropHighlight()
+      },
+      onEnd(event) {
+        hook.unbindDropHighlight()
+        hook.clearDropHighlight()
+        hook.draggedItem = null
+
         if (event.from !== event.to || event.oldIndex === event.newIndex) return
 
         const movedId = event.item.id.replace("collection-", "")
@@ -55,15 +120,19 @@ const RootCollectionSort = {
           .filter((child) => child.id?.startsWith("collection-"))
           .map((child) => child.id.replace("collection-", ""))
 
-        this.pushEvent("move_collection", {
+        hook.pushEvent("move_collection", {
           id: movedId,
-          parent_id: this.el.dataset.parentId,
+          parent_id: hook.el.dataset.parentId,
           ordered_ids: orderedIds,
         })
       },
     })
   },
   destroySortable() {
+    this.unbindDropHighlight()
+    this.clearDropHighlight()
+    this.draggedItem = null
+
     if (this.sortable) {
       this.sortable.destroy()
       this.sortable = null
